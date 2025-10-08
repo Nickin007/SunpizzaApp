@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:go_router/go_router.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/work_order_card.dart';
+import '../../services/work_order_service.dart';
+import 'create_work_order_screen.dart';
+import 'work_order_detail_screen.dart';
 
 /// 店务中心 - 工单任务中心
 class WorkOrderCenterScreen extends StatefulWidget {
@@ -19,8 +21,18 @@ class _WorkOrderCenterScreenState extends State<WorkOrderCenterScreen>
   late Map<String, RefreshController> _refreshControllers;
   late Map<String, List<Map<String, dynamic>>> _workOrdersData;
   late Map<String, int> _currentPages;
+  late Map<String, bool> _hasMore; // 是否还有更多数据
   
-  final List<String> _tabs = ['待受理', '进行中', '已完成', '已关闭'];
+  final List<String> _tabs = ['待受理', '进行中', '已完成', '已归档'];
+  final WorkOrderService _workOrderService = WorkOrderService();
+  
+  // 状态名称到 ID 的映射
+  final Map<String, int> _statusMap = {
+    '待受理': 1,
+    '进行中': 2,
+    '已完成': 3,
+    '已归档': 4,
+  };
   
   @override
   void initState() {
@@ -31,11 +43,13 @@ class _WorkOrderCenterScreenState extends State<WorkOrderCenterScreen>
     _refreshControllers = {};
     _workOrdersData = {};
     _currentPages = {};
+    _hasMore = {};
     
     for (var tab in _tabs) {
       _refreshControllers[tab] = RefreshController();
       _workOrdersData[tab] = [];
       _currentPages[tab] = 1;
+      _hasMore[tab] = true;
     }
     
     // 初始加载数据
@@ -57,41 +71,84 @@ class _WorkOrderCenterScreenState extends State<WorkOrderCenterScreen>
   Future<void> _loadData(String status, {bool isRefresh = false}) async {
     if (isRefresh) {
       _currentPages[status] = 1;
+      _hasMore[status] = true;
     } else {
+      if (!_hasMore[status]!) {
+        _refreshControllers[status]!.loadNoData();
+        return;
+      }
       _currentPages[status] = _currentPages[status]! + 1;
     }
     
-    // TODO: 从 API 加载数据
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    // 模拟数据 - 每个状态只显示 1 条示例
-    final newOrders = isRefresh ? [
-      {
-        'id': _tabs.indexOf(status) + 1,
-        'title': '【${_getExampleType(status)}】$status示例工单',
-        'type': _getExampleType(status),
-        'priority': _getExamplePriority(status),
-        'dueDate': '2025-10-${15 + _tabs.indexOf(status)}',
-        'creator': '${_getExampleCreator(status)}',
-      }
-    ] : <Map<String, dynamic>>[];
-    
-    setState(() {
+    try {
+      // 调用真实的 API
+      final statusId = _statusMap[status]!;
+      final page = _currentPages[status]!;
+      
+      final response = await _workOrderService.getWorkOrders(
+        statusId: statusId,
+        page: page,
+        perPage: 20,
+      );
+      
+      // 解析返回数据
+      final newOrders = (response['items'] as List)
+          .map((item) => {
+                'id': item['id'],
+                'title': item['title'],
+                'type': item['type']?['type_name'] ?? '未知类型',
+                'priority': item['priority']?['priority_name'] ?? '中',
+                'status': item['status']?['status_name'] ?? '待受理',
+                'dueDate': item['due_date']?.toString().substring(0, 10) ?? '',
+                'creator': item['creator']?['real_name'] ?? '未知',
+                'shopName': item['shop']?['name'] ?? '',
+                'createdAt': item['created_at']?.toString().substring(0, 10) ?? '',
+              })
+          .toList();
+      
+      // 判断是否还有更多数据
+      final pagination = response['pagination'];
+      final currentPage = pagination['page'];
+      final totalPages = pagination['pages'];
+      _hasMore[status] = currentPage < totalPages;
+      
+      setState(() {
+        if (isRefresh) {
+          _workOrdersData[status] = newOrders;
+        } else {
+          _workOrdersData[status]!.addAll(newOrders);
+        }
+      });
+      
+      // 更新 RefreshController 状态
       if (isRefresh) {
-        _workOrdersData[status] = newOrders;
+        _refreshControllers[status]!.refreshCompleted();
       } else {
-        _workOrdersData[status]!.addAll(newOrders);
+        if (_hasMore[status]!) {
+          _refreshControllers[status]!.loadComplete();
+        } else {
+          _refreshControllers[status]!.loadNoData();
+        }
       }
-    });
-    
-    // 更新 RefreshController 状态
-    if (isRefresh) {
-      _refreshControllers[status]!.refreshCompleted();
-      // 示例数据已经全部加载，没有更多数据
-      _refreshControllers[status]!.loadNoData();
-    } else {
-      // 上拉加载时，直接提示没有更多数据
-      _refreshControllers[status]!.loadNoData();
+    } catch (e) {
+      print('加载工单列表失败: $e');
+      
+      // 更新 RefreshController 状态
+      if (isRefresh) {
+        _refreshControllers[status]!.refreshFailed();
+      } else {
+        _refreshControllers[status]!.loadFailed();
+      }
+      
+      // 显示错误提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('加载失败: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -105,22 +162,20 @@ class _WorkOrderCenterScreenState extends State<WorkOrderCenterScreen>
           preferredSize: Size.fromHeight(48.h),
           child: Container(
             color: AppColors.surface,
-            child:             TabBar(
+            child: TabBar(
               controller: _tabController,
-              isScrollable: true,
               labelColor: AppColors.primary,
               unselectedLabelColor: AppColors.textSecondary,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 3,
+              indicatorColor: Colors.transparent,
+              indicatorSize: TabBarIndicatorSize.label,
+              indicatorWeight: 0.1,
+              isScrollable: false,
               labelStyle: TextStyle(
-                fontSize: 13.sp,
+                fontSize: 14.sp,
                 fontWeight: FontWeight.w600,
               ),
-              labelPadding: EdgeInsets.symmetric(horizontal: 12.w),
               tabs: _tabs.map((tab) {
-                return Tab(
-                  text: '$tab (${_workOrdersData[tab]?.length ?? 0})',
-                );
+                return Tab(text: tab);
               }).toList(),
             ),
           ),
@@ -133,7 +188,24 @@ class _WorkOrderCenterScreenState extends State<WorkOrderCenterScreen>
         }).toList(),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/create-work-order'),
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CreateWorkOrderScreen(),
+            ),
+          );
+          
+          print('📝 创建工单返回结果: $result');
+          
+          // 如果创建成功，刷新"待受理"标签页的数据
+          if (result == true && mounted) {
+            print('🔄 开始刷新工单列表...');
+            // 直接调用 _loadData 方法刷新数据
+            await _loadData(_tabs[0], isRefresh: true);
+            _refreshControllers[_tabs[0]]?.refreshCompleted();
+          }
+        },
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add, color: AppColors.textWhite),
       ),
@@ -222,13 +294,32 @@ class _WorkOrderCenterScreenState extends State<WorkOrderCenterScreen>
         itemBuilder: (context, index) {
           final order = orders[index];
           return WorkOrderCard(
-            title: order['title'] as String,
-            type: order['type'] as String,
-            priority: order['priority'] as String,
-            dueDate: order['dueDate'] as String,
-            creator: order['creator'] as String,
-            onTap: () {
-              context.push('/work-order/${order['id']}');
+            title: (order['title'] as String?) ?? '未命名工单',
+            type: (order['type'] as String?) ?? '未知类型',
+            priority: (order['priority'] as String?) ?? '中',
+            status: (order['status'] as String?) ?? '待受理',
+            dueDate: (order['dueDate'] as String?) ?? '',
+            creator: (order['creator'] as String?) ?? '未知',
+            shopName: order['shopName'] as String?,
+            createdAt: order['createdAt'] as String?,
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WorkOrderDetailScreen(
+                    workOrderId: order['id'] as int,
+                  ),
+                ),
+              );
+              
+              // 如果状态更新了，刷新所有标签页
+              if (result == true && mounted) {
+                print('🔄 工单状态已更新，刷新所有标签页...');
+                for (var tab in _tabs) {
+                  await _loadData(tab, isRefresh: true);
+                  _refreshControllers[tab]?.refreshCompleted();
+                }
+              }
             },
           );
         },
@@ -236,53 +327,6 @@ class _WorkOrderCenterScreenState extends State<WorkOrderCenterScreen>
     );
   }
 
-  /// 为不同状态返回合适的示例类型
-  String _getExampleType(String status) {
-    switch (status) {
-      case '待受理':
-        return '设备报修';
-      case '进行中':
-        return '稽查整改';
-      case '已完成':
-        return '营销活动';
-      case '已关闭':
-        return '物料申请';
-      default:
-        return '其他';
-    }
-  }
-  
-  /// 为不同状态返回合适的示例优先级
-  String _getExamplePriority(String status) {
-    switch (status) {
-      case '待受理':
-        return '高';
-      case '进行中':
-        return '中';
-      case '已完成':
-        return '低';
-      case '已关闭':
-        return '中';
-      default:
-        return '低';
-    }
-  }
-  
-  /// 为不同状态返回合适的示例创建人
-  String _getExampleCreator(String status) {
-    switch (status) {
-      case '待受理':
-        return '李店长';
-      case '进行中':
-        return '张经理';
-      case '已完成':
-        return '王主管';
-      case '已关闭':
-        return '陈店长';
-      default:
-        return '管理员';
-    }
-  }
 }
 
 

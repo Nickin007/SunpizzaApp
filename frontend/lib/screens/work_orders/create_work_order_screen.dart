@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/work_order_provider.dart';
-import '../../models/work_order_model.dart';
+import '../../services/work_order_service.dart';
 
-/// 创建工单页面
+/// 创建/编辑工单页面
 class CreateWorkOrderScreen extends StatefulWidget {
-  const CreateWorkOrderScreen({super.key});
+  final int? workOrderId; // 如果为null，则为创建模式；否则为编辑模式
+  final Map<String, dynamic>? initialData; // 编辑模式的初始数据
+  
+  const CreateWorkOrderScreen({
+    super.key,
+    this.workOrderId,
+    this.initialData,
+  });
 
   @override
   State<CreateWorkOrderScreen> createState() => _CreateWorkOrderScreenState();
@@ -19,50 +22,172 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _assigneeNameController = TextEditingController();
+  final WorkOrderService _workOrderService = WorkOrderService();
   
-  TaskType? _selectedType;
-  Priority? _selectedPriority;
+  Map<String, dynamic>? _selectedType;
+  Map<String, dynamic>? _selectedPriority;
   DateTime? _selectedDueDate;
   
   bool _isLoading = false;
+  bool _isSearchingAssignee = false;
   
   // 字典数据
-  List<TaskType> _taskTypes = [];
-  List<Priority> _priorities = [];
+  List<Map<String, dynamic>> _taskTypes = [];
+  List<Map<String, dynamic>> _priorities = [];
+  List<Map<String, dynamic>> _shops = [];
+  Map<String, dynamic>? _selectedShop;
+  
+  // 受理人
+  Map<String, dynamic>? _assigneeUser;
+  String? _assigneeError;
+  
+  // 是否为编辑模式
+  bool get isEditMode => widget.workOrderId != null;
   
   @override
   void initState() {
     super.initState();
     _loadDictData();
+    _initializeFormData();
+  }
+  
+  /// 初始化表单数据（编辑模式）
+  void _initializeFormData() {
+    if (isEditMode && widget.initialData != null) {
+      final data = widget.initialData!;
+      
+      // 填充基本信息
+      _titleController.text = data['title'] ?? '';
+      _descriptionController.text = data['description'] ?? '';
+      
+      // 填充受理人信息
+      if (data['assignee'] != null) {
+        _assigneeUser = {
+          'id': data['assignee']['id'],
+          'real_name': data['assignee']['real_name'],
+          'username': data['assignee']['username'],
+        };
+        _assigneeNameController.text = data['assignee']['real_name'] ?? '';
+      }
+      
+      // 填充截止日期
+      if (data['due_date'] != null) {
+        try {
+          _selectedDueDate = DateTime.parse(data['due_date'].toString().substring(0, 10));
+        } catch (e) {
+          print('解析截止日期失败: $e');
+        }
+      }
+    }
   }
   
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _assigneeNameController.dispose();
     super.dispose();
   }
   
   /// 加载字典数据
   Future<void> _loadDictData() async {
-    // TODO: 从 API 加载任务类型和优先级
-    // 暂时使用模拟数据
-    setState(() {
-      _taskTypes = [
-        TaskType(id: 1, typeName: '稽查整改', color: '#FF6B6B'),
-        TaskType(id: 2, typeName: '营销活动', color: '#4ECDC4'),
-        TaskType(id: 3, typeName: '设备报修', color: '#45B7D1'),
-        TaskType(id: 4, typeName: '物料申请', color: '#96CEB4'),
-        TaskType(id: 5, typeName: '人员调度', color: '#F7C46C'),
-        TaskType(id: 6, typeName: '其他', color: '#9E9E9E'),
-      ];
+    try {
+      final types = await _workOrderService.getTaskTypes();
+      final priorities = await _workOrderService.getPriorities();
       
-      _priorities = [
-        Priority(id: 1, priorityName: '低', color: '#5DADE2', sortOrder: 1),
-        Priority(id: 2, priorityName: '中', color: '#F4D03F', sortOrder: 2),
-        Priority(id: 3, priorityName: '高', color: '#EC7063', sortOrder: 3),
-      ];
+      // 加载门店列表（admin 创建工单时需要）
+      List<Map<String, dynamic>> shops = [];
+      try {
+        final response = await _workOrderService.getShops();
+        shops = List<Map<String, dynamic>>.from(response['items']);
+      } catch (e) {
+        print('加载门店列表失败: $e');
+      }
+      
+      setState(() {
+        _taskTypes = types;
+        _priorities = priorities;
+        _shops = shops;
+        
+        // 编辑模式：设置选中的类型、优先级、门店
+        if (isEditMode && widget.initialData != null) {
+          final data = widget.initialData!;
+          
+          // 设置任务类型
+          if (data['type'] != null) {
+            _selectedType = _taskTypes.firstWhere(
+              (t) => t['id'] == data['type']['id'],
+              orElse: () => _taskTypes.isNotEmpty ? _taskTypes[0] : {},
+            );
+          }
+          
+          // 设置优先级
+          if (data['priority'] != null) {
+            _selectedPriority = _priorities.firstWhere(
+              (p) => p['id'] == data['priority']['id'],
+              orElse: () => _priorities.isNotEmpty ? _priorities[0] : {},
+            );
+          }
+          
+          // 设置门店
+          if (data['shop'] != null && _shops.isNotEmpty) {
+            _selectedShop = _shops.firstWhere(
+              (s) => s['id'] == data['shop']['id'],
+              orElse: () => _shops[0],
+            );
+          }
+        } else {
+          // 创建模式：自动选择第一个门店（如果有的话）
+          if (_shops.isNotEmpty) {
+            _selectedShop = _shops[0];
+          }
+        }
+      });
+    } catch (e) {
+      print('加载字典数据失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('加载数据失败: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+  
+  /// 搜索受理人
+  Future<void> _searchAssignee(String realName) async {
+    if (realName.trim().isEmpty) {
+      setState(() {
+        _assigneeUser = null;
+        _assigneeError = null;
+      });
+      return;
+    }
+    
+    setState(() {
+      _isSearchingAssignee = true;
+      _assigneeError = null;
     });
+    
+    try {
+      final user = await _workOrderService.searchUserByName(realName.trim());
+      setState(() {
+        _assigneeUser = user;
+        _assigneeError = null;
+        _isSearchingAssignee = false;
+      });
+      print('✅ 找到受理人: ${user['real_name']} (ID: ${user['id']})');
+    } catch (e) {
+      setState(() {
+        _assigneeUser = null;
+        _assigneeError = e.toString().replaceAll('Exception: ', '');
+        _isSearchingAssignee = false;
+      });
+      print('❌ 未找到受理人: $e');
+    }
   }
   
   /// 选择截止日期
@@ -112,35 +237,88 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
     });
     
     try {
-      // TODO: 调用 API 创建工单
-      // final workOrderProvider = context.read<WorkOrderProvider>();
-      // final authProvider = context.read<AuthProvider>();
-      // final data = {
-      //   'title': _titleController.text.trim(),
-      //   'description': _descriptionController.text.trim(),
-      //   'type_id': _selectedType!.id,
-      //   'priority_id': _selectedPriority!.id,
-      //   if (_selectedDueDate != null) 
-      //     'due_date': _selectedDueDate!.toIso8601String(),
-      //   if (authProvider.currentUser?.shopId != null)
-      //     'shop_id': authProvider.currentUser!.shopId,
-      // };
-      // await workOrderProvider.createWorkOrder(data);
-      
-      // 模拟API调用延迟
-      await Future.delayed(const Duration(seconds: 1));
-      
-      if (mounted) {
-        _showMessage('工单创建成功！', isSuccess: true);
-        context.pop();
+      if (isEditMode) {
+        // 编辑模式：更新工单
+        print('🚀 开始更新工单...');
+        print('  工单ID: ${widget.workOrderId}');
+        print('  标题: ${_titleController.text.trim()}');
+        
+        await _workOrderService.updateWorkOrder(
+          widget.workOrderId!,
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim().isNotEmpty 
+              ? _descriptionController.text.trim()
+              : null,
+          statusId: 1, // 编辑后重置为"待受理"状态
+          dueDate: _selectedDueDate?.toIso8601String(),
+        );
+        
+        print('✅ 工单更新成功！');
+      } else {
+        // 创建模式：创建新工单
+        print('🚀 开始创建工单...');
+        print('  标题: ${_titleController.text.trim()}');
+        print('  类型ID: ${_selectedType!['id']}');
+        print('  优先级ID: ${_selectedPriority!['id']}');
+        print('  门店ID: ${_selectedShop?['id']}');
+        print('  受理人ID: ${_assigneeUser?['id']}');
+        print('  受理人姓名: ${_assigneeUser?['real_name']}');
+        
+        // 调用真实的 API 创建工单
+        final result = await _workOrderService.createWorkOrder(
+          title: _titleController.text.trim(),
+          typeId: _selectedType!['id'],
+          priorityId: _selectedPriority!['id'],
+          description: _descriptionController.text.trim().isNotEmpty 
+              ? _descriptionController.text.trim()
+              : null,
+          dueDate: _selectedDueDate?.toIso8601String(),
+          shopId: _selectedShop?['id'], // 传递门店 ID
+          assigneeId: _assigneeUser?['id'], // 传递受理人 ID
+        );
+        
+        print('✅ 工单创建成功！');
+        print('  工单ID: ${result['id']}');
       }
-    } catch (e) {
-      _showMessage('创建失败：$e');
-    } finally {
+      
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
+        
+        // 显示成功消息
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12.w),
+                Text(isEditMode ? '工单更新成功！' : '工单创建成功！'),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        
+        // 延迟返回，确保用户看到成功消息
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            Navigator.pop(context, true); // 返回 true 表示操作成功，触发列表刷新
+          }
+        });
+      }
+    } catch (e) {
+      print('❌ ${isEditMode ? '工单更新' : '工单创建'}失败！');
+      print('  错误: $e');
+      
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _showMessage('创建失败：$e');
       }
     }
   }
@@ -161,7 +339,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('创建工单'),
+        title: Text(isEditMode ? '编辑工单' : '创建工单'),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _submitWorkOrder,
@@ -175,7 +353,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                     ),
                   )
                 : Text(
-                    '提交',
+                    isEditMode ? '保存' : '提交',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16.sp,
@@ -227,6 +405,20 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                 hint: '请详细描述工单内容...',
                 maxLines: 5,
               ),
+              SizedBox(height: 20.h),
+              
+              // 所属门店（仅对 admin 显示）
+              if (_shops.isNotEmpty) ...[
+                _buildSectionTitle('所属门店', required: true),
+                SizedBox(height: 8.h),
+                _buildShopSelector(),
+                SizedBox(height: 20.h),
+              ],
+              
+              // 受理人
+              _buildSectionTitle('受理人'),
+              SizedBox(height: 8.h),
+              _buildAssigneeField(),
               SizedBox(height: 20.h),
               
               // 截止日期
@@ -336,7 +528,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
       spacing: 10.w,
       runSpacing: 10.h,
       children: _taskTypes.map((type) {
-        final isSelected = _selectedType?.id == type.id;
+        final isSelected = _selectedType?['id'] == type['id'];
         return GestureDetector(
           onTap: () {
             setState(() {
@@ -354,7 +546,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
               ),
             ),
             child: Text(
-              type.typeName,
+              type['type_name'],
               style: TextStyle(
                 fontSize: 14.sp,
                 color: isSelected ? Colors.white : AppColors.textPrimary,
@@ -371,10 +563,10 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
   Widget _buildPrioritySelector() {
     return Row(
       children: _priorities.map((priority) {
-        final isSelected = _selectedPriority?.id == priority.id;
+        final isSelected = _selectedPriority?['id'] == priority['id'];
         return Expanded(
           child: Padding(
-            padding: EdgeInsets.only(right: priority.id == 3 ? 0 : 10.w),
+            padding: EdgeInsets.only(right: priority['id'] == 3 ? 0 : 10.w),
             child: GestureDetector(
               onTap: () {
                 setState(() {
@@ -393,7 +585,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    priority.priorityName,
+                    priority['priority_name'],
                     style: TextStyle(
                       fontSize: 15.sp,
                       color: isSelected ? Colors.white : AppColors.textPrimary,
@@ -456,6 +648,213 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
           ],
         ),
       ),
+    );
+  }
+  
+  /// 门店选择器
+  Widget _buildShopSelector() {
+    return InkWell(
+      onTap: () => _showShopPicker(),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(
+            color: _selectedShop != null ? AppColors.primary : Colors.grey[300]!,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.store,
+              color: _selectedShop != null ? AppColors.primary : AppColors.textHint,
+              size: 20.w,
+            ),
+            SizedBox(width: 12.w),
+            Text(
+              _selectedShop != null
+                  ? (_selectedShop!['name'] ?? '未命名门店')
+                  : '请选择所属门店',
+              style: TextStyle(
+                fontSize: 15.sp,
+                color: _selectedShop != null 
+                    ? AppColors.textPrimary 
+                    : AppColors.textHint,
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: AppColors.textSecondary,
+              size: 16.w,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// 显示门店选择器
+  void _showShopPicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      builder: (context) => Container(
+        padding: EdgeInsets.all(20.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '选择门店',
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 20.h),
+            ..._shops.map((shop) => ListTile(
+              leading: Icon(Icons.store, color: AppColors.primary),
+              title: Text(shop['name'] ?? '未命名门店'),
+              subtitle: Text(shop['address'] ?? ''),
+              trailing: _selectedShop?['id'] == shop['id']
+                  ? Icon(Icons.check_circle, color: AppColors.primary)
+                  : null,
+              onTap: () {
+                setState(() {
+                  _selectedShop = shop;
+                });
+                Navigator.pop(context);
+              },
+            )).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// 受理人输入框
+  Widget _buildAssigneeField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _assigneeNameController,
+          decoration: InputDecoration(
+            hintText: '输入受理人姓名（如：李店长）',
+            filled: true,
+            fillColor: Colors.grey[50],
+            contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.r),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.r),
+              borderSide: BorderSide(
+                color: _assigneeError != null ? AppColors.error : Colors.grey[300]!,
+                width: 1.5,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.r),
+              borderSide: BorderSide(
+                color: _assigneeError != null ? AppColors.error : AppColors.primary,
+                width: 1.5,
+              ),
+            ),
+            suffixIcon: _isSearchingAssignee
+                ? Padding(
+                    padding: EdgeInsets.all(12.w),
+                    child: SizedBox(
+                      width: 20.w,
+                      height: 20.w,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    ),
+                  )
+                : _assigneeUser != null
+                    ? Icon(Icons.check_circle, color: AppColors.success, size: 24.w)
+                    : _assigneeError != null
+                        ? Icon(Icons.error, color: AppColors.error, size: 24.w)
+                        : null,
+          ),
+          onChanged: (value) {
+            // 防抖搜索
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (_assigneeNameController.text == value) {
+                _searchAssignee(value);
+              }
+            });
+          },
+        ),
+        
+        // 显示验证结果
+        if (_assigneeError != null) ...[
+          SizedBox(height: 8.h),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+            decoration: BoxDecoration(
+              color: AppColors.error.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(
+                color: AppColors.error.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, size: 16.w, color: AppColors.error),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Text(
+                    _assigneeError!,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        
+        if (_assigneeUser != null) ...[
+          SizedBox(height: 8.h),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+            decoration: BoxDecoration(
+              color: AppColors.success.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(
+                color: AppColors.success.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle_outline, size: 16.w, color: AppColors.success),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Text(
+                    '已找到：${_assigneeUser!['real_name']} (${_assigneeUser!['username']})',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
   

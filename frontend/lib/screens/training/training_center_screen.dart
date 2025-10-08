@@ -44,8 +44,9 @@ class _TrainingCenterScreenState extends State<TrainingCenterScreen>
               controller: _tabController,
               labelColor: AppColors.primary,
               unselectedLabelColor: AppColors.textSecondary,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 3,
+              indicatorColor: Colors.transparent,
+              indicatorSize: TabBarIndicatorSize.label,
+              indicatorWeight: 0.1,
               isScrollable: false,
               labelStyle: TextStyle(
                 fontSize: 14.sp,

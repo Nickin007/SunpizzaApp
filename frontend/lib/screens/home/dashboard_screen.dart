@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/stat_circle_card.dart';
 import '../../widgets/quick_action_button.dart';
+import '../../services/work_order_service.dart';
 
 /// 首页 - 数据仪表盘
 class DashboardScreen extends StatefulWidget {
@@ -16,14 +17,60 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // 模拟数据，实际应从API获取
-  // 与工单中心的示例数据保持一致（每个状态1条示例）
-  final Map<String, int> _stats = {
-    '待受理': 1,
-    '进行中': 1,
-    '已完成': 1,
-    '已关闭': 1,
+  final WorkOrderService _workOrderService = WorkOrderService();
+  Map<String, int> _stats = {
+    '待受理': 0,
+    '进行中': 0,
+    '已完成': 0,
+    '已归档': 0,
   };
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  /// 加载统计数据
+  Future<void> _loadStats() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      print('📊 开始加载首页统计数据...');
+      final stats = await _workOrderService.getStats();
+      print('📊 后端返回的统计数据: $stats');
+      
+      setState(() {
+        // 后端返回的 key 可能不同，需要映射
+        _stats = {
+          '待受理': stats['待受理'] ?? 0,
+          '进行中': stats['进行中'] ?? 0,
+          '已完成': stats['已完成'] ?? 0,
+          '已归档': stats['已归档'] ?? 0,
+        };
+        _isLoading = false;
+      });
+      
+      print('📊 映射后的统计数据: $_stats');
+    } catch (e) {
+      print('❌ 加载统计数据失败: $e');
+      setState(() {
+        _isLoading = false;
+      });
+      // 显示错误提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('加载统计数据失败: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,8 +79,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
+        child: RefreshIndicator(
+          onRefresh: _loadStats,
+          child: CustomScrollView(
+            slivers: [
             // 顶部欢迎区域 - 科技感设计
             SliverToBoxAdapter(
               child: Container(
@@ -234,8 +283,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         SizedBox(width: 12.w),
                         Expanded(
                           child: StatCircleCard(
-                            title: '已关闭',
-                            count: _stats['已关闭']!,
+                            title: '已归档',
+                            count: _stats['已归档']!,
                             color: AppColors.statusClosed,
                             onTap: () => _navigateToWorkOrders('closed'),
                           ),
@@ -327,6 +376,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             SizedBox(height: 20.h).sliverBox,
           ],
+        ),
         ),
       ),
     );

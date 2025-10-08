@@ -151,7 +151,7 @@ def init_dict_tables():
         {'id': 1, 'status_name': '待受理', 'color': '#95A5A6'},
         {'id': 2, 'status_name': '进行中', 'color': '#3498DB'},
         {'id': 3, 'status_name': '已完成', 'color': '#2ECC71'},
-        {'id': 4, 'status_name': '已关闭', 'color': '#7F8C8D'}
+        {'id': 4, 'status_name': '已归档', 'color': '#7F8C8D'}
     ]
     
     for s in statuses:

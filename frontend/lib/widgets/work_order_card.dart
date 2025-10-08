@@ -7,8 +7,11 @@ class WorkOrderCard extends StatelessWidget {
   final String title;
   final String type;
   final String priority;
+  final String status;
   final String dueDate;
   final String creator;
+  final String? shopName;
+  final String? createdAt;
   final VoidCallback? onTap;
 
   const WorkOrderCard({
@@ -16,8 +19,11 @@ class WorkOrderCard extends StatelessWidget {
     required this.title,
     required this.type,
     required this.priority,
+    required this.status,
     required this.dueDate,
     required this.creator,
+    this.shopName,
+    this.createdAt,
     this.onTap,
   });
 
@@ -42,35 +48,36 @@ class WorkOrderCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 标题和优先级
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                SizedBox(width: 8.w),
-                _buildPriorityBadge(priority),
-              ],
+            // 标题
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             SizedBox(height: 12.h),
             
-            // 类型标签
-            _buildTypeBadge(type),
+            // 3个标签：类型、优先级、状态
+            Wrap(
+              spacing: 8.w,
+              runSpacing: 8.h,
+              children: [
+                _buildTypeBadge(type),
+                _buildPriorityBadge(priority),
+                _buildStatusBadge(status),
+              ],
+            ),
             
             SizedBox(height: 12.h),
             
-            // 底部信息
+            // 底部信息：创建人、门店、创建时间
             Row(
               children: [
+                // 创建人
                 Icon(
                   Icons.person_outline,
                   size: 14.w,
@@ -84,7 +91,32 @@ class WorkOrderCard extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
+                
+                // 门店
+                if (shopName != null) ...[
+                  SizedBox(width: 12.w),
+                  Icon(
+                    Icons.store_outlined,
+                    size: 14.w,
+                    color: AppColors.textSecondary,
+                  ),
+                  SizedBox(width: 4.w),
+                  Flexible(
+                    child: Text(
+                      shopName!,
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+                
                 const Spacer(),
+                
+                // 创建时间
                 Icon(
                   Icons.access_time,
                   size: 14.w,
@@ -92,12 +124,10 @@ class WorkOrderCard extends StatelessWidget {
                 ),
                 SizedBox(width: 4.w),
                 Text(
-                  dueDate,
+                  createdAt ?? dueDate,
                   style: TextStyle(
                     fontSize: 12.sp,
-                    color: _isOverdue(dueDate)
-                        ? AppColors.error
-                        : AppColors.textSecondary,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -108,6 +138,30 @@ class WorkOrderCard extends StatelessWidget {
     );
   }
 
+  Widget _buildTypeBadge(String type) {
+    Color color = _getTypeColor(type);
+    
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6.r),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        type,
+        style: TextStyle(
+          fontSize: 11.sp,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+  
   Widget _buildPriorityBadge(String priority) {
     Color color;
     switch (priority) {
@@ -122,50 +176,60 @@ class WorkOrderCard extends StatelessWidget {
     }
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(4.r),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.priority_high,
-            size: 12.w,
-            color: color,
-          ),
-          Text(
-            priority,
-            style: TextStyle(
-              fontSize: 11.sp,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTypeBadge(String type) {
-    Color color = _getTypeColor(type);
-    
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
       decoration: BoxDecoration(
         color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(4.r),
+        borderRadius: BorderRadius.circular(6.r),
         border: Border.all(
           color: color.withOpacity(0.3),
           width: 1,
         ),
       ),
       child: Text(
-        type,
+        priority,
         style: TextStyle(
-          fontSize: 12.sp,
-          fontWeight: FontWeight.w500,
+          fontSize: 11.sp,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildStatusBadge(String status) {
+    Color color;
+    switch (status) {
+      case '待受理':
+        color = AppColors.statusPending;
+        break;
+      case '进行中':
+        color = AppColors.statusInProgress;
+        break;
+      case '已完成':
+        color = AppColors.statusCompleted;
+        break;
+      case '已关闭':
+        color = AppColors.statusClosed;
+        break;
+      default:
+        color = AppColors.textSecondary;
+    }
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6.r),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(
+          fontSize: 11.sp,
+          fontWeight: FontWeight.w600,
           color: color,
         ),
       ),
@@ -189,14 +253,6 @@ class WorkOrderCard extends StatelessWidget {
     }
   }
 
-  bool _isOverdue(String dueDate) {
-    try {
-      final date = DateTime.parse(dueDate);
-      return date.isBefore(DateTime.now());
-    } catch (e) {
-      return false;
-    }
-  }
 }
 
 
