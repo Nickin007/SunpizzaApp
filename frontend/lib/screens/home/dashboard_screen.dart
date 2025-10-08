@@ -17,11 +17,12 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   // 模拟数据，实际应从API获取
+  // 与工单中心的示例数据保持一致（每个状态1条示例）
   final Map<String, int> _stats = {
-    '待受理': 5,
-    '进行中': 12,
-    '已完成': 48,
-    '已关闭': 23,
+    '待受理': 1,
+    '进行中': 1,
+    '已完成': 1,
+    '已关闭': 1,
   };
 
   @override
