@@ -18,61 +18,133 @@
 
 ### 技术架构
 
-- **前端**: Flutter (iOS、Android、Web)
+- **移动端**: Flutter (iOS、Android)
+- **Web 管理后台**: Flutter Web
 - **后端**: Python Flask (RESTful API)
 - **数据库**: MySQL 8.0+
+- **部署**: 腾讯云 Ubuntu 22.04、Nginx、Gunicorn
 
 ## 项目结构
 
 ```
 SunpizzaApp/
-├── backend/                    # Flask后端
-│   ├── app/
+├── backend/                    # Flask 后端
+│   ├── app/                    # 应用主目录
 │   │   ├── __init__.py        # 应用工厂
 │   │   ├── models.py          # 数据库模型（14个表）
 │   │   ├── api/               # RESTful API
-│   │   │   ├── users.py       # 用户管理API
-│   │   │   ├── shops.py       # 门店管理API
-│   │   │   ├── work_orders.py # 工单任务API
-│   │   │   ├── training.py    # 培训系统API
-│   │   │   └── routine_tasks.py # 清洁任务API
-│   │   └── utils/
-│   │       ├── auth.py        # JWT认证
+│   │   │   ├── users.py       # 用户管理 API
+│   │   │   ├── shops.py       # 门店管理 API
+│   │   │   ├── work_orders.py # 工单任务 API
+│   │   │   ├── training.py    # 培训系统 API
+│   │   │   └── routine_tasks.py # 清洁任务 API
+│   │   └── utils/             # 工具类
+│   │       ├── auth.py        # JWT 认证
 │   │       └── response.py    # 统一响应格式
 │   ├── config.py              # 配置文件
-│   ├── app.py                 # 应用入口
+│   ├── wsgi.py                # WSGI 应用入口（Gunicorn）
 │   ├── init_db.py             # 数据库初始化脚本
-│   ├── requirements.txt       # Python依赖
+│   ├── test_connection.py     # 数据库连接测试
+│   ├── requirements.txt       # Python 依赖
+│   ├── venv/                  # Python 虚拟环境（不提交到 Git）
+│   ├── .env                   # 环境变量配置（不提交到 Git）
 │   └── .gitignore
 │
-├── frontend/                   # Flutter前端
+├── frontend/                   # Flutter 项目（移动端 + Web 管理后台）
 │   ├── lib/
-│   │   ├── core/              # 核心功能
-│   │   │   ├── constants/     # 常量（API地址、颜色等）
-│   │   │   ├── router/        # 路由配置
-│   │   │   ├── services/      # 服务层（API、存储）
-│   │   │   └── theme/         # 主题配置
-│   │   ├── models/            # 数据模型
-│   │   ├── providers/         # 状态管理（Provider）
+│   │   ├── main.dart          # 移动端入口
+│   │   ├── core/              # 核心功能（共享）
+│   │   │   ├── config/
+│   │   │   │   └── environment.dart  # 环境配置（开发/生产）
+│   │   │   ├── constants/
+│   │   │   │   ├── api_constants.dart # API 端点
+│   │   │   │   └── app_colors.dart    # 颜色常量
+│   │   │   ├── router/
+│   │   │   │   └── app_router.dart    # 路由配置（GoRouter）
+│   │   │   ├── services/
+│   │   │   │   ├── api_service.dart   # API 服务
+│   │   │   │   └── storage_service.dart # 本地存储
+│   │   │   └── theme/
+│   │   │       └── app_theme.dart     # 应用主题
+│   │   ├── models/            # 数据模型（共享）
+│   │   │   ├── user_model.dart        # 用户模型
+│   │   │   ├── shop_model.dart        # 门店模型
+│   │   │   └── work_order_model.dart  # 工单模型
+│   │   ├── providers/         # 状态管理（Provider，共享）
+│   │   │   ├── auth_provider.dart     # 认证状态
+│   │   │   ├── shop_provider.dart     # 门店状态
+│   │   │   └── work_order_provider.dart # 工单状态
 │   │   ├── screens/           # 页面
-│   │   │   ├── auth/          # 登录页
-│   │   │   ├── home/          # 主页
-│   │   │   ├── work_orders/   # 工单
+│   │   │   ├── auth/          # 登录页（移动端）
+│   │   │   │   └── login_screen.dart
+│   │   │   ├── main/          # 主框架
+│   │   │   │   └── main_screen.dart
+│   │   │   ├── home/          # 首页
+│   │   │   │   └── dashboard_screen.dart
+│   │   │   ├── work_orders/   # 工单模块
+│   │   │   │   ├── work_order_center_screen.dart
+│   │   │   │   ├── work_order_detail_screen.dart
+│   │   │   │   ├── work_order_comment_screen.dart
+│   │   │   │   └── create_work_order_screen.dart
 │   │   │   ├── routine_tasks/ # 清洁任务
-│   │   │   ├── training/      # 培训
+│   │   │   │   └── routine_task_screen.dart
+│   │   │   ├── training/      # 培训模块
+│   │   │   │   ├── training_center_screen.dart
+│   │   │   │   ├── course_list_screen.dart
+│   │   │   │   └── course_detail_screen.dart
 │   │   │   └── profile/       # 个人中心
-│   │   └── main.dart          # 应用入口
-│   ├── pubspec.yaml           # Flutter依赖
-│   ├── README.md
+│   │   │       └── profile_center_screen.dart
+│   │   └── widgets/           # 通用组件
+│   │       ├── stat_circle_card.dart  # 统计圆环卡片
+│   │       ├── quick_action_button.dart # 快捷按钮
+│   │       ├── work_order_card.dart   # 工单卡片
+│   │       └── course_card.dart       # 课程卡片
+│   ├── assets/                # 资源文件
+│   │   └── images/
+│   │       └── logo.png       # 圣比萨 Logo
+│   ├── android/               # Android 配置
+│   │   ├── app/
+│   │   │   ├── build.gradle.kts
+│   │   │   └── src/main/AndroidManifest.xml
+│   │   ├── build.gradle.kts
+│   │   └── gradle.properties
+│   ├── ios/                   # iOS 配置
+│   │   ├── Runner/
+│   │   │   └── Info.plist
+│   │   └── Runner.xcodeproj/
+│   ├── web/                   # Web 配置
+│   │   ├── index.html
+│   │   ├── manifest.json
+│   │   ├── favicon.png
+│   │   └── icons/             # PWA 图标
+│   ├── linux/                 # Linux 桌面配置
+│   ├── macos/                 # macOS 配置
+│   ├── windows/               # Windows 桌面配置
+│   ├── test/                  # 测试文件
+│   │   └── widget_test.dart
+│   ├── build/                 # 构建输出（不提交到 Git）
+│   ├── pubspec.yaml           # Flutter 依赖
+│   ├── pubspec.lock           # 依赖锁定
+│   ├── analysis_options.yaml  # 代码分析配置
+│   ├── UI优化说明.md           # UI 优化文档
 │   └── .gitignore
 │
 ├── docs/                       # 项目文档
-│   ├── API文档.md
-│   ├── 数据库设计.md
-│   ├── 部署指南.md
-│   └── 快速启动指南.md
+│   ├── API文档.md              # 完整 API 接口文档
+│   └── 数据库设计.md           # 数据库表结构设计
 │
-└── README.md                   # 项目总览
+├── deploy/                     # 部署脚本（Shell）
+│   ├── 完整部署指南.md         # 详细部署步骤
+│   ├── test_api.sh            # API 接口测试脚本
+│   ├── server_setup.sh        # 服务器基础环境设置
+│   ├── mysql_setup.sh         # MySQL 安装配置
+│   ├── deploy_backend.sh      # 后端部署脚本
+│   ├── nginx_setup.sh         # Nginx 反向代理配置
+│   ├── finish_service.sh      # 服务启动脚本
+│   └── 一键部署.sh            # 一键部署所有服务
+│
+├── README.md                   # 项目总览（本文件）
+└── 快速启动.md                 # 快速启动指南
 ```
 
 ## 快速开始
@@ -162,21 +234,112 @@ SunpizzaApp/
 - **POST** `/api/training/courses/{id}/start` - 开始学习
 - **GET** `/api/training/my-records` - 我的学习记录
 
-### 前端设置（待完善）
+### 移动端设置
 
-```bash
-cd frontend
-flutter pub get
-flutter run
-```
+1. **环境要求**
+   - Flutter SDK 3.0+
+   - Android Studio / Xcode（用于真机调试）
+
+2. **安装依赖**
+   ```bash
+   cd frontend
+   flutter pub get
+   ```
+
+3. **配置环境**
+   编辑 `lib/core/config/environment.dart`：
+   - 开发环境：`developmentApiUrl` - 本地电脑 IP + 5000端口
+   - 生产环境：`productionApiUrl` - 云服务器地址
+
+4. **运行移动端**
+   ```bash
+   # Chrome 浏览器预览
+   flutter run -d chrome
+   
+   # Android 真机
+   flutter run -d <设备ID>
+   
+   # iOS 真机（需要 macOS）
+   flutter run -d <设备ID>
+   ```
+
+5. **构建 APK**
+   ```bash
+   flutter build apk --release
+   # 生成的 APK 在 build/app/outputs/flutter-apk/
+   ```
+
+### Web 管理后台设置
+
+1. **运行开发模式**
+   ```bash
+   cd frontend
+   flutter run -d chrome -t lib/main_web.dart
+   ```
+
+2. **构建生产版本**
+   ```bash
+   flutter build web -t lib/main_web.dart
+   # 生成的文件在 build/web/
+   ```
+
+3. **部署到 Nginx**
+   将 `build/web/` 目录上传到服务器：
+   ```bash
+   scp -r build/web/* ubuntu@your-server:/var/www/admin
+   ```
+
+4. **访问地址**
+   - 开发环境：`http://localhost:<port>`
+   - 生产环境：`http://your-domain/admin`
+
+⚠️ **注意：** Web 管理后台仅允许管理员账号登录
+
+## 平台对比
+
+| 特性 | 移动端 App | Web 管理后台 |
+|-----|-----------|-------------|
+| **目标用户** | 店长、区域经理、管理员 | 仅管理员 |
+| **主要用途** | 日常工单处理、培训学习 | 系统管理、数据维护 |
+| **UI 设计** | 移动端优化、触摸友好 | 桌面端优化、表格为主 |
+| **代码复用** | - | 复用移动端 70%+ 代码 |
+| **部署方式** | App Store / APK | Nginx 静态托管 |
+| **访问方式** | 下载安装 | 浏览器访问 |
+| **离线能力** | 支持 | 不支持 |
+
+### 为什么用 Flutter Web 做管理后台？
+
+✅ **代码复用率高** - 复用移动端的 models、services、providers  
+✅ **统一技术栈** - 一套代码，维护简单  
+✅ **开发效率高** - 不需要学习新框架  
+✅ **品牌一致性** - UI 风格与移动端统一  
+✅ **适合内部系统** - 管理后台是内部工具，不需要 SEO
 
 ## 用户角色与权限
 
-| 角色 | 权限说明 |
-|------|---------|
-| **管理员 (admin)** | 系统全部权限：用户管理、门店管理、字典表维护、全局数据查看 |
-| **区域经理 (regional_manager)** | 管辖门店的工单管理、数据查看、任务分配 |
-| **店长 (shop_manager)** | 本店工单处理、任务执行、培训学习 |
+| 角色 | 移动端权限 | Web 管理后台权限 |
+|------|-----------|----------------|
+| **管理员 (admin)** | 全部功能 | ✅ 可登录，拥有全部管理权限 |
+| **区域经理 (regional_manager)** | 工单管理、数据查看 | ❌ 不可登录 |
+| **店长 (shop_manager)** | 工单处理、培训学习 | ❌ 不可登录 |
+
+### 权限说明
+
+**移动端（App）：**
+- ✅ 所有角色都可以登录
+- 根据角色显示不同功能和数据
+
+**Web 管理后台：**
+- ✅ 仅管理员可以登录
+- 用于系统管理和数据维护
+- 功能包括：
+  - 用户管理（创建、编辑、删除用户）
+  - 门店管理（新增、编辑门店信息）
+  - 工单管理（查看、编辑、删除所有工单）
+  - 培训内容管理（创建、编辑课程）
+  - 字典表管理（任务类型、优先级、状态）
+  - 数据统计与导出
+  - 系统设置
 
 ## 数据库设计
 
@@ -243,15 +406,41 @@ Authorization: Bearer <token>
 
 ⚠️ **生产环境请务必修改默认密码！**
 
-## 后续开发计划
+## 开发进度
 
-- [ ] 文件上传功能实现
+### ✅ 已完成
+- ✅ 后端 API 全部实现（Flask + MySQL）
+- ✅ 数据库设计与初始化脚本
+- ✅ JWT 认证与权限控制
+- ✅ 移动端 UI 设计（Flutter）
+  - ✅ 登录页面（红色科技风 + 品牌 Logo）
+  - ✅ 首页仪表盘
+  - ✅ 工单管理
+  - ✅ 培训中心
+  - ✅ 个人中心
+- ✅ 环境配置系统（开发/生产环境自动切换）
+- ✅ 云服务器部署（腾讯云 + Nginx + Gunicorn）
+- ✅ Android APK 打包与真机调试
+
+### 🔄 进行中
+- 🔄 Web 管理后台开发
+  - [ ] 管理员登录页
+  - [ ] 仪表盘（数据统计）
+  - [ ] 用户管理（增删改查、重置密码）
+  - [ ] 门店管理（增删改查）
+  - [ ] 工单管理（查看、编辑、删除）
+  - [ ] 培训内容管理
+  - [ ] 系统设置
+
+### 📋 待开发
+- [ ] 文件上传功能优化
 - [ ] 推送通知集成
 - [ ] 定时任务（自动生成日清/周清/月清任务）
-- [ ] 数据导出功能
-- [ ] Flutter前端完整实现
-- [ ] Web管理后台界面
+- [ ] 数据导出功能（Excel/CSV）
+- [ ] iOS 打包与发布
 - [ ] 单元测试与集成测试
+- [ ] 操作日志系统
+- [ ] 数据备份功能
 
 ## 联系方式
 

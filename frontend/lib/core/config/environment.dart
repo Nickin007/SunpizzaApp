@@ -1,6 +1,8 @@
 /// 环境配置
 /// 用于区分开发环境和生产环境的 API 地址
 
+import 'package:flutter/foundation.dart';
+
 enum Environment {
   /// 开发环境（本地电脑 + 手机真机调试）
   development,
@@ -10,17 +12,36 @@ enum Environment {
 }
 
 class EnvironmentConfig {
-  /// 当前环境（可以手动切换）
+  /// 🤖 自动检测当前环境
   /// 
-  /// 🔧 开发时改成 Environment.development
-  /// 🚀 上线前改成 Environment.production
-  static const Environment currentEnvironment = Environment.development;
+  /// Debug 模式（flutter run）    → 开发环境
+  /// Release 模式（flutter build） → 生产环境
+  /// 
+  /// 也可以手动指定：设置 _forceEnvironment
+  static Environment? _forceEnvironment; // null = 自动检测
+  
+  /// 手动强制指定环境（用于特殊测试）
+  /// 例如：EnvironmentConfig.forceEnvironment(Environment.production);
+  static void forceEnvironment(Environment? env) {
+    _forceEnvironment = env;
+  }
+  
+  /// 获取当前环境
+  static Environment get currentEnvironment {
+    // 如果手动指定了环境，使用指定的
+    if (_forceEnvironment != null) {
+      return _forceEnvironment!;
+    }
+    
+    // 自动检测：Debug 模式 = 开发环境，Release 模式 = 生产环境
+    return kDebugMode ? Environment.development : Environment.production;
+  }
   
   /// 开发环境配置
   static const String developmentApiUrl = 'http://192.168.31.164:5000'; // 👈 你的电脑 IP
   
   /// 生产环境配置
-  static const String productionApiUrl = 'https://api.sunpizza.com'; // 👈 修改成你的服务器域名
+  static const String productionApiUrl = 'http://118.89.73.199'; // 👈 服务器地址
   
   /// 获取当前环境的 API 地址
   static String get apiBaseUrl {

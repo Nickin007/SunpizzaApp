@@ -46,16 +46,18 @@ class _WorkOrderCenterScreenState extends State<WorkOrderCenterScreen>
           preferredSize: Size.fromHeight(48.h),
           child: Container(
             color: AppColors.surface,
-            child: TabBar(
+            child:             TabBar(
               controller: _tabController,
+              isScrollable: true,
               labelColor: AppColors.primary,
               unselectedLabelColor: AppColors.textSecondary,
               indicatorColor: AppColors.primary,
               indicatorWeight: 3,
               labelStyle: TextStyle(
-                fontSize: 14.sp,
+                fontSize: 13.sp,
                 fontWeight: FontWeight.w600,
               ),
+              labelPadding: EdgeInsets.symmetric(horizontal: 12.w),
               tabs: _tabs.map((tab) {
                 return Tab(
                   text: '$tab (${_counts[tab]})',

@@ -33,13 +33,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            // 顶部欢迎区域
+            // 顶部欢迎区域 - 科技感设计
             SliverToBoxAdapter(
               child: Container(
-                padding: EdgeInsets.all(20.w),
-                decoration: const BoxDecoration(
+                padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 30.h),
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppColors.primary, AppColors.primaryDark],
+                    colors: [
+                      AppColors.primaryDark,
+                      AppColors.primary,
+                      AppColors.primaryLight,
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -47,20 +51,130 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // 顶部栏
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            // Logo
+                            Container(
+                              width: 40.w,
+                              height: 40.w,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10.r),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10.r),
+                                child: Image.asset(
+                                  'assets/images/logo.png',
+                                  width: 40.w,
+                                  height: 40.w,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 12.w),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '圣比萨',
+                                  style: TextStyle(
+                                    fontSize: 18.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'SMART STORE',
+                                  style: TextStyle(
+                                    fontSize: 10.sp,
+                                    color: Colors.white.withOpacity(0.8),
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        // 通知按钮
+                        Container(
+                          width: 40.w,
+                          height: 40.w,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: Icon(
+                                  Icons.notifications_outlined,
+                                  color: Colors.white,
+                                  size: 22.w,
+                                ),
+                              ),
+                              Positioned(
+                                right: 8.w,
+                                top: 8.h,
+                                child: Container(
+                                  width: 8.w,
+                                  height: 8.w,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.accent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 24.h),
+                    // 欢迎文本
                     Text(
-                      '早上好，${user?.realName ?? "用户"}',
+                      '早上好，${user?.realName ?? "用户"} 👋',
                       style: TextStyle(
-                        fontSize: 24.sp,
+                        fontSize: 28.sp,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textWhite,
+                        color: Colors.white,
+                        height: 1.2,
                       ),
                     ),
-                    SizedBox(height: 4.h),
-                    Text(
-                      user?.shopName ?? '圣比萨门店管理平台',
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        color: AppColors.textWhite.withOpacity(0.9),
+                    SizedBox(height: 8.h),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20.r),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.store,
+                            color: Colors.white,
+                            size: 14.w,
+                          ),
+                          SizedBox(width: 6.w),
+                          Text(
+                            user?.shopName ?? '圣比萨门店管理平台',
+                            style: TextStyle(
+                              fontSize: 13.sp,
+                              color: Colors.white.withOpacity(0.95),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -295,5 +409,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 extension SliverBoxExtension on SizedBox {
   Widget get sliverBox => SliverToBoxAdapter(child: this);
 }
+
 
 

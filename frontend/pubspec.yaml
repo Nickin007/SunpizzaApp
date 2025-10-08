@@ -62,10 +62,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   
-  # 资源文件（暂时注释，以后需要时再添加）
-  # assets:
-  #   - assets/images/
-  #   - assets/icons/
+  # 资源文件
+  assets:
+    - assets/images/logo.png
   
   # 字体（暂时使用系统默认字体）
   # fonts:

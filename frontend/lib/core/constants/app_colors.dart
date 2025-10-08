@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 /// 应用颜色常量
 class AppColors {
-  // 主题色
-  static const Color primary = Color(0xFFFF6B35); // 圣比萨橙色
-  static const Color primaryDark = Color(0xFFE85A2A);
-  static const Color primaryLight = Color(0xFFFF8C5F);
+  // 主题色 - 圣比萨红（Logo配色）
+  static const Color primary = Color(0xFFDC1E32); // 圣比萨红
+  static const Color primaryDark = Color(0xFFB01828);
+  static const Color primaryLight = Color(0xFFFF4158);
   
-  // 辅助色
-  static const Color secondary = Color(0xFF004E89);
-  static const Color accent = Color(0xFFFFC857);
+  // 辅助色 - 科技感深色系
+  static const Color secondary = Color(0xFF1A1A1A); // 深黑
+  static const Color accent = Color(0xFFFFD700); // 金色点缀
   
   // 背景色
   static const Color background = Color(0xFFF5F5F5);
