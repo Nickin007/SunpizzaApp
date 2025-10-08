@@ -40,9 +40,10 @@ pip install --upgrade pip
 pip install -r requirements.txt
 pip install gunicorn  # 生产环境 WSGI 服务器
 
-# 创建生产环境配置文件
-echo "⚙️  创建生产环境配置..."
-cat > ${BACKEND_DIR}/.env << EOF
+# 创建生产环境配置文件（如果不存在）
+if [ ! -f "${BACKEND_DIR}/.env" ]; then
+    echo "⚙️  创建生产环境配置..."
+    cat > ${BACKEND_DIR}/.env << EOF
 # 生产环境配置
 SECRET_KEY=sunpizza-prod-secret-key-$(openssl rand -hex 16)
 JWT_SECRET_KEY=sunpizza-jwt-prod-secret-$(openssl rand -hex 16)
@@ -50,10 +51,16 @@ JWT_SECRET_KEY=sunpizza-jwt-prod-secret-$(openssl rand -hex 16)
 # MySQL 配置
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
-MYSQL_USER=sunpizza_user
-MYSQL_PASSWORD=Sunpizza2025@DB
-MYSQL_DATABASE=sunpizza_db
+MYSQL_USER=root
+MYSQL_PASSWORD=YYyy1q2w3e
+MYSQL_DB=sunpizza_db
+
+# 文件上传
+UPLOAD_FOLDER=/home/ubuntu/SunpizzaApp/backend/uploads
 EOF
+else
+    echo "✅ .env 文件已存在，跳过生成"
+fi
 
 # 初始化数据库
 echo "🗄️  初始化数据库..."
