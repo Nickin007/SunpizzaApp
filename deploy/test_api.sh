@@ -120,7 +120,7 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 if [ -n "$TOKEN" ]; then
     echo ""
     echo -e "${YELLOW}测试: 获取门店列表${NC}"
-    response=$(curl -s -w "\n%{http_code}" "${API_BASE}/api/shops" \
+    response=$(curl -s -w "\n%{http_code}" "${API_BASE}/api/shops/" \
         -H "Authorization: Bearer $TOKEN")
     
     http_code=$(echo "$response" | tail -n 1)
@@ -155,7 +155,7 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 if [ -n "$TOKEN" ]; then
     echo ""
     echo -e "${YELLOW}测试: 获取工单列表${NC}"
-    response=$(curl -s -w "\n%{http_code}" "${API_BASE}/api/work-orders" \
+    response=$(curl -s -w "\n%{http_code}" "${API_BASE}/api/work-orders/" \
         -H "Authorization: Bearer $TOKEN")
     
     http_code=$(echo "$response" | tail -n 1)
