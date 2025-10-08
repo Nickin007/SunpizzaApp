@@ -72,7 +72,7 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=${BACKEND_DIR}
 Environment="PATH=${BACKEND_DIR}/venv/bin"
-ExecStart=${BACKEND_DIR}/venv/bin/gunicorn -c ${BACKEND_DIR}/gunicorn_config.py app:app
+ExecStart=${BACKEND_DIR}/venv/bin/gunicorn -c ${BACKEND_DIR}/gunicorn_config.py wsgi:app
 Restart=always
 RestartSec=10
 
