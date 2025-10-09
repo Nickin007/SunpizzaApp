@@ -12,7 +12,17 @@ def create_app(config_class=Config):
     
     # 初始化扩展
     db.init_app(app)
-    CORS(app)
+    
+    # 配置 CORS - 允许所有来源访问
+    CORS(app, 
+         resources={r"/api/*": {
+             "origins": "*",
+             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+             "allow_headers": ["Content-Type", "Authorization"],
+             "expose_headers": ["Content-Type", "Authorization"],
+             "supports_credentials": False,
+             "max_age": 3600
+         }})
     
     # 注册蓝图
     from app.api import users, shops, work_orders, training, routine_tasks
