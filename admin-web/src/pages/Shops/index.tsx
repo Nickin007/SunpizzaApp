@@ -3,7 +3,7 @@ import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm }
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { shopsApi } from '../../api/shops';
 import { usersApi } from '../../api/users';
-import { Shop, User } from '../../types';
+import type { Shop, User } from '../../types';
 
 const Shops: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -97,31 +97,40 @@ const Shops: React.FC = () => {
       title: '门店名称',
       dataIndex: 'name',
       key: 'name',
+      width: 200,
+      ellipsis: true,
     },
     {
       title: '地址',
       dataIndex: 'address',
       key: 'address',
+      width: 250,
+      ellipsis: true,
     },
     {
       title: '区域经理',
       dataIndex: ['regional_manager', 'real_name'],
       key: 'regional_manager',
+      width: 120,
       render: (text: string) => text || '-',
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
+      width: 180,
       render: (text: string) => new Date(text).toLocaleString('zh-CN'),
     },
     {
       title: '操作',
       key: 'action',
+      width: 160,
+      fixed: 'right' as const,
       render: (_: any, record: Shop) => (
-        <Space>
+        <Space size="small">
           <Button
             type="link"
+            size="small"
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
           >
@@ -133,7 +142,7 @@ const Shops: React.FC = () => {
             okText="确定"
             cancelText="取消"
           >
-            <Button type="link" danger icon={<DeleteOutlined />}>
+            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
               删除
             </Button>
           </Popconfirm>
@@ -143,31 +152,36 @@ const Shops: React.FC = () => {
   ];
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <h2>门店管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增门店
-        </Button>
+    <div className="page-container">
+      <div className="page-header">
+        <h2 className="page-title">门店管理</h2>
+        <div className="page-actions">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            新增门店
+          </Button>
+        </div>
       </div>
 
-      <Table
-        loading={loading}
-        dataSource={shops}
-        columns={columns}
-        rowKey="id"
-        pagination={{
-          current: page,
-          pageSize: pageSize,
-          total: total,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: (page, pageSize) => {
-            setPage(page);
-            setPageSize(pageSize);
-          },
-        }}
-      />
+      <div className="table-container">
+        <Table
+          loading={loading}
+          dataSource={shops}
+          columns={columns}
+          rowKey="id"
+          scroll={{ x: 1000 }}
+          pagination={{
+            current: page,
+            pageSize: pageSize,
+            total: total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: (page, pageSize) => {
+              setPage(page);
+              setPageSize(pageSize);
+            },
+          }}
+        />
+      </div>
 
       <Modal
         title={editingShop ? '编辑门店' : '新增门店'}

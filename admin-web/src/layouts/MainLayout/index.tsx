@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import logoImage from '../../assets/logo.png';
 import './index.css';
 
 const { Header, Sider, Content } = Layout;
@@ -70,20 +71,25 @@ const MainLayout: React.FC = () => {
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider trigger={null} collapsible collapsed={collapsed} theme="dark">
+    <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
+      <Sider trigger={null} collapsible collapsed={collapsed} theme="light" className="custom-sider">
         <div className="logo">
-          <h2>{collapsed ? '🍕' : '🍕 阳光披萨'}</h2>
+          {collapsed ? (
+            <img src={logoImage} alt="Logo" className="logo-small" />
+          ) : (
+            <img src={logoImage} alt="圣比萨 Logo" className="logo-large" />
+          )}
         </div>
         <Menu
-          theme="dark"
+          theme="light"
           mode="inline"
           selectedKeys={[location.pathname]}
           items={menuItems}
           onClick={({ key }) => handleMenuClick(key)}
+          className="custom-menu"
         />
       </Sider>
-      <Layout>
+      <Layout className="main-content-layout">
         <Header className="header">
           <div className="header-left">
             {React.createElement(collapsed ? MenuUnfoldOutlined : MenuFoldOutlined, {

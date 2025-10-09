@@ -1,0 +1,174 @@
+/* 通用页面样式 - 确保所有页面充满整个内容区域 */
+
+/* 页面容器 */
+.page-container {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 32px 40px;
+  background: white;
+  border-radius: 16px;
+  min-height: calc(100vh - 200px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  margin-bottom: 24px;
+}
+
+/* 页面标题 */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+/* 操作按钮区域 */
+.page-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* 表格容器 - 允许内部表格横向滚动 */
+.table-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto; /* 表格太宽时可以横向滚动 */
+  overflow-y: visible;
+}
+
+.table-container .ant-table-wrapper {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.table-container .ant-table {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* 表单容器 */
+.form-container {
+  width: 100% !important;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* 搜索栏 */
+.search-bar {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+/* 统计卡片 */
+.stats-card {
+  margin-bottom: 24px;
+}
+
+.stats-card .ant-card {
+  transition: all 0.3s;
+}
+
+.stats-card .ant-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+/* 行和列 */
+.ant-row {
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* 按钮样式优化 */
+.ant-btn-primary {
+  background-color: #e31e24;
+  border-color: #e31e24;
+}
+
+.ant-btn-primary:hover {
+  background-color: #c41e3a;
+  border-color: #c41e3a;
+}
+
+/* 标签样式优化 */
+.ant-tag {
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* 模态框样式 */
+.ant-modal {
+  max-width: 90vw;
+}
+
+.ant-modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 20px 24px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .page-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  
+  .search-bar {
+    padding: 12px;
+  }
+}
+
+/* 确保所有直接子元素也无宽度限制 */
+.page-container > * {
+  max-width: none !important;
+}
+
+/* 卡片网格布局 */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+  width: 100%;
+}
+
+/* 加载状态 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+/* 空状态 */
+.empty-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  color: #8c8c8c;
+}
+

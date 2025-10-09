@@ -119,16 +119,21 @@ const Users: React.FC = () => {
       title: '用户名',
       dataIndex: 'username',
       key: 'username',
+      width: 150,
+      ellipsis: true,
     },
     {
       title: '真实姓名',
       dataIndex: 'real_name',
       key: 'real_name',
+      width: 120,
+      ellipsis: true,
     },
     {
       title: '角色',
       dataIndex: 'role',
       key: 'role',
+      width: 120,
       render: (role: string) => (
         <Tag color={roleColors[role]}>{roleNames[role]}</Tag>
       ),
@@ -137,21 +142,27 @@ const Users: React.FC = () => {
       title: '所属门店',
       dataIndex: ['shop', 'name'],
       key: 'shop',
+      width: 180,
+      ellipsis: true,
       render: (text: string) => text || '-',
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
+      width: 180,
       render: (text: string) => new Date(text).toLocaleString('zh-CN'),
     },
     {
       title: '操作',
       key: 'action',
+      width: 160,
+      fixed: 'right' as const,
       render: (_: any, record: User) => (
-        <Space>
+        <Space size="small">
           <Button
             type="link"
+            size="small"
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
           >
@@ -163,7 +174,7 @@ const Users: React.FC = () => {
             okText="确定"
             cancelText="取消"
           >
-            <Button type="link" danger icon={<DeleteOutlined />}>
+            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
               删除
             </Button>
           </Popconfirm>
@@ -173,31 +184,36 @@ const Users: React.FC = () => {
   ];
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <h2>用户管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增用户
-        </Button>
+    <div className="page-container">
+      <div className="page-header">
+        <h2 className="page-title">用户管理</h2>
+        <div className="page-actions">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            新增用户
+          </Button>
+        </div>
       </div>
 
-      <Table
-        loading={loading}
-        dataSource={users}
-        columns={columns}
-        rowKey="id"
-        pagination={{
-          current: page,
-          pageSize: pageSize,
-          total: total,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: (page, pageSize) => {
-            setPage(page);
-            setPageSize(pageSize);
-          },
-        }}
-      />
+      <div className="table-container">
+        <Table
+          loading={loading}
+          dataSource={users}
+          columns={columns}
+          rowKey="id"
+          scroll={{ x: 1000 }}
+          pagination={{
+            current: page,
+            pageSize: pageSize,
+            total: total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: (page, pageSize) => {
+              setPage(page);
+              setPageSize(pageSize);
+            },
+          }}
+        />
+      </div>
 
       <Modal
         title={editingUser ? '编辑用户' : '新增用户'}

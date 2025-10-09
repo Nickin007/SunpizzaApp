@@ -146,8 +146,10 @@ const Dict: React.FC = () => {
   ];
 
   return (
-    <div>
-      <h2 style={{ marginBottom: 24 }}>字典管理</h2>
+    <div className="page-container">
+      <div className="page-header">
+        <h2 className="page-title">字典管理</h2>
+      </div>
       <Card>
         <Tabs items={items} />
       </Card>

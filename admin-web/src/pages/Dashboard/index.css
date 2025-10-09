@@ -1,17 +1,39 @@
+/* Dashboard 容器 - 充满整个内容区域 */
+.dashboard {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 32px 40px;
+  background: white;
+  border-radius: 16px;
+  min-height: calc(100vh - 200px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  margin-bottom: 24px;
+}
+
 .dashboard h2 {
   margin-bottom: 24px;
   font-size: 24px;
   font-weight: 600;
+  color: #333;
 }
 
+/* 卡片样式 */
 .dashboard .ant-card {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s;
 }
 
+.dashboard .ant-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+/* 统计数字样式 */
 .dashboard .ant-statistic-title {
   font-size: 14px;
   color: #8c8c8c;
+  margin-bottom: 8px;
 }
 
 .dashboard .ant-statistic-content {
@@ -19,3 +41,50 @@
   font-weight: 600;
 }
 
+/* 统计图标颜色 */
+.dashboard .anticon {
+  font-size: 24px;
+}
+
+.dashboard .anticon-file-text {
+  color: #1890ff;
+}
+
+.dashboard .anticon-clock-circle {
+  color: #faad14;
+}
+
+.dashboard .anticon-sync {
+  color: #52c41a;
+}
+
+.dashboard .anticon-check-circle {
+  color: #13c2c2;
+}
+
+.dashboard .anticon-inbox {
+  color: #eb2f96;
+}
+
+/* 表格样式 */
+.dashboard .ant-table {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.dashboard .ant-table-wrapper {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* 行列样式 */
+.dashboard .ant-row {
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.dashboard .ant-col {
+  padding-left: 12px;
+  padding-right: 12px;
+}

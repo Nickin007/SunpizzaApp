@@ -27,7 +27,7 @@ import { workOrdersApi } from '../../api/workOrders';
 import { usersApi } from '../../api/users';
 import { shopsApi } from '../../api/shops';
 import { dictApi } from '../../api/dict';
-import { WorkOrder, User, Shop, DictTaskType, DictPriority, DictStatus } from '../../types';
+import type { WorkOrder, User, Shop, DictTaskType, DictPriority, DictStatus } from '../../types';
 import dayjs from 'dayjs';
 
 const { TextArea } = Input;
@@ -293,32 +293,36 @@ const WorkOrders: React.FC = () => {
   ];
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <h2>工单管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增工单
-        </Button>
+    <div className="page-container">
+      <div className="page-header">
+        <h2 className="page-title">工单管理</h2>
+        <div className="page-actions">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            新增工单
+          </Button>
+        </div>
       </div>
 
-      <Table
-        loading={loading}
-        dataSource={workOrders}
-        columns={columns}
-        rowKey="id"
-        scroll={{ x: 1200 }}
-        pagination={{
-          current: page,
-          pageSize: pageSize,
-          total: total,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: (page, pageSize) => {
-            setPage(page);
-            setPageSize(pageSize);
-          },
-        }}
-      />
+      <div className="table-container">
+        <Table
+          loading={loading}
+          dataSource={workOrders}
+          columns={columns}
+          rowKey="id"
+          scroll={{ x: 1300 }}
+          pagination={{
+            current: page,
+            pageSize: pageSize,
+            total: total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: (page, pageSize) => {
+              setPage(page);
+              setPageSize(pageSize);
+            },
+          }}
+        />
+      </div>
 
       <Modal
         title={editingOrder ? '编辑工单' : '新增工单'}

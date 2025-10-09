@@ -1,71 +1,223 @@
+/* Logo 区域 */
 .logo {
-  height: 64px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
+  background: white;
   margin: 16px;
-  border-radius: 8px;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(227, 30, 36, 0.1);
+  transition: all 0.3s;
 }
 
-.logo h2 {
-  color: white;
-  margin: 0;
-  font-size: 18px;
+.logo:hover {
+  box-shadow: 0 4px 12px rgba(227, 30, 36, 0.2);
+  transform: translateY(-2px);
 }
 
+/* Logo 图片样式 */
+.logo-large {
+  width: 100%;
+  height: auto;
+  max-height: 60px;
+  object-fit: contain;
+  transition: all 0.3s;
+}
+
+.logo-small {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  transition: all 0.3s;
+}
+
+/* 顶部 Header - 与 content 保持相同的左右边距 */
 .header {
   background: white;
-  padding: 0 24px;
+  padding: 0 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  height: 64px;
+  line-height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 20px 0 40px; /* 与 content 相同的左右边距 */
 }
 
 .header-left {
   display: flex;
   align-items: center;
+  gap: 24px;
 }
 
+/* 折叠按钮 */
 .trigger {
   font-size: 20px;
   cursor: pointer;
-  transition: color 0.3s;
+  transition: all 0.3s;
+  padding: 8px;
+  border-radius: 4px;
 }
 
 .trigger:hover {
-  color: #1890ff;
+  color: #e31e24;
+  background-color: #fff5f5;
 }
 
+/* 右侧用户信息 */
 .header-right {
   display: flex;
   align-items: center;
+  gap: 16px;
 }
 
 .user-info {
   display: flex;
   align-items: center;
+  gap: 12px;
   cursor: pointer;
-  padding: 0 12px;
-  border-radius: 4px;
-  transition: background-color 0.3s;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.3s;
 }
 
 .user-info:hover {
-  background-color: #f0f0f0;
+  background-color: #f5f5f5;
 }
 
 .username {
-  margin-left: 8px;
   font-size: 14px;
+  font-weight: 500;
+  color: #333;
 }
 
+/* 内容区域 - 充满整个可用空间，右侧预留20px */
 .content {
-  margin: 24px;
-  padding: 24px;
-  background: white;
-  border-radius: 8px;
-  min-height: 280px;
+  margin: 32px 20px 32px 40px; /* 上 右 下 左 */
+  padding: 0;
+  min-height: calc(100vh - 128px);
+  max-width: none !important;
+  overflow: hidden; /* 防止子元素溢出 */
+  box-sizing: border-box;
 }
 
+/* 确保内部容器不超出父容器宽度 */
+.content > * {
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* 主内容布局 - 右侧整体区域与屏幕右边缘保持 100px 距离 */
+.main-content-layout {
+  margin-right: 100px !important;
+  background: #f5f5f5 !important;
+  overflow: hidden; /* 防止内容溢出右侧留白区域 */
+  box-sizing: border-box;
+}
+
+/* 自定义侧边栏 - 红白色系 */
+.custom-sider {
+  background: linear-gradient(180deg, #eca0a0 0%, #ef7e7e 100%) !important;
+  box-shadow: 2px 0 12px rgba(227, 30, 36, 0.08);
+  border-right: 1px solid rgba(227, 30, 36, 0.1);
+}
+
+.custom-sider .ant-layout-sider-trigger {
+  background: #e31e24 !important;
+  color: rgb(235, 113, 113) !important;
+}
+
+/* 自定义菜单 - 红白配色 */
+.custom-menu {
+  background: transparent !important;
+  border-right: none !important;
+  font-weight: 500;
+}
+
+/* 菜单项默认样式 */
+.custom-menu .ant-menu-item {
+  color: #333 !important;
+  margin: 4px 12px !important;
+  border-radius: 8px !important;
+  height: 48px !important;
+  line-height: 48px !important;
+  padding-left: 24px !important;
+  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) !important;
+}
+
+/* 菜单项 hover 样式 */
+.custom-menu .ant-menu-item:hover {
+  background: linear-gradient(135deg, #fff0f0 0%, #ffe5e5 100%) !important;
+  color: #e31e24 !important;
+  transform: translateX(4px);
+}
+
+/* 菜单项选中样式 */
+.custom-menu .ant-menu-item-selected {
+  background: linear-gradient(135deg, #e31e24 0%, #c41e3a 100%) !important;
+  color: white !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 12px rgba(227, 30, 36, 0.3);
+}
+
+.custom-menu .ant-menu-item-selected:hover {
+  background: linear-gradient(135deg, #c41e3a 0%, #a01828 100%) !important;
+  transform: translateX(4px);
+}
+
+/* 菜单图标样式 */
+.custom-menu .ant-menu-item .anticon {
+  font-size: 18px;
+  margin-right: 12px;
+  transition: all 0.3s;
+}
+
+.custom-menu .ant-menu-item-selected .anticon {
+  color: white !important;
+}
+
+.custom-menu .ant-menu-item:hover .anticon {
+  color: #e31e24 !important;
+  transform: scale(1.1);
+}
+
+.custom-menu .ant-menu-item-selected:hover .anticon {
+  color: white !important;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+  .header {
+    padding: 0 16px;
+    margin: 0 16px 0 20px; /* 移动端调整边距 */
+  }
+  
+  .content {
+    margin: 16px 16px 16px 20px; /* 移动端调整边距 */
+  }
+  
+  .username {
+    display: none;
+  }
+  
+  .logo {
+    height: 60px;
+    margin: 12px;
+    padding: 8px;
+  }
+  
+  .logo-large {
+    max-height: 40px;
+  }
+  
+  .custom-menu .ant-menu-item {
+    height: 42px !important;
+    line-height: 42px !important;
+    margin: 3px 8px !important;
+  }
+}
