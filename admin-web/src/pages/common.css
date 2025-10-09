@@ -1,18 +1,18 @@
 /* 通用页面样式 - 确保所有页面充满整个内容区域 */
 
-/* 页面容器 */
+/* 页面容器 - 左右对称的内边距 */
 .page-container {
-  width: 100% !important;
-  max-width: none !important;
-  padding: 32px 40px;
+  width: 100%;
+  padding: 32px 40px; /* 上下32px, 左右40px 对称 */
   background: white;
   border-radius: 16px;
   min-height: calc(100vh - 200px);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   margin-bottom: 24px;
+  box-sizing: border-box;
 }
 
-/* 页面标题 */
+/* 🎯 页面标题 - 对称留白方案 */
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -20,8 +20,16 @@
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 1px solid #f0f0f0;
+  margin-left: 0 !important;
+  width: 100% !important;  /* 强制宽度为 100% */
+  max-width: 100% !important;  /* 不超过容器宽度 */
+  box-sizing: border-box !important;
+  /* 🔥 核心方案：右侧 padding 与父容器对称，负 margin 让下边框延伸到边缘 */
+  padding-right: 40px;
+  margin-right: -40px;
 }
 
+/* 页面标题文字 */
 .page-title {
   font-size: 24px;
   font-weight: 600;
@@ -29,29 +37,59 @@
   margin: 0;
 }
 
-/* 操作按钮区域 */
+/* 🎯 操作按钮区域 - 与表格区域相同的留白方案 */
 .page-actions {
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-shrink: 0;  /* 防止按钮被压缩 */
+  /* 🔥 核心方案：右侧 padding 与父容器对称，负 margin 让按钮区域延伸到边缘 */
+  padding-right: 40px;
+  margin-right: -40px;
 }
 
-/* 表格容器 - 允许内部表格横向滚动 */
+/* 🎯 关键修复：表格容器 - 确保左右对称留白 */
 .table-container {
-  width: 100%;
-  max-width: 100%;
   overflow-x: auto; /* 表格太宽时可以横向滚动 */
   overflow-y: visible;
+  margin: 0;
+  /* 🔥 核心方案：右侧 padding 与父容器对称，负 margin 抵消滚动条顶格 */
+  padding-right: 40px;
+  margin-right: -40px;
 }
 
-.table-container .ant-table-wrapper {
-  width: 100% !important;
-  max-width: none !important;
+/* 修复Ant Design表格scroll导致的宽度问题 */
+.page-container .table-container .ant-table {
+  /* 表格宽度自适应，不固定 */
+  min-width: auto !important;
+  /* 🎯 移除表格底部边框，统一使用 .page-header 的下边框作为分割线 */
+  border-bottom: none !important;
 }
 
-.table-container .ant-table {
+.page-container .table-container .ant-table-container {
+  /* 确保表格容器不超出 */
+  max-width: 100% !important;
+}
+
+/* 修复分页器位置 */
+.page-container .table-container .ant-table-pagination {
+  /* 分页器在表格容器内，不溢出 */
   width: 100% !important;
-  max-width: none !important;
+  margin: 16px 0 0 0 !important;
+  padding: 0 !important;
+}
+
+/* ✅ 已删除所有强制 margin-right: 0 !important; 和 padding-right: 0 !important; */
+
+.page-container .ant-table-wrapper,
+.page-container .ant-spin-nested-loading,
+.page-container .ant-spin-container,
+.page-container .ant-table,
+.page-container .ant-table-container,
+.page-container .ant-table-content,
+.page-container table {
+  /* ✅ 只保留 max-width */
+  max-width: 100% !important;
 }
 
 /* 表单容器 */
@@ -83,11 +121,11 @@
   transform: translateY(-2px);
 }
 
-/* 行和列 */
-.ant-row {
-  width: 100% !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
+/* 行和列 - 确保对称布局 */
+.page-container .ant-row {
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 /* 按钮样式优化 */
@@ -139,11 +177,18 @@
   .search-bar {
     padding: 12px;
   }
+  
+  /* 移动端表格容器也保持对称 */
+  .table-container {
+    padding-right: 24px;
+    margin-right: -24px;
+  }
 }
 
-/* 确保所有直接子元素也无宽度限制 */
+/* 确保所有直接子元素尊重容器宽度 */
 .page-container > * {
-  max-width: none !important;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* 卡片网格布局 */
@@ -171,4 +216,3 @@
   min-height: 400px;
   color: #8c8c8c;
 }
-

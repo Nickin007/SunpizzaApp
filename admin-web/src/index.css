@@ -29,6 +29,14 @@ body {
   background-color: #f0f2f5;
 }
 
+/* 全局强制：所有内容尊重容器边界 - 最高优先级 */
+* {
+  box-sizing: border-box !important;
+}
+
+/* ✅ 已删除所有 Ant Design 组件的 margin-right/padding-right 强制规则 */
+/* 让组件自然适应父容器的布局，不再强制覆盖 */
+
 /* 链接样式 */
 a {
   font-weight: 500;

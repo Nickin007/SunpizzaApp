@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Table, Tag, Spin } from 'antd';
+import { Card, Row, Col, Statistic, Spin } from 'antd';
 import {
   FileTextOutlined,
   ClockCircleOutlined,
   SyncOutlined,
   CheckCircleOutlined,
-  InboxOutlined,
+  UserOutlined,
+  TeamOutlined,
+  ShopOutlined,
+  CrownOutlined,
 } from '@ant-design/icons';
 import { workOrdersApi } from '../../api/workOrders';
-import { Statistics, WorkOrder } from '../../types';
-import dayjs from 'dayjs';
+import { usersApi } from '../../api/users';
+import { shopsApi } from '../../api/shops';
+import type { Statistics } from '../../types';
 import './index.css';
 
 const Dashboard: React.FC = () => {
@@ -21,7 +25,13 @@ const Dashboard: React.FC = () => {
     completed: 0,
     archived: 0,
   });
-  const [recentOrders, setRecentOrders] = useState<WorkOrder[]>([]);
+  const [userStats, setUserStats] = useState({
+    admin: 0,
+    regional_manager: 0,
+    shop_manager: 0,
+    employee: 0,
+  });
+  const [shopCount, setShopCount] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -30,13 +40,28 @@ const Dashboard: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 加载统计数据
+      // 加载工单统计数据
       const statsRes = await workOrdersApi.getStatistics();
       setStats(statsRes.data.data);
 
-      // 加载最近的工单
-      const ordersRes = await workOrdersApi.getWorkOrders({ page: 1, per_page: 10 });
-      setRecentOrders(ordersRes.data.data.items);
+      // 加载用户角色统计
+      const [adminRes, managerRes, shopManagerRes, employeeRes] = await Promise.all([
+        usersApi.getUsers({ role: 'admin', per_page: 1000 }),
+        usersApi.getUsers({ role: 'regional_manager', per_page: 1000 }),
+        usersApi.getUsers({ role: 'shop_manager', per_page: 1000 }),
+        usersApi.getUsers({ role: 'employee', per_page: 1000 }),
+      ]);
+      
+      setUserStats({
+        admin: adminRes.data.data.total,
+        regional_manager: managerRes.data.data.total,
+        shop_manager: shopManagerRes.data.data.total,
+        employee: employeeRes.data.data.total,
+      });
+
+      // 加载门店统计
+      const shopsRes = await shopsApi.getShops({ per_page: 1000 });
+      setShopCount(shopsRes.data.data.total);
     } catch (error) {
       console.error('加载数据失败：', error);
     } finally {
@@ -44,69 +69,16 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const statusColors: Record<string, string> = {
-    '待受理': 'default',
-    '进行中': 'processing',
-    '已完成': 'success',
-    '已归档': 'default',
-  };
-
-  const priorityColors: Record<string, string> = {
-    '低': 'green',
-    '中': 'orange',
-    '高': 'red',
-  };
-
-  const columns = [
-    {
-      title: '工单标题',
-      dataIndex: 'title',
-      key: 'title',
-    },
-    {
-      title: '类型',
-      dataIndex: ['type', 'type_name'],
-      key: 'type',
-      render: (text: string, record: WorkOrder) => (
-        <Tag color={record.type?.color}>{text}</Tag>
-      ),
-    },
-    {
-      title: '优先级',
-      dataIndex: ['priority', 'priority_name'],
-      key: 'priority',
-      render: (text: string, record: WorkOrder) => (
-        <Tag color={priorityColors[text] || 'default'}>{text}</Tag>
-      ),
-    },
-    {
-      title: '状态',
-      dataIndex: ['status', 'status_name'],
-      key: 'status',
-      render: (text: string) => (
-        <Tag color={statusColors[text] || 'default'}>{text}</Tag>
-      ),
-    },
-    {
-      title: '门店',
-      dataIndex: ['shop', 'name'],
-      key: 'shop',
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      render: (text: string) => dayjs(text).format('YYYY-MM-DD HH:mm'),
-    },
-  ];
 
   return (
     <Spin spinning={loading}>
       <div className="dashboard">
         <h2>数据概览</h2>
+        
+        {/* 工单状态统计 */}
         <Row gutter={16} style={{ marginBottom: 24 }}>
           <Col span={6}>
-            <Card>
+            <Card className="stat-card">
               <Statistic
                 title="总工单数"
                 value={stats.total}
@@ -116,7 +88,7 @@ const Dashboard: React.FC = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card>
+            <Card className="stat-card">
               <Statistic
                 title="待受理"
                 value={stats.pending}
@@ -126,7 +98,7 @@ const Dashboard: React.FC = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card>
+            <Card className="stat-card">
               <Statistic
                 title="进行中"
                 value={stats.in_progress}
@@ -136,7 +108,7 @@ const Dashboard: React.FC = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card>
+            <Card className="stat-card">
               <Statistic
                 title="已完成"
                 value={stats.completed}
@@ -147,14 +119,63 @@ const Dashboard: React.FC = () => {
           </Col>
         </Row>
 
-        <Card title="最近工单" extra={<InboxOutlined />}>
-          <Table
-            dataSource={recentOrders}
-            columns={columns}
-            rowKey="id"
-            pagination={false}
-          />
-        </Card>
+        {/* 账号角色统计 */}
+        <Row gutter={16} style={{ marginBottom: 24 }}>
+          <Col span={6}>
+            <Card className="stat-card role-admin">
+              <Statistic
+                title="管理员账号"
+                value={userStats.admin}
+                prefix={<CrownOutlined />}
+                valueStyle={{ color: '#e31e24' }}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card className="stat-card role-manager">
+              <Statistic
+                title="区域经理账号"
+                value={userStats.regional_manager}
+                prefix={<TeamOutlined />}
+                valueStyle={{ color: '#fa8c16' }}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card className="stat-card role-shop-manager">
+              <Statistic
+                title="店长账号"
+                value={userStats.shop_manager}
+                prefix={<UserOutlined />}
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card className="stat-card role-employee">
+              <Statistic
+                title="员工账号"
+                value={userStats.employee}
+                prefix={<UserOutlined />}
+                valueStyle={{ color: '#52c41a' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 门店统计 */}
+        <Row gutter={16}>
+          <Col span={24}>
+            <Card className="stat-card shop-count-card">
+              <Statistic
+                title="🏪 门店总数"
+                value={shopCount}
+                prefix={<ShopOutlined />}
+                valueStyle={{ color: '#722ed1', fontSize: '36px' }}
+              />
+            </Card>
+          </Col>
+        </Row>
       </div>
     </Spin>
   );

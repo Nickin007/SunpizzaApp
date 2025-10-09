@@ -23,11 +23,21 @@
   max-width: none !important;
 }
 
-/* 移除所有可能的宽度限制 */
-.page-container,
+/* 页面容器居中但不强制宽度 */
 .content-wrapper,
 .main-content {
-  width: 100% !important;
-  max-width: none !important;
+  width: 100%;
   margin: 0 auto;
+}
+
+/* ✅ 已删除所有 Ant Design 表格/分页器的 margin-right/padding-right 强制规则 */
+/* 让表格和分页器自然适应父容器的布局 */
+
+/* 全局强制：确保表格内容不溢出 */
+.ant-spin-nested-loading,
+.ant-spin-container,
+.ant-table,
+.ant-table-container,
+.ant-table-content {
+  max-width: 100% !important;
 }

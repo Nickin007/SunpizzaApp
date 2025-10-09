@@ -1,5 +1,5 @@
 import { http } from '../utils/request';
-import { Shop, PaginationResponse } from '../types';
+import type { Shop, PaginationResponse } from '../types';
 
 export const shopsApi = {
   // 获取门店列表

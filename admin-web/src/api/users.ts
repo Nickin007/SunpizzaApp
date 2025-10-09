@@ -1,5 +1,5 @@
 import { http } from '../utils/request';
-import { User, PaginationResponse } from '../types';
+import type { User, PaginationResponse } from '../types';
 
 export const usersApi = {
   // 获取用户列表

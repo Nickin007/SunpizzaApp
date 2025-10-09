@@ -27,12 +27,10 @@ def paginated_response(items, page, per_page, total, message='获取成功'):
     return success_response(
         data={
             'items': items,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': total,
-                'pages': (total + per_page - 1) // per_page
-            }
+            'total': total,  # 前端需要直接访问 total
+            'page': page,
+            'per_page': per_page,
+            'pages': (total + per_page - 1) // per_page
         },
         message=message
     )

@@ -1,5 +1,5 @@
 import { http } from '../utils/request';
-import { DictTaskType, DictPriority, DictStatus } from '../types';
+import type { DictTaskType, DictPriority, DictStatus } from '../types';
 
 export const dictApi = {
   // 获取任务类型

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Tabs, Table, Tag, Card } from 'antd';
 import { dictApi } from '../../api/dict';
-import { DictTaskType, DictPriority, DictStatus } from '../../types';
+import type { DictTaskType, DictPriority, DictStatus } from '../../types';
 
 const Dict: React.FC = () => {
   const [types, setTypes] = useState<DictTaskType[]>([]);

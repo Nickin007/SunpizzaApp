@@ -3,7 +3,7 @@ import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, 
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { usersApi } from '../../api/users';
 import { shopsApi } from '../../api/shops';
-import { User, Shop } from '../../types';
+import type { User, Shop } from '../../types';
 
 const Users: React.FC = () => {
   const [loading, setLoading] = useState(false);

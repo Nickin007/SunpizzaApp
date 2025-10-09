@@ -1,5 +1,5 @@
 import { http } from '../utils/request';
-import { WorkOrder, PaginationResponse, TaskComment, Statistics } from '../types';
+import type { WorkOrder, PaginationResponse, TaskComment, Statistics } from '../types';
 
 export const workOrdersApi = {
   // 获取工单列表

@@ -282,7 +282,7 @@ def get_statuses(current_user):
 @bp.route('/stats', methods=['GET'])
 @token_required
 def get_work_order_stats(current_user):
-    """获取工单统计数据（用于首页仪表盘）"""
+    """获取工单统计数据（用于首页仪表盘）- 旧版API"""
     from app.models import User, Shop
     from sqlalchemy import func
     
@@ -308,6 +308,55 @@ def get_work_order_stats(current_user):
     for status in statuses:
         count = base_query.filter_by(status_id=status.id).count()
         stats[status.status_name] = count
+    
+    return success_response(data=stats, message='获取统计数据成功')
+
+@bp.route('/statistics', methods=['GET'])
+@token_required
+def get_statistics(current_user):
+    """获取工单统计数据（标准格式）"""
+    from app.models import Shop
+    
+    # 基础查询
+    base_query = WorkOrder.query
+    
+    # 根据角色过滤数据
+    if current_user['role'] == 'shop_manager':
+        if current_user.get('shop_id'):
+            base_query = base_query.filter(WorkOrder.shop_id == current_user['shop_id'])
+        else:
+            base_query = base_query.filter(
+                (WorkOrder.creator_id == current_user['user_id']) |
+                (WorkOrder.assignee_id == current_user['user_id'])
+            )
+    elif current_user['role'] == 'regional_manager':
+        managed_shop_ids = [s.id for s in Shop.query.filter_by(regional_manager_id=current_user['user_id']).all()]
+        if managed_shop_ids:
+            base_query = base_query.filter(WorkOrder.shop_id.in_(managed_shop_ids))
+        else:
+            # 如果没有管辖门店，返回空统计
+            return success_response(data={
+                'total': 0,
+                'pending': 0,
+                'in_progress': 0,
+                'completed': 0,
+                'archived': 0
+            })
+    
+    # 获取各状态ID（假设：1=待受理, 2=进行中, 3=已完成, 4=已归档）
+    total = base_query.count()
+    pending = base_query.filter_by(status_id=1).count()
+    in_progress = base_query.filter_by(status_id=2).count()
+    completed = base_query.filter_by(status_id=3).count()
+    archived = base_query.filter_by(status_id=4).count()
+    
+    stats = {
+        'total': total,
+        'pending': pending,
+        'in_progress': in_progress,
+        'completed': completed,
+        'archived': archived
+    }
     
     return success_response(data=stats, message='获取统计数据成功')
 
