@@ -117,3 +117,57 @@ export interface Statistics {
   archived: number;
 }
 
+// ==================== 培训模块类型 ====================
+export interface TrainingCategory {
+  id: number;
+  name: string;
+  parent_id: number | null;
+  type: 'product' | 'service' | 'operation';
+  sort_order: number;
+}
+
+export interface TrainingCourse {
+  id: number;
+  title: string;
+  description: string | null;
+  category_id: number;
+  category?: TrainingCategory;
+  video_url: string | null;
+  document_content: string | null;
+  has_exam: boolean;
+  is_published: boolean;
+  created_at: string;
+  exam_questions?: ExamQuestion[];
+}
+
+export interface ExamQuestion {
+  id: number;
+  course_id: number;
+  question_text: string;
+  question_type: 'single_choice' | 'multiple_choice' | 'true_false' | 'subjective';
+  options: string[] | null;
+  correct_answer: string | null;
+  is_subjective: boolean;
+  score: number;
+  sort_order: number;
+}
+
+export interface ExamSubmission {
+  id: number;
+  user_id: number;
+  student_name: string | null;
+  course_id: number;
+  course_name: string | null;
+  answers: Record<string, string>;
+  objective_score: number;
+  subjective_score: number;
+  total_score: number;
+  status: 'pending_review' | 'passed' | 'failed';
+  reviewed_by: number | null;
+  reviewer_name: string | null;
+  reviewed_at: string | null;
+  feedback: string | null;
+  created_at: string;
+  questions?: ExamQuestion[];
+}
+

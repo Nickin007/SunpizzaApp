@@ -279,6 +279,207 @@ def get_statuses(current_user):
     statuses = DictStatus.query.all()
     return success_response(data=[s.to_dict() for s in statuses], message='获取状态列表成功')
 
+# ==================== 字典管理 - 新增功能 ====================
+
+@bp.route('/dict/types', methods=['POST'])
+@admin_required
+def create_task_type(current_user):
+    """创建任务类型（仅管理员）"""
+    data = request.get_json()
+    
+    if not data.get('type_name'):
+        return error_response('类型名称不能为空', 400)
+    
+    task_type = DictTaskType(
+        type_name=data['type_name'],
+        color=data.get('color', '#999999')
+    )
+    
+    try:
+        db.session.add(task_type)
+        db.session.commit()
+        return success_response(data=task_type.to_dict(), message='任务类型创建成功', code=201)
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'创建失败: {str(e)}', 500)
+
+@bp.route('/dict/priorities', methods=['POST'])
+@admin_required
+def create_priority(current_user):
+    """创建优先级（仅管理员）"""
+    data = request.get_json()
+    
+    if not data.get('priority_name'):
+        return error_response('优先级名称不能为空', 400)
+    
+    priority = DictPriority(
+        priority_name=data['priority_name'],
+        color=data.get('color', '#999999'),
+        sort_order=data.get('sort_order', 1)
+    )
+    
+    try:
+        db.session.add(priority)
+        db.session.commit()
+        return success_response(data=priority.to_dict(), message='优先级创建成功', code=201)
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'创建失败: {str(e)}', 500)
+
+@bp.route('/dict/statuses', methods=['POST'])
+@admin_required
+def create_status(current_user):
+    """创建工单状态（仅管理员）"""
+    data = request.get_json()
+    
+    if not data.get('status_name'):
+        return error_response('状态名称不能为空', 400)
+    
+    status = DictStatus(
+        status_name=data['status_name'],
+        color=data.get('color', '#999999')
+    )
+    
+    try:
+        db.session.add(status)
+        db.session.commit()
+        return success_response(data=status.to_dict(), message='工单状态创建成功', code=201)
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'创建失败: {str(e)}', 500)
+
+# ==================== 字典管理 - 编辑功能 ====================
+
+@bp.route('/dict/types/<int:type_id>', methods=['PUT'])
+@admin_required
+def update_task_type(current_user, type_id):
+    """更新任务类型（仅管理员）"""
+    task_type = DictTaskType.query.get(type_id)
+    if not task_type:
+        return error_response('任务类型不存在', 404)
+    
+    data = request.get_json()
+    if 'type_name' in data:
+        task_type.type_name = data['type_name']
+    if 'color' in data:
+        task_type.color = data['color']
+    
+    try:
+        db.session.commit()
+        return success_response(data=task_type.to_dict(), message='任务类型更新成功')
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'更新失败: {str(e)}', 500)
+
+@bp.route('/dict/types/<int:type_id>', methods=['DELETE'])
+@admin_required
+def delete_task_type(current_user, type_id):
+    """删除任务类型（仅管理员）"""
+    task_type = DictTaskType.query.get(type_id)
+    if not task_type:
+        return error_response('任务类型不存在', 404)
+    
+    # 检查是否有工单使用此类型
+    work_order_count = WorkOrder.query.filter_by(type_id=type_id).count()
+    if work_order_count > 0:
+        return error_response(f'无法删除，有 {work_order_count} 个工单正在使用此类型', 400)
+    
+    try:
+        db.session.delete(task_type)
+        db.session.commit()
+        return success_response(message='任务类型删除成功')
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'删除失败: {str(e)}', 500)
+
+@bp.route('/dict/priorities/<int:priority_id>', methods=['PUT'])
+@admin_required
+def update_priority(current_user, priority_id):
+    """更新优先级（仅管理员）"""
+    priority = DictPriority.query.get(priority_id)
+    if not priority:
+        return error_response('优先级不存在', 404)
+    
+    data = request.get_json()
+    if 'priority_name' in data:
+        priority.priority_name = data['priority_name']
+    if 'color' in data:
+        priority.color = data['color']
+    if 'sort_order' in data:
+        priority.sort_order = data['sort_order']
+    
+    try:
+        db.session.commit()
+        return success_response(data=priority.to_dict(), message='优先级更新成功')
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'更新失败: {str(e)}', 500)
+
+@bp.route('/dict/priorities/<int:priority_id>', methods=['DELETE'])
+@admin_required
+def delete_priority(current_user, priority_id):
+    """删除优先级（仅管理员）"""
+    priority = DictPriority.query.get(priority_id)
+    if not priority:
+        return error_response('优先级不存在', 404)
+    
+    # 检查是否有工单使用此优先级
+    work_order_count = WorkOrder.query.filter_by(priority_id=priority_id).count()
+    if work_order_count > 0:
+        return error_response(f'无法删除，有 {work_order_count} 个工单正在使用此优先级', 400)
+    
+    try:
+        db.session.delete(priority)
+        db.session.commit()
+        return success_response(message='优先级删除成功')
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'删除失败: {str(e)}', 500)
+
+@bp.route('/dict/statuses/<int:status_id>', methods=['PUT'])
+@admin_required
+def update_status(current_user, status_id):
+    """更新工单状态（仅管理员）"""
+    status = DictStatus.query.get(status_id)
+    if not status:
+        return error_response('工单状态不存在', 404)
+    
+    data = request.get_json()
+    if 'status_name' in data:
+        status.status_name = data['status_name']
+    if 'color' in data:
+        status.color = data['color']
+    
+    try:
+        db.session.commit()
+        return success_response(data=status.to_dict(), message='工单状态更新成功')
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'更新失败: {str(e)}', 500)
+
+@bp.route('/dict/statuses/<int:status_id>', methods=['DELETE'])
+@admin_required
+def delete_status(current_user, status_id):
+    """删除工单状态（仅管理员）"""
+    status = DictStatus.query.get(status_id)
+    if not status:
+        return error_response('工单状态不存在', 404)
+    
+    # 检查是否有工单使用此状态
+    work_order_count = WorkOrder.query.filter_by(status_id=status_id).count()
+    if work_order_count > 0:
+        return error_response(f'无法删除，有 {work_order_count} 个工单正在使用此状态', 400)
+    
+    try:
+        db.session.delete(status)
+        db.session.commit()
+        return success_response(message='工单状态删除成功')
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'删除失败: {str(e)}', 500)
+
+# ==================== 工单统计 ====================
+
 @bp.route('/stats', methods=['GET'])
 @token_required
 def get_work_order_stats(current_user):

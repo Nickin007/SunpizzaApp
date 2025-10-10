@@ -19,7 +19,7 @@
 ### 技术架构
 
 - **移动端**: Flutter (iOS、Android)
-- **Web 管理后台**: Flutter Web
+- **Web 管理后台**: React 18 + TypeScript + Ant Design
 - **后端**: Python Flask (RESTful API)
 - **数据库**: MySQL 8.0+
 - **部署**: 腾讯云 Ubuntu 22.04、Nginx、Gunicorn
@@ -28,7 +28,7 @@
 
 ```
 SunpizzaApp/
-├── backend/                    # Flask 后端
+├── backend/                    # Flask 后端 API（Python）
 │   ├── app/                    # 应用主目录
 │   │   ├── __init__.py        # 应用工厂
 │   │   ├── models.py          # 数据库模型（14个表）
@@ -41,16 +41,17 @@ SunpizzaApp/
 │   │   └── utils/             # 工具类
 │   │       ├── auth.py        # JWT 认证
 │   │       └── response.py    # 统一响应格式
+│   ├── tests/                 # 测试文件
+│   │   ├── test_connection.py     # 数据库连接测试
+│   │   └── test_work_orders_api.py # 工单 API 测试
 │   ├── config.py              # 配置文件
 │   ├── wsgi.py                # WSGI 应用入口（Gunicorn）
-│   ├── init_db.py             # 数据库初始化脚本
-│   ├── test_connection.py     # 数据库连接测试
 │   ├── requirements.txt       # Python 依赖
 │   ├── venv/                  # Python 虚拟环境（不提交到 Git）
 │   ├── .env                   # 环境变量配置（不提交到 Git）
 │   └── .gitignore
 │
-├── frontend/                   # Flutter 项目（移动端 + Web 管理后台）
+├── frontend/                   # Flutter 移动端（Dart）
 │   ├── lib/
 │   │   ├── main.dart          # 移动端入口
 │   │   ├── core/              # 核心功能（共享）
@@ -129,22 +130,55 @@ SunpizzaApp/
 │   ├── UI优化说明.md           # UI 优化文档
 │   └── .gitignore
 │
+├── admin-web/                  # React 管理后台（TypeScript）
+│   ├── src/
+│   │   ├── api/               # API 接口封装
+│   │   │   ├── auth.ts        # 认证 API
+│   │   │   ├── users.ts       # 用户管理 API
+│   │   │   ├── shops.ts       # 门店管理 API
+│   │   │   ├── workOrders.ts  # 工单管理 API
+│   │   │   └── dict.ts        # 字典数据 API
+│   │   ├── pages/             # 页面组件
+│   │   │   ├── Login/         # 登录页
+│   │   │   ├── Dashboard/     # 仪表盘
+│   │   │   ├── Users/         # 用户管理
+│   │   │   ├── Shops/         # 门店管理
+│   │   │   ├── WorkOrders/    # 工单管理
+│   │   │   └── Dict/          # 字典管理
+│   │   ├── layouts/           # 布局组件
+│   │   │   └── MainLayout/    # 主布局
+│   │   ├── store/             # 状态管理（Zustand）
+│   │   │   └── authStore.ts   # 认证状态
+│   │   ├── types/             # TypeScript 类型定义
+│   │   ├── utils/             # 工具函数
+│   │   │   └── request.ts     # Axios 请求封装
+│   │   └── router/            # 路由配置
+│   ├── public/                # 静态资源
+│   ├── dist/                  # 构建输出（不提交到 Git）
+│   ├── package.json           # npm 依赖
+│   ├── vite.config.ts         # Vite 配置
+│   └── tsconfig.json          # TypeScript 配置
+│
 ├── docs/                       # 项目文档
 │   ├── API文档.md              # 完整 API 接口文档
-│   └── 数据库设计.md           # 数据库表结构设计
+│   ├── 数据库设计.md           # 数据库表结构设计
+│   ├── 快速启动.md             # 快速启动指南
+│   ├── 工单模块完整测试指南.md # 工单模块测试文档
+│   └── 完整部署指南.md         # 详细部署步骤
 │
-├── deploy/                     # 部署脚本（Shell）
-│   ├── 完整部署指南.md         # 详细部署步骤
+├── deploy/                     # 部署脚本和数据库初始化
+│   ├── init_db.py             # 数据库初始化脚本
 │   ├── test_api.sh            # API 接口测试脚本
 │   ├── server_setup.sh        # 服务器基础环境设置
 │   ├── mysql_setup.sh         # MySQL 安装配置
 │   ├── deploy_backend.sh      # 后端部署脚本
 │   ├── nginx_setup.sh         # Nginx 反向代理配置
 │   ├── finish_service.sh      # 服务启动脚本
+│   ├── 配置nginx-前端服务器.sh # 前端服务器 Nginx 配置
 │   └── 一键部署.sh            # 一键部署所有服务
 │
-├── README.md                   # 项目总览（本文件）
-└── 快速启动.md                 # 快速启动指南
+├── .gitignore                  # Git 忽略文件配置
+└── README.md                   # 项目总览（本文件）
 ```
 
 ## 快速开始
@@ -174,7 +208,8 @@ SunpizzaApp/
 
 4. **初始化数据库**
    ```bash
-   python init_db.py
+   cd ..
+   python deploy/init_db.py
    ```
    
    这将创建所有表并初始化：
@@ -271,27 +306,37 @@ SunpizzaApp/
 
 ### Web 管理后台设置
 
-1. **运行开发模式**
+1. **环境要求**
+   - Node.js 16+
+   - npm 或 yarn
+
+2. **安装依赖**
    ```bash
-   cd frontend
-   flutter run -d chrome -t lib/main_web.dart
+   cd admin-web
+   npm install
    ```
 
-2. **构建生产版本**
+3. **运行开发模式**
    ```bash
-   flutter build web -t lib/main_web.dart
-   # 生成的文件在 build/web/
+   npm run dev
+   # 访问 http://localhost:5173
    ```
 
-3. **部署到 Nginx**
-   将 `build/web/` 目录上传到服务器：
+4. **构建生产版本**
    ```bash
-   scp -r build/web/* ubuntu@your-server:/var/www/admin
+   npm run build
+   # 生成的文件在 dist/
    ```
 
-4. **访问地址**
-   - 开发环境：`http://localhost:<port>`
-   - 生产环境：`http://your-domain/admin`
+5. **部署到 Nginx**
+   将 `dist/` 目录上传到服务器：
+   ```bash
+   scp -r dist/* ubuntu@your-server:/var/www/admin
+   ```
+
+6. **访问地址**
+   - 开发环境：`http://localhost:5173`
+   - 生产环境：`http://your-domain`
 
 ⚠️ **注意：** Web 管理后台仅允许管理员账号登录
 
@@ -302,17 +347,17 @@ SunpizzaApp/
 | **目标用户** | 店长、区域经理、管理员 | 仅管理员 |
 | **主要用途** | 日常工单处理、培训学习 | 系统管理、数据维护 |
 | **UI 设计** | 移动端优化、触摸友好 | 桌面端优化、表格为主 |
-| **代码复用** | - | 复用移动端 70%+ 代码 |
+| **技术栈** | Flutter (Dart) | React + TypeScript |
 | **部署方式** | App Store / APK | Nginx 静态托管 |
 | **访问方式** | 下载安装 | 浏览器访问 |
 | **离线能力** | 支持 | 不支持 |
 
-### 为什么用 Flutter Web 做管理后台？
+### 为什么用 React 做管理后台？
 
-✅ **代码复用率高** - 复用移动端的 models、services、providers  
-✅ **统一技术栈** - 一套代码，维护简单  
-✅ **开发效率高** - 不需要学习新框架  
-✅ **品牌一致性** - UI 风格与移动端统一  
+✅ **成熟的生态系统** - Ant Design 提供丰富的企业级组件  
+✅ **优秀的表格性能** - 适合大量数据展示和操作  
+✅ **开发体验好** - TypeScript 类型安全 + Vite 快速构建  
+✅ **社区支持强** - 更多第三方库和解决方案  
 ✅ **适合内部系统** - 管理后台是内部工具，不需要 SEO
 
 ## 用户角色与权限
@@ -422,15 +467,15 @@ Authorization: Bearer <token>
 - ✅ 云服务器部署（腾讯云 + Nginx + Gunicorn）
 - ✅ Android APK 打包与真机调试
 
-### 🔄 进行中
-- 🔄 Web 管理后台开发
-  - [ ] 管理员登录页
-  - [ ] 仪表盘（数据统计）
-  - [ ] 用户管理（增删改查、重置密码）
-  - [ ] 门店管理（增删改查）
-  - [ ] 工单管理（查看、编辑、删除）
-  - [ ] 培训内容管理
-  - [ ] 系统设置
+### ✅ 已完成（续）
+- ✅ React Web 管理后台开发
+  - ✅ 管理员登录页（红色科技风）
+  - ✅ 仪表盘（数据统计 - 工单、用户、门店）
+  - ✅ 用户管理（增删改查）
+  - ✅ 门店管理（增删改查）
+  - ✅ 工单管理（查看、编辑、删除）
+  - ✅ 字典管理（类型、优先级、状态）
+  - ✅ 响应式布局与现代化 UI
 
 ### 📋 待开发
 - [ ] 文件上传功能优化

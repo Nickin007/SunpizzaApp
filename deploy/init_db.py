@@ -1,4 +1,10 @@
 """数据库初始化脚本"""
+import sys
+import os
+
+# 添加 backend 目录到 Python 路径
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+
 import pymysql
 from app import create_app, db
 from app.models import (

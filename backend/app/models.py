@@ -312,16 +312,15 @@ class TrainingCategory(db.Model):
 
 
 class TrainingCourse(db.Model):
-    """培训课程表"""
+    """培训课程表 - 视频+文档+考试一体化"""
     __tablename__ = 'training_courses'
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text)
     category_id = db.Column(db.Integer, db.ForeignKey('training_categories.id'), nullable=False)
-    content_type = db.Column(db.Enum('text', 'pdf', 'video', name='content_type'), nullable=False)
-    content_url = db.Column(db.String(500))
-    content_text = db.Column(db.Text)
+    video_url = db.Column(db.String(500))  # 视频地址（可选）
+    document_content = db.Column(db.Text)  # 富文本文档内容
     has_exam = db.Column(db.Boolean, default=False)
     is_published = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -329,52 +328,69 @@ class TrainingCourse(db.Model):
     # 关系
     exam_questions = db.relationship('ExamQuestion', backref='course', lazy='dynamic')
     learning_records = db.relationship('LearningRecord', backref='course', lazy='dynamic')
+    exam_submissions = db.relationship('ExamSubmission', backref='course', lazy='dynamic')
     
-    def to_dict(self):
-        return {
+    def to_dict(self, include_questions=False):
+        data = {
             'id': self.id,
             'title': self.title,
             'description': self.description,
             'category': self.category.to_dict() if self.category else None,
-            'content_type': self.content_type,
-            'content_url': self.content_url,
-            'content_text': self.content_text,
+            'video_url': self.video_url,
+            'document_content': self.document_content,
             'has_exam': self.has_exam,
             'is_published': self.is_published,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+        if include_questions:
+            data['exam_questions'] = [q.to_dict() for q in self.exam_questions.all()]
+        return data
 
 
 class ExamQuestion(db.Model):
-    """考试题库表"""
+    """考试题库表 - 支持客观题和主观题"""
     __tablename__ = 'exam_questions'
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     course_id = db.Column(db.Integer, db.ForeignKey('training_courses.id'), nullable=False)
     question_text = db.Column(db.Text, nullable=False)
-    question_type = db.Column(db.Enum('single_choice', 'multiple_choice', 'true_false', name='question_type'), nullable=False)
-    options = db.Column(db.JSON)  # 选项数组
-    correct_answer = db.Column(db.String(255), nullable=False)  # 正确答案
+    question_type = db.Column(db.Enum('single_choice', 'multiple_choice', 'true_false', 'subjective', name='question_type'), nullable=False)
+    options = db.Column(db.JSON)  # 选项数组（客观题使用）
+    correct_answer = db.Column(db.String(255))  # 正确答案（客观题使用，主观题为空）
+    is_subjective = db.Column(db.Boolean, default=False)  # 是否为主观题
+    score = db.Column(db.Integer, default=10)  # 题目分值
+    sort_order = db.Column(db.Integer, default=0)  # 排序
     
-    def to_dict(self):
-        return {
+    def to_dict(self, include_answer=False):
+        """
+        转换为字典
+        include_answer: 是否包含答案（考试时不返回答案）
+        """
+        data = {
             'id': self.id,
             'question_text': self.question_text,
             'question_type': self.question_type,
             'options': self.options,
-            'correct_answer': self.correct_answer
+            'is_subjective': self.is_subjective,
+            'score': self.score,
+            'sort_order': self.sort_order
         }
+        if include_answer and not self.is_subjective:
+            data['correct_answer'] = self.correct_answer
+        return data
 
 
 class LearningRecord(db.Model):
-    """学习记录表"""
+    """学习记录表 - 记录视频进度和学习状态"""
     __tablename__ = 'learning_records'
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey('training_courses.id'), nullable=False)
+    video_progress = db.Column(db.Integer, default=0)  # 视频观看进度（秒）
+    document_read = db.Column(db.Boolean, default=False)  # 是否已阅读文档
     completed = db.Column(db.Boolean, default=False)
-    exam_score = db.Column(db.Integer)  # 考试分数
+    exam_score = db.Column(db.Integer)  # 考试分数（已废弃，改用ExamSubmission）
     exam_passed = db.Column(db.Boolean, default=False)
     started_at = db.Column(db.DateTime, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
@@ -386,10 +402,55 @@ class LearningRecord(db.Model):
             'id': self.id,
             'user_id': self.user_id,
             'course': self.course.to_dict() if self.course else None,
+            'video_progress': self.video_progress,
+            'document_read': self.document_read,
             'completed': self.completed,
             'exam_score': self.exam_score,
             'exam_passed': self.exam_passed,
             'started_at': self.started_at.isoformat() if self.started_at else None,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None
         }
+
+
+class ExamSubmission(db.Model):
+    """考试提交表 - 记录考试答案和评分"""
+    __tablename__ = 'exam_submissions'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('training_courses.id'), nullable=False)
+    answers = db.Column(db.JSON, nullable=False)  # 格式: {"question_id": "answer", ...}
+    objective_score = db.Column(db.Integer, default=0)  # 客观题得分（自动判分）
+    subjective_score = db.Column(db.Integer, default=0)  # 主观题得分（管理员评分）
+    total_score = db.Column(db.Integer, default=0)  # 总分
+    status = db.Column(db.Enum('pending_review', 'passed', 'failed', name='exam_status'), default='pending_review')
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('users.id'))  # 审核人
+    reviewed_at = db.Column(db.DateTime)  # 审核时间
+    feedback = db.Column(db.Text)  # 审核反馈
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # 关系
+    student = db.relationship('User', foreign_keys=[user_id], backref='exam_submissions')
+    reviewer = db.relationship('User', foreign_keys=[reviewed_by], backref='reviewed_exams')
+    
+    def to_dict(self, include_answers=True):
+        data = {
+            'id': self.id,
+            'user_id': self.user_id,
+            'student_name': self.student.real_name if self.student else None,
+            'course_id': self.course_id,
+            'course_name': self.course.title if self.course else None,
+            'objective_score': self.objective_score,
+            'subjective_score': self.subjective_score,
+            'total_score': self.total_score,
+            'status': self.status,
+            'reviewed_by': self.reviewed_by,
+            'reviewer_name': self.reviewer.real_name if self.reviewer else None,
+            'reviewed_at': self.reviewed_at.isoformat() if self.reviewed_at else None,
+            'feedback': self.feedback,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+        if include_answers:
+            data['answers'] = self.answers
+        return data
 

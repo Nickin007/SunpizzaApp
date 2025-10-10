@@ -6,6 +6,9 @@ import Users from '../pages/Users';
 import Shops from '../pages/Shops';
 import WorkOrders from '../pages/WorkOrders';
 import Dict from '../pages/Dict';
+import Training from '../pages/Training';
+import Questions from '../pages/Training/Questions';
+import ExamReview from '../pages/Training/ExamReview';
 import { useAuthStore } from '../store/authStore';
 
 // 路由守卫组件
@@ -46,6 +49,18 @@ const router = createBrowserRouter([
       {
         path: 'dict',
         element: <Dict />,
+      },
+      {
+        path: 'training',
+        element: <Training />,
+      },
+      {
+        path: 'training/questions/:courseId',
+        element: <Questions />,
+      },
+      {
+        path: 'training/exam-review',
+        element: <ExamReview />,
       },
     ],
   },

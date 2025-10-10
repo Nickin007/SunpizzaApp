@@ -10,6 +10,7 @@
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   margin-bottom: 24px;
   box-sizing: border-box;
+  overflow: hidden; /* 🎯 关键：裁剪溢出内容，确保四个角的圆角都能正确显示 */
 }
 
 /* 🎯 页面标题 - 对称留白方案 */

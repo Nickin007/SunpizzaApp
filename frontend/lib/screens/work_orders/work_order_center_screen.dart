@@ -107,9 +107,8 @@ class _WorkOrderCenterScreenState extends State<WorkOrderCenterScreen>
           .toList();
       
       // 判断是否还有更多数据
-      final pagination = response['pagination'];
-      final currentPage = pagination['page'];
-      final totalPages = pagination['pages'];
+      final currentPage = response['page'];
+      final totalPages = response['pages'];
       _hasMore[status] = currentPage < totalPages;
       
       setState(() {

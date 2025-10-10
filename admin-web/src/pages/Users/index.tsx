@@ -14,6 +14,7 @@ const Users: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string>(''); // 监听选中的角色
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -46,11 +47,13 @@ const Users: React.FC = () => {
   const handleAdd = () => {
     setEditingUser(null);
     form.resetFields();
+    setSelectedRole(''); // 重置角色选择
     setModalVisible(true);
   };
 
   const handleEdit = (record: User) => {
     setEditingUser(record);
+    setSelectedRole(record.role); // 设置当前角色
     form.setFieldsValue({
       username: record.username,
       real_name: record.real_name,
@@ -254,20 +257,32 @@ const Users: React.FC = () => {
             label="角色"
             rules={[{ required: true, message: '请选择角色' }]}
           >
-            <Select placeholder="请选择角色" options={roleOptions} />
-          </Form.Item>
-
-          <Form.Item
-            name="shop_id"
-            label="所属门店"
-            tooltip="管理员和区域经理可以不选"
-          >
-            <Select
-              placeholder="请选择门店"
-              allowClear
-              options={shops.map(shop => ({ label: shop.name, value: shop.id }))}
+            <Select 
+              placeholder="请选择角色" 
+              options={roleOptions}
+              onChange={(value) => {
+                setSelectedRole(value);
+                // 如果选择管理员或区域经理，清空门店选择
+                if (value === 'admin' || value === 'regional_manager') {
+                  form.setFieldsValue({ shop_id: undefined });
+                }
+              }}
             />
           </Form.Item>
+
+          {/* 只有店长和员工需要选择门店 */}
+          {(selectedRole === 'shop_manager' || selectedRole === 'employee' || selectedRole === 'staff') && (
+            <Form.Item
+              name="shop_id"
+              label="所属门店"
+              rules={[{ required: true, message: '请选择所属门店' }]}
+            >
+              <Select
+                placeholder="请选择门店"
+                options={shops.map(shop => ({ label: shop.name, value: shop.id }))}
+              />
+            </Form.Item>
+          )}
         </Form>
       </Modal>
     </div>

@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/course_card.dart';
+import '../../services/training_service.dart';
 
 /// 培训中心
 class TrainingCenterScreen extends StatefulWidget {
@@ -15,19 +16,86 @@ class TrainingCenterScreen extends StatefulWidget {
 class _TrainingCenterScreenState extends State<TrainingCenterScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TrainingService _trainingService = TrainingService();
   
-  final List<String> _categories = ['全部', '产品类', '服务类', '运营类'];
+  final List<Map<String, String>> _categories = [
+    {'name': '全部', 'type': ''},
+    {'name': '产品类', 'type': 'product'},
+    {'name': '服务类', 'type': 'service'},
+    {'name': '运营类', 'type': 'operation'},
+  ];
+  
+  Map<String, List<Map<String, dynamic>>> _coursesData = {};
+  Map<String, bool> _isLoading = {};
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _categories.length, vsync: this);
+    
+    // 初始化加载状态
+    for (var category in _categories) {
+      _coursesData[category['name']!] = [];
+      _isLoading[category['name']!] = false;
+    }
+    
+    // 加载所有分类的课程
+    for (var category in _categories) {
+      _loadCourses(category['name']!, category['type']!);
+    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+  
+  /// 加载课程列表
+  Future<void> _loadCourses(String categoryName, String categoryType) async {
+    if (_isLoading[categoryName]!) return;
+    
+    setState(() {
+      _isLoading[categoryName] = true;
+    });
+    
+    try {
+      List<Map<String, dynamic>> courses;
+      
+      if (categoryType.isEmpty) {
+        // 加载全部课程
+        courses = await _trainingService.getCourses();
+      } else {
+        // 按分类加载（需要先获取分类ID）
+        final categories = await _trainingService.getCategories(type: categoryType);
+        if (categories.isNotEmpty) {
+          courses = await _trainingService.getCourses(
+            categoryId: categories[0]['id'],
+          );
+        } else {
+          courses = [];
+        }
+      }
+      
+      setState(() {
+        _coursesData[categoryName] = courses;
+        _isLoading[categoryName] = false;
+      });
+    } catch (e) {
+      print('加载课程失败: $e');
+      setState(() {
+        _isLoading[categoryName] = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('加载失败: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -53,7 +121,7 @@ class _TrainingCenterScreenState extends State<TrainingCenterScreen>
                 fontWeight: FontWeight.w600,
               ),
               tabs: _categories.map((category) {
-                return Tab(text: category);
+                return Tab(text: category['name']);
               }).toList(),
             ),
           ),
@@ -62,29 +130,47 @@ class _TrainingCenterScreenState extends State<TrainingCenterScreen>
       body: TabBarView(
         controller: _tabController,
         children: _categories.map((category) {
-          return _buildCourseGrid(category);
+          return _buildCourseGrid(category['name']!, category['type']!);
         }).toList(),
       ),
     );
   }
 
-  Widget _buildCourseGrid(String category) {
-    // 模拟课程数据
-    final mockCourses = List.generate(
-      8,
-      (index) => {
-        'id': index + 1,
-        'title': '${category == '全部' ? '产品' : category.replaceAll('类', '')}培训课程 ${index + 1}',
-        'description': '这是课程描述，介绍课程的主要内容和学习目标...',
-        'status': index % 3 == 0 ? '未开始' : (index % 2 == 0 ? '学习中' : '已通过'),
-        'coverUrl': null,
-      },
-    );
+  Widget _buildCourseGrid(String categoryName, String categoryType) {
+    final courses = _coursesData[categoryName] ?? [];
+    final isLoading = _isLoading[categoryName] ?? false;
+    
+    if (isLoading && courses.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+    
+    if (courses.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.school_outlined,
+              size: 64.w,
+              color: AppColors.textSecondary,
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              '暂无课程',
+              style: TextStyle(
+                fontSize: 16.sp,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return RefreshIndicator(
-      onRefresh: () async {
-        await Future.delayed(const Duration(seconds: 1));
-      },
+      onRefresh: () => _loadCourses(categoryName, categoryType),
       child: GridView.builder(
         padding: EdgeInsets.all(16.w),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -93,14 +179,38 @@ class _TrainingCenterScreenState extends State<TrainingCenterScreen>
           mainAxisSpacing: 12.h,
           childAspectRatio: 0.75,
         ),
-        itemCount: mockCourses.length,
+        itemCount: courses.length,
         itemBuilder: (context, index) {
-          final course = mockCourses[index];
+          final course = courses[index];
+          
+          // 确定学习状态
+          String status = '未开始';
+          if (course['learning_record'] != null) {
+            final record = course['learning_record'];
+            if (record['completed'] == true) {
+              status = '已完成';
+            } else {
+              status = '学习中';
+            }
+          }
+          
+          // 检查考试状态
+          if (course['exam_submission'] != null) {
+            final examStatus = course['exam_submission']['status'];
+            if (examStatus == 'passed') {
+              status = '已通过';
+            } else if (examStatus == 'failed') {
+              status = '未通过';
+            } else if (examStatus == 'pending_review') {
+              status = '待审核';
+            }
+          }
+          
           return CourseCard(
-            title: course['title'] as String,
-            description: course['description'] as String,
-            status: course['status'] as String,
-            coverUrl: course['coverUrl'] as String?,
+            title: course['title'] ?? '未命名课程',
+            description: course['description'] ?? '',
+            status: status,
+            coverUrl: null, // 暂不支持封面
             onTap: () {
               context.push('/course/${course['id']}');
             },

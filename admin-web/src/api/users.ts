@@ -17,7 +17,7 @@ export const usersApi = {
     real_name: string;
     role: string;
     shop_id?: number;
-  }) => http.post<User>('/users/', data),
+  }) => http.post<User>('/users/register', data), // ✅ 修正：调用后端已有的 /register 路由
 
   // 更新用户
   updateUser: (id: number, data: {

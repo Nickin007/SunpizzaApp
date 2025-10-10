@@ -41,7 +41,7 @@ class EnvironmentConfig {
   static const String developmentApiUrl = 'http://192.168.31.164:5000'; // 👈 你的电脑 IP
   
   /// 生产环境配置
-  static const String productionApiUrl = 'http://118.89.73.199'; // 👈 服务器地址
+  static const String productionApiUrl = 'http://118.89.73.199:5000'; // 👈 服务器地址:端口
   
   /// 获取当前环境的 API 地址
   static String get apiBaseUrl {
