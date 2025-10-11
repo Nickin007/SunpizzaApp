@@ -10,7 +10,6 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   BookOutlined,
-  CheckCircleOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -47,20 +46,9 @@ const MainLayout: React.FC = () => {
       label: '工单管理',
     },
     {
-      key: 'training',
+      key: '/training',
       icon: <BookOutlined />,
-      label: '培训模块',
-      children: [
-        {
-          key: '/training',
-          label: '课程管理',
-        },
-        {
-          key: '/training/exam-review',
-          icon: <CheckCircleOutlined />,
-          label: '考试审核',
-        },
-      ],
+      label: '培训管理',
     },
     {
       key: '/dict',

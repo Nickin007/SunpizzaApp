@@ -54,10 +54,6 @@ def register(current_user):
     if data['role'] not in valid_roles:
         return error_response('无效的用户角色', 400)
     
-    # 如果是店长，必须指定门店
-    if data['role'] == 'shop_manager' and not data.get('shop_id'):
-        return error_response('店长必须关联门店', 400)
-    
     # 创建用户
     user = User(
         username=data['username'],

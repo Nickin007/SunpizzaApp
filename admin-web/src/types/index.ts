@@ -25,8 +25,10 @@ export interface Shop {
   name: string;
   address: string;
   regional_manager_id: number;
+  manager_id?: number;
   created_at: string;
   regional_manager?: User;
+  manager?: User;
 }
 
 // ==================== 工单相关类型 ====================

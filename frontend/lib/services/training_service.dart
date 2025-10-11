@@ -125,63 +125,6 @@ class TrainingService {
     }
   }
 
-  /// 获取考试题目（不含答案）
-  Future<Map<String, dynamic>> getExamQuestions(int courseId) async {
-    try {
-      final response = await _apiService.get(
-        '/api/training/courses/$courseId/exam',
-      );
-
-      if (response.data['success']) {
-        return response.data['data'];
-      } else {
-        throw Exception(response.data['message'] ?? '获取考试题目失败');
-      }
-    } catch (e) {
-      throw Exception('获取考试题目失败: $e');
-    }
-  }
-
-  /// 提交考试答案
-  /// [courseId] - 课程ID
-  /// [answers] - 答案Map，格式：{"1": "A", "2": "B,C", "3": "主观题答案..."}
-  Future<Map<String, dynamic>> submitExam(
-    int courseId,
-    Map<String, String> answers,
-  ) async {
-    try {
-      final response = await _apiService.post(
-        '/api/training/courses/$courseId/submit-exam',
-        data: {'answers': answers},
-      );
-
-      if (response.data['success']) {
-        return response.data['data'];
-      } else {
-        throw Exception(response.data['message'] ?? '提交考试失败');
-      }
-    } catch (e) {
-      throw Exception('提交考试失败: $e');
-    }
-  }
-
-  /// 获取我的考试记录
-  Future<List<Map<String, dynamic>>> getMyExams() async {
-    try {
-      final response = await _apiService.get(
-        '/api/training/my-exams',
-      );
-
-      if (response.data['success']) {
-        return List<Map<String, dynamic>>.from(response.data['data']);
-      } else {
-        throw Exception(response.data['message'] ?? '获取考试记录失败');
-      }
-    } catch (e) {
-      throw Exception('获取考试记录失败: $e');
-    }
-  }
-
   /// 获取我的学习记录
   Future<List<Map<String, dynamic>>> getMyLearningRecords() async {
     try {

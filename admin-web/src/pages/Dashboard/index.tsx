@@ -29,7 +29,6 @@ const Dashboard: React.FC = () => {
     admin: 0,
     regional_manager: 0,
     shop_manager: 0,
-    employee: 0,
   });
   const [shopCount, setShopCount] = useState(0);
 
@@ -45,18 +44,16 @@ const Dashboard: React.FC = () => {
       setStats(statsRes.data.data);
 
       // 加载用户角色统计
-      const [adminRes, managerRes, shopManagerRes, employeeRes] = await Promise.all([
+      const [adminRes, managerRes, shopManagerRes] = await Promise.all([
         usersApi.getUsers({ role: 'admin', per_page: 1000 }),
         usersApi.getUsers({ role: 'regional_manager', per_page: 1000 }),
         usersApi.getUsers({ role: 'shop_manager', per_page: 1000 }),
-        usersApi.getUsers({ role: 'employee', per_page: 1000 }),
       ]);
       
       setUserStats({
         admin: adminRes.data.data.total,
         regional_manager: managerRes.data.data.total,
         shop_manager: shopManagerRes.data.data.total,
-        employee: employeeRes.data.data.total,
       });
 
       // 加载门店统计
@@ -121,7 +118,7 @@ const Dashboard: React.FC = () => {
 
         {/* 账号角色统计 */}
         <Row gutter={16} style={{ marginBottom: 24 }}>
-          <Col span={6}>
+          <Col span={8}>
             <Card className="stat-card role-admin">
               <Statistic
                 title="管理员账号"
@@ -131,7 +128,7 @@ const Dashboard: React.FC = () => {
               />
             </Card>
           </Col>
-          <Col span={6}>
+          <Col span={8}>
             <Card className="stat-card role-manager">
               <Statistic
                 title="区域经理账号"
@@ -141,23 +138,13 @@ const Dashboard: React.FC = () => {
               />
             </Card>
           </Col>
-          <Col span={6}>
+          <Col span={8}>
             <Card className="stat-card role-shop-manager">
               <Statistic
                 title="店长账号"
                 value={userStats.shop_manager}
                 prefix={<UserOutlined />}
                 valueStyle={{ color: '#1890ff' }}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card className="stat-card role-employee">
-              <Statistic
-                title="员工账号"
-                value={userStats.employee}
-                prefix={<UserOutlined />}
-                valueStyle={{ color: '#52c41a' }}
               />
             </Card>
           </Col>

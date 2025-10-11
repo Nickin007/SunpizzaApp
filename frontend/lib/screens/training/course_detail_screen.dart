@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/training_service.dart';
 
-/// 课程详情页 - 视频+文档+考试
+/// 课程详情页 - 视频+文档
 class CourseDetailScreen extends StatefulWidget {
   final int courseId;
 
@@ -33,7 +33,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
   final List<Map<String, dynamic>> _tabs = [
     {'title': '视频学习', 'icon': Icons.play_circle_outline},
     {'title': '文档阅读', 'icon': Icons.description_outlined},
-    {'title': '课程考试', 'icon': Icons.quiz_outlined},
   ];
 
   @override
@@ -226,7 +225,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
         children: [
           _buildVideoTab(),
           _buildDocumentTab(),
-          _buildExamTab(),
         ],
       ),
     );
@@ -404,81 +402,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     );
   }
 
-  /// 课程考试Tab
-  Widget _buildExamTab() {
-    final hasExam = _courseData!['has_exam'] ?? false;
-    final examSubmission = _courseData!['exam_submission'];
-
-    if (!hasExam) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.quiz_outlined,
-              size: 64.w,
-              color: AppColors.textSecondary,
-            ),
-            SizedBox(height: 16.h),
-            Text(
-              '该课程暂无考试',
-              style: TextStyle(
-                fontSize: 16.sp,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: EdgeInsets.all(16.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '课程考试',
-            style: TextStyle(
-              fontSize: 20.sp,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 16.h),
-          
-          // 考试状态卡片
-          _buildExamStatusCard(examSubmission),
-          
-          SizedBox(height: 24.h),
-          
-          // 操作按钮
-          if (examSubmission == null)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // 跳转到考试页面
-                  context.push('/exam/${widget.courseId}').then((result) {
-                    if (result == true) {
-                      // 考试提交成功，刷新数据
-                      _loadCourseDetail();
-                    }
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: 16.h),
-                ),
-                child: Text(
-                  '开始考试',
-                  style: TextStyle(fontSize: 16.sp),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   /// 学习进度卡片
   Widget _buildLearningProgress() {
     final learningRecord = _courseData!['learning_record'];
@@ -526,125 +449,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           ],
         ),
       ),
-    );
-  }
-
-  /// 考试状态卡片
-  Widget _buildExamStatusCard(Map<String, dynamic>? examSubmission) {
-    if (examSubmission == null) {
-      return Card(
-        color: Colors.blue.shade50,
-        child: Padding(
-          padding: EdgeInsets.all(16.w),
-          child: Row(
-            children: [
-              Icon(Icons.info_outline, color: Colors.blue, size: 24.w),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: Text(
-                  '您还未参加考试',
-                  style: TextStyle(fontSize: 14.sp),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final status = examSubmission['status'];
-    final objectiveScore = examSubmission['objective_score'] ?? 0;
-    final subjectiveScore = examSubmission['subjective_score'] ?? 0;
-    final totalScore = examSubmission['total_score'] ?? 0;
-
-    Color statusColor;
-    String statusText;
-    IconData statusIcon;
-
-    switch (status) {
-      case 'passed':
-        statusColor = AppColors.success;
-        statusText = '考试通过';
-        statusIcon = Icons.check_circle;
-        break;
-      case 'failed':
-        statusColor = AppColors.error;
-        statusText = '考试未通过';
-        statusIcon = Icons.cancel;
-        break;
-      default:
-        statusColor = Colors.orange;
-        statusText = '待审核';
-        statusIcon = Icons.pending;
-    }
-
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16.w),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(statusIcon, color: statusColor, size: 24.w),
-                SizedBox(width: 8.w),
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.bold,
-                    color: statusColor,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 16.h),
-            _buildScoreRow('客观题得分', objectiveScore),
-            SizedBox(height: 8.h),
-            _buildScoreRow('主观题得分', subjectiveScore, isPending: status == 'pending_review'),
-            Divider(height: 24.h),
-            _buildScoreRow('总分', totalScore, isTotal: true),
-            if (examSubmission['feedback'] != null && examSubmission['feedback'].toString().isNotEmpty) ...[
-              SizedBox(height: 16.h),
-              Text(
-                '审核反馈：',
-                style: TextStyle(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 4.h),
-              Text(
-                examSubmission['feedback'],
-                style: TextStyle(fontSize: 14.sp),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScoreRow(String label, int score, {bool isPending = false, bool isTotal = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isTotal ? 16.sp : 14.sp,
-            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-        Text(
-          isPending ? '待审核' : '$score 分',
-          style: TextStyle(
-            fontSize: isTotal ? 18.sp : 14.sp,
-            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            color: isPending ? Colors.orange : (isTotal ? AppColors.primary : null),
-          ),
-        ),
-      ],
     );
   }
 

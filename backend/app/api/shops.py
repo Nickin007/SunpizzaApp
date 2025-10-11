@@ -64,7 +64,8 @@ def create_shop(current_user):
     shop = Shop(
         name=data['name'],
         address=data.get('address'),
-        regional_manager_id=data.get('regional_manager_id')
+        regional_manager_id=data.get('regional_manager_id'),
+        manager_id=data.get('manager_id')
     )
     
     try:
@@ -91,6 +92,8 @@ def update_shop(current_user, shop_id):
         shop.address = data['address']
     if 'regional_manager_id' in data:
         shop.regional_manager_id = data['regional_manager_id']
+    if 'manager_id' in data:
+        shop.manager_id = data['manager_id']
     
     try:
         db.session.commit()

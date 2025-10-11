@@ -9,6 +9,7 @@ const Shops: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [shops, setShops] = useState<Shop[]>([]);
   const [regionalManagers, setRegionalManagers] = useState<User[]>([]);
+  const [shopManagers, setShopManagers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -18,7 +19,7 @@ const Shops: React.FC = () => {
 
   useEffect(() => {
     loadShops();
-    loadRegionalManagers();
+    loadUsers();
   }, [page, pageSize]);
 
   const loadShops = async () => {
@@ -34,12 +35,17 @@ const Shops: React.FC = () => {
     }
   };
 
-  const loadRegionalManagers = async () => {
+  const loadUsers = async () => {
     try {
-      const response = await usersApi.getUsers({ role: 'regional_manager', per_page: 100 });
-      setRegionalManagers(response.data.data.items);
+      // 加载区域经理
+      const regionalManagersResponse = await usersApi.getUsers({ role: 'regional_manager', per_page: 100 });
+      setRegionalManagers(regionalManagersResponse.data.data.items);
+      
+      // 加载店长
+      const shopManagersResponse = await usersApi.getUsers({ role: 'shop_manager', per_page: 100 });
+      setShopManagers(shopManagersResponse.data.data.items);
     } catch (error) {
-      console.error('加载区域经理列表失败：', error);
+      console.error('加载用户列表失败：', error);
     }
   };
 
@@ -55,6 +61,7 @@ const Shops: React.FC = () => {
       name: record.name,
       address: record.address,
       regional_manager_id: record.regional_manager_id,
+      manager_id: record.manager_id,
     });
     setModalVisible(true);
   };
@@ -111,6 +118,13 @@ const Shops: React.FC = () => {
       title: '区域经理',
       dataIndex: ['regional_manager', 'real_name'],
       key: 'regional_manager',
+      width: 120,
+      render: (text: string) => text || '-',
+    },
+    {
+      title: '店长',
+      dataIndex: ['manager', 'real_name'],
+      key: 'manager',
       width: 120,
       render: (text: string) => text || '-',
     },
@@ -213,9 +227,33 @@ const Shops: React.FC = () => {
             rules={[{ required: true, message: '请选择区域经理' }]}
           >
             <Select
-              placeholder="请选择区域经理"
+              showSearch
+              placeholder="请输入搜索区域经理"
+              optionFilterProp="label"
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
               options={regionalManagers.map(user => ({
-                label: user.real_name,
+                label: `${user.real_name} (${user.username})`,
+                value: user.id,
+              }))}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="manager_id"
+            label="店长"
+            rules={[{ required: true, message: '请选择店长' }]}
+          >
+            <Select
+              showSearch
+              placeholder="请输入搜索店长"
+              optionFilterProp="label"
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={shopManagers.map(user => ({
+                label: `${user.real_name} (${user.username})`,
                 value: user.id,
               }))}
             />

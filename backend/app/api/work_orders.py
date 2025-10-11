@@ -1,7 +1,7 @@
 from flask import Blueprint, request
 from datetime import datetime
 from app import db
-from app.models import WorkOrder, TaskComment, TaskAttachment, DictTaskType, DictPriority, DictStatus
+from app.models import WorkOrder, TaskComment, TaskAttachment, DictTaskType, DictPriority, DictStatus, ActivityLog
 from app.utils.auth import token_required, admin_required
 from app.utils.response import success_response, error_response, paginated_response
 
@@ -135,6 +135,26 @@ def create_work_order(current_user):
     
     try:
         db.session.add(work_order)
+        db.session.flush()  # 获取work_order的ID
+        
+        # 记录活动日志 - 工单创建
+        activity = ActivityLog(
+            action_type='work_order_created',
+            work_order_id=work_order.id,
+            user_id=current_user['user_id']
+        )
+        db.session.add(activity)
+        
+        # 如果分配给其他人，记录分配日志
+        if assignee_id != current_user['user_id']:
+            assign_activity = ActivityLog(
+                action_type='work_order_assigned',
+                work_order_id=work_order.id,
+                user_id=current_user['user_id'],
+                target_user_id=assignee_id
+            )
+            db.session.add(assign_activity)
+        
         db.session.commit()
         
         # TODO: 发送推送通知给被分配人
@@ -207,14 +227,25 @@ def update_work_order(current_user, work_order_id):
             return error_response('截止日期格式错误', 400)
     
     try:
-        db.session.commit()
+        db.session.flush()
         
-        # 如果状态改变，自动添加评论记录
+        # 如果状态改变，记录活动日志
         if status_changed and old_status_id != new_status_id:
             old_status = DictStatus.query.get(old_status_id)
             new_status = DictStatus.query.get(new_status_id)
             
             if old_status and new_status:
+                # 记录活动日志
+                activity = ActivityLog(
+                    action_type='work_order_status_changed',
+                    work_order_id=work_order.id,
+                    user_id=current_user['user_id'],
+                    old_value=old_status.status_name,
+                    new_value=new_status.status_name
+                )
+                db.session.add(activity)
+                
+                # 自动添加评论记录
                 comment_content = f'📝 {current_user_obj.real_name} 于 {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} 将该工单从"{old_status.status_name}"状态转至"{new_status.status_name}"状态'
                 
                 comment = TaskComment(
@@ -252,6 +283,16 @@ def add_comment(current_user, work_order_id):
     
     try:
         db.session.add(comment)
+        
+        # 记录活动日志
+        activity = ActivityLog(
+            action_type='work_order_comment',
+            work_order_id=work_order_id,
+            user_id=current_user['user_id'],
+            comment=data['content'][:100]  # 只存储前100个字符
+        )
+        db.session.add(activity)
+        
         db.session.commit()
         return success_response(data=comment.to_dict(), message='评论添加成功', code=201)
     except Exception as e:
@@ -634,4 +675,78 @@ def delete_work_order(current_user, work_order_id):
     except Exception as e:
         db.session.rollback()
         return error_response(f'删除失败：{str(e)}', 500)
+
+# ==================== 活动日志 ====================
+
+@bp.route('/activities', methods=['GET'])
+@token_required
+def get_activities(current_user):
+    """获取活动日志列表（用于首页最新动态）"""
+    from app.models import User
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    # 基础查询 - 按时间倒序
+    query = ActivityLog.query.order_by(ActivityLog.created_at.desc())
+    
+    # 根据角色过滤数据
+    if current_user['role'] == 'shop_manager':
+        # 店长只看与自己相关的工单活动
+        # 1. 自己创建的工单
+        # 2. 分配给自己的工单
+        # 3. 自己门店的工单
+        current_user_obj = User.query.get(current_user['user_id'])
+        if current_user_obj and current_user_obj.shop_id:
+            # 获取该店长相关的所有工单ID
+            related_work_orders = WorkOrder.query.filter(
+                (WorkOrder.creator_id == current_user['user_id']) |
+                (WorkOrder.assignee_id == current_user['user_id']) |
+                (WorkOrder.shop_id == current_user_obj.shop_id)
+            ).all()
+            related_work_order_ids = [wo.id for wo in related_work_orders]
+            
+            if related_work_order_ids:
+                query = query.filter(ActivityLog.work_order_id.in_(related_work_order_ids))
+            else:
+                # 如果没有相关工单，返回空列表
+                return success_response(
+                    data=[],
+                    message='获取活动日志成功',
+                    page=1,
+                    pages=0,
+                    total=0,
+                    per_page=per_page
+                )
+        else:
+            # 如果没有门店，只看与自己直接相关的
+            query = query.join(WorkOrder).filter(
+                (WorkOrder.creator_id == current_user['user_id']) |
+                (WorkOrder.assignee_id == current_user['user_id'])
+            )
+    
+    elif current_user['role'] == 'regional_manager':
+        # 区域经理能看到所有活动（暂时）
+        pass
+    
+    # admin 可以看到所有活动
+    
+    # 分页
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    activities = [{
+        **activity.to_dict(),
+    } for activity in pagination.items]
+    
+    # 返回格式与前端期望一致
+    return success_response(
+        data={
+            'data': activities,
+            'page': pagination.page,
+            'pages': pagination.pages,
+            'total': pagination.total,
+            'per_page': per_page
+        },
+        message='获取活动日志成功'
+    )
 

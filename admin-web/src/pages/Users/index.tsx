@@ -2,24 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tag } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { usersApi } from '../../api/users';
-import { shopsApi } from '../../api/shops';
-import type { User, Shop } from '../../types';
+import type { User } from '../../types';
 
 const Users: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [shops, setShops] = useState<Shop[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [selectedRole, setSelectedRole] = useState<string>(''); // 监听选中的角色
   const [form] = Form.useForm();
 
   useEffect(() => {
     loadUsers();
-    loadShops();
   }, [page, pageSize]);
 
   const loadUsers = async () => {
@@ -35,30 +31,18 @@ const Users: React.FC = () => {
     }
   };
 
-  const loadShops = async () => {
-    try {
-      const response = await shopsApi.getShops({ per_page: 100 });
-      setShops(response.data.data.items);
-    } catch (error) {
-      console.error('加载门店列表失败：', error);
-    }
-  };
-
   const handleAdd = () => {
     setEditingUser(null);
     form.resetFields();
-    setSelectedRole(''); // 重置角色选择
     setModalVisible(true);
   };
 
   const handleEdit = (record: User) => {
     setEditingUser(record);
-    setSelectedRole(record.role); // 设置当前角色
     form.setFieldsValue({
       username: record.username,
       real_name: record.real_name,
       role: record.role,
-      shop_id: record.shop_id,
     });
     setModalVisible(true);
   };
@@ -84,9 +68,10 @@ const Users: React.FC = () => {
         message.success('创建成功');
       }
       setModalVisible(false);
-      loadUsers();
-    } catch (error) {
+      await loadUsers(); // 确保等待加载完成
+    } catch (error: any) {
       console.error('提交失败：', error);
+      message.error(error.response?.data?.message || '操作失败，请重试');
     }
   };
 
@@ -94,21 +79,18 @@ const Users: React.FC = () => {
     { label: '管理员', value: 'admin' },
     { label: '区域经理', value: 'regional_manager' },
     { label: '店长', value: 'shop_manager' },
-    { label: '员工', value: 'staff' },
   ];
 
   const roleColors: Record<string, string> = {
     admin: 'red',
     regional_manager: 'orange',
     shop_manager: 'blue',
-    staff: 'green',
   };
 
   const roleNames: Record<string, string> = {
     admin: '管理员',
     regional_manager: '区域经理',
     shop_manager: '店长',
-    staff: '员工',
   };
 
   const columns = [
@@ -140,14 +122,6 @@ const Users: React.FC = () => {
       render: (role: string) => (
         <Tag color={roleColors[role]}>{roleNames[role]}</Tag>
       ),
-    },
-    {
-      title: '所属门店',
-      dataIndex: ['shop', 'name'],
-      key: 'shop',
-      width: 180,
-      ellipsis: true,
-      render: (text: string) => text || '-',
     },
     {
       title: '创建时间',
@@ -260,29 +234,8 @@ const Users: React.FC = () => {
             <Select 
               placeholder="请选择角色" 
               options={roleOptions}
-              onChange={(value) => {
-                setSelectedRole(value);
-                // 如果选择管理员或区域经理，清空门店选择
-                if (value === 'admin' || value === 'regional_manager') {
-                  form.setFieldsValue({ shop_id: undefined });
-                }
-              }}
             />
           </Form.Item>
-
-          {/* 只有店长和员工需要选择门店 */}
-          {(selectedRole === 'shop_manager' || selectedRole === 'employee' || selectedRole === 'staff') && (
-            <Form.Item
-              name="shop_id"
-              label="所属门店"
-              rules={[{ required: true, message: '请选择所属门店' }]}
-            >
-              <Select
-                placeholder="请选择门店"
-                options={shops.map(shop => ({ label: shop.name, value: shop.id }))}
-              />
-            </Form.Item>
-          )}
         </Form>
       </Modal>
     </div>

@@ -22,11 +22,9 @@ import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
-  QuestionCircleOutlined,
   UploadOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 import { trainingApi } from '../../api/training';
 import { uploadApi } from '../../api/upload';
 import type { TrainingCourse, TrainingCategory } from '../../types';
@@ -36,7 +34,6 @@ const { TextArea } = Input;
 const { TabPane } = Tabs;
 
 const Training: React.FC = () => {
-  const navigate = useNavigate();
   const [courses, setCourses] = useState<TrainingCourse[]>([]);
   const [categories, setCategories] = useState<TrainingCategory[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,7 +68,6 @@ const Training: React.FC = () => {
     setEditingCourse(null);
     form.resetFields();
     form.setFieldsValue({
-      has_exam: false,
       is_published: true,
       document_content: '',
     });
@@ -87,7 +83,6 @@ const Training: React.FC = () => {
       category_id: record.category_id,
       video_url: record.video_url,
       document_content: record.document_content || '',
-      has_exam: record.has_exam,
       is_published: record.is_published,
     });
     // 如果已有视频，显示文件名（从URL提取）
@@ -160,11 +155,6 @@ const Training: React.FC = () => {
     return false; // 阻止默认上传行为
   };
 
-  const handleManageQuestions = (record: TrainingCourse) => {
-    // 跳转到题目管理页面
-    navigate(`/training/questions/${record.id}`);
-  };
-
   const columns = [
     {
       title: 'ID',
@@ -213,15 +203,6 @@ const Training: React.FC = () => {
       ),
     },
     {
-      title: '考试',
-      dataIndex: 'has_exam',
-      key: 'has_exam',
-      width: 80,
-      render: (hasExam: boolean) => (
-        hasExam ? <Tag color="orange">有</Tag> : <Tag>无</Tag>
-      ),
-    },
-    {
       title: '状态',
       dataIndex: 'is_published',
       key: 'is_published',
@@ -246,16 +227,6 @@ const Training: React.FC = () => {
       fixed: 'right' as const,
       render: (_: any, record: TrainingCourse) => (
         <Space size="small">
-          {record.has_exam && (
-            <Button
-              type="link"
-              size="small"
-              icon={<QuestionCircleOutlined />}
-              onClick={() => handleManageQuestions(record)}
-            >
-              题目
-            </Button>
-          )}
           <Button
             type="link"
             size="small"
@@ -272,9 +243,7 @@ const Training: React.FC = () => {
               description={
                 <div>
                   <div>⚠️ 此操作将同时删除：</div>
-                  <div>• 所有考试题目</div>
                   <div>• 所有学习记录</div>
-                  <div>• 所有考试提交记录</div>
                   <div style={{ marginTop: 8, color: '#ff4d4f', fontWeight: 'bold' }}>
                     删除后无法恢复！
                   </div>
@@ -453,10 +422,6 @@ const Training: React.FC = () => {
               showCount
               style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: '13px' }}
             />
-          </Form.Item>
-
-          <Form.Item name="has_exam" label="是否包含考试" valuePropName="checked">
-            <Switch />
           </Form.Item>
 
           <Form.Item name="is_published" label="是否发布" valuePropName="checked">

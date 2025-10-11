@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/stat_circle_card.dart';
 import '../../widgets/quick_action_button.dart';
 import '../../services/work_order_service.dart';
+import '../../services/activity_service.dart';
 
 /// 首页 - 数据仪表盘
 class DashboardScreen extends StatefulWidget {
@@ -18,27 +19,27 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final WorkOrderService _workOrderService = WorkOrderService();
+  final ActivityService _activityService = ActivityService();
+  
   Map<String, int> _stats = {
     '待受理': 0,
     '进行中': 0,
     '已完成': 0,
     '已归档': 0,
   };
-  bool _isLoading = true;
+  List<Map<String, dynamic>> _activities = [];
+  bool _isLoadingActivities = true;
 
   @override
   void initState() {
     super.initState();
     _loadStats();
+    _loadActivities();
   }
 
   /// 加载统计数据
   Future<void> _loadStats() async {
     try {
-      setState(() {
-        _isLoading = true;
-      });
-
       print('📊 开始加载首页统计数据...');
       final stats = await _workOrderService.getStats();
       print('📊 后端返回的统计数据: $stats');
@@ -51,15 +52,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           '已完成': stats['已完成'] ?? 0,
           '已归档': stats['已归档'] ?? 0,
         };
-        _isLoading = false;
       });
       
       print('📊 映射后的统计数据: $_stats');
     } catch (e) {
       print('❌ 加载统计数据失败: $e');
-      setState(() {
-        _isLoading = false;
-      });
       // 显示错误提示
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -72,6 +69,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  /// 加载活动日志
+  Future<void> _loadActivities() async {
+    try {
+      setState(() {
+        _isLoadingActivities = true;
+      });
+
+      print('📊 开始加载活动日志...');
+      final response = await _activityService.getActivities(page: 1, perPage: 10);
+      
+      setState(() {
+        // response 结构: { data: { data: [...], page: 1, pages: 1, total: 2 } }
+        final responseData = response['data'] as Map<String, dynamic>?;
+        _activities = List<Map<String, dynamic>>.from(responseData?['data'] ?? []);
+        _isLoadingActivities = false;
+      });
+      
+      print('📊 活动日志加载成功，共 ${_activities.length} 条');
+    } catch (e) {
+      print('❌ 加载活动日志失败: $e');
+      setState(() {
+        _isLoadingActivities = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('加载活动日志失败: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 刷新所有数据
+  Future<void> _refreshAll() async {
+    await Future.wait([
+      _loadStats(),
+      _loadActivities(),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
@@ -80,7 +120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _loadStats,
+          onRefresh: _refreshAll,
           child: CustomScrollView(
             slivers: [
             // 顶部欢迎区域 - 科技感设计
@@ -360,18 +400,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // 动态列表
             SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: 20.w),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    return _buildActivityItem(
-                      '【营销活动】双十一促销活动准备',
-                      '张经理 已分配给您',
-                      '5分钟前',
-                    );
-                  },
-                  childCount: 5,
-                ),
-              ),
+              sliver: _isLoadingActivities
+                  ? SliverToBoxAdapter(
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20.h),
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    )
+                  : _activities.isEmpty
+                      ? SliverToBoxAdapter(
+                          child: Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.h),
+                              child: Text(
+                                '暂无动态',
+                                style: TextStyle(
+                                  fontSize: 14.sp,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final activity = _activities[index];
+                              return _buildActivityItem(activity);
+                            },
+                            childCount: _activities.length,
+                          ),
+                        ),
             ),
 
             SizedBox(height: 20.h).sliverBox,
@@ -382,7 +445,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildActivityItem(String title, String description, String time) {
+  Widget _buildActivityItem(Map<String, dynamic> activity) {
+    // 解析数据
+    final workOrderTitle = activity['work_order_title'] ?? '未知工单';
+    final description = activity['description'] ?? '执行了操作';
+    final createdAt = activity['created_at'] as String?;
+    final actionType = activity['action_type'] as String?;
+    
+    // 格式化时间
+    final relativeTime = _activityService.formatRelativeTime(createdAt);
+    
+    // 根据操作类型选择图标
+    IconData icon;
+    Color iconColor;
+    switch (actionType) {
+      case 'work_order_created':
+        icon = Icons.add_circle;
+        iconColor = AppColors.success;
+        break;
+      case 'work_order_status_changed':
+        icon = Icons.swap_horiz;
+        iconColor = AppColors.warning;
+        break;
+      case 'work_order_assigned':
+        icon = Icons.person_add;
+        iconColor = AppColors.info;
+        break;
+      case 'work_order_comment':
+        icon = Icons.comment;
+        iconColor = AppColors.primary;
+        break;
+      case 'work_order_image_added':
+        icon = Icons.image;
+        iconColor = AppColors.accent;
+        break;
+      default:
+        icon = Icons.notifications_active;
+        iconColor = AppColors.primary;
+    }
+    
     return Container(
       margin: EdgeInsets.only(bottom: 12.h),
       padding: EdgeInsets.all(12.w),
@@ -403,12 +504,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             width: 40.w,
             height: 40.w,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: iconColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20.r),
             ),
             child: Icon(
-              Icons.notifications_active,
-              color: AppColors.primary,
+              icon,
+              color: iconColor,
               size: 20.w,
             ),
           ),
@@ -418,7 +519,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  '【$workOrderTitle】',
                   style: TextStyle(
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w500,
@@ -434,12 +535,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fontSize: 12.sp,
                     color: AppColors.textSecondary,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
+          SizedBox(width: 8.w),
           Text(
-            time,
+            relativeTime,
             style: TextStyle(
               fontSize: 11.sp,
               color: AppColors.textHint,
