@@ -14,7 +14,8 @@ import {
   Tag,
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import elemeApi, { FieldConfig } from '../../../../../api/eleme';
+import elemeApi from '../../../../../api/eleme';
+import type { FieldConfig } from '../../../../../api/eleme';
 
 const { Option } = Select;
 
