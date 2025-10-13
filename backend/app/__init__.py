@@ -30,13 +30,14 @@ def create_app(config_class=Config):
          }})
     
     # 注册蓝图
-    from app.api import users, shops, work_orders, training, routine_tasks, upload
+    from app.api import users, shops, work_orders, training, routine_tasks, upload, eleme
     app.register_blueprint(users.bp)
     app.register_blueprint(shops.bp)
     app.register_blueprint(work_orders.bp)
     app.register_blueprint(training.bp)
     app.register_blueprint(routine_tasks.bp)
     app.register_blueprint(upload.bp)
+    app.register_blueprint(eleme.bp)
     
     # 配置静态文件访问（用于访问上传的视频、图片等）
     @app.route('/uploads/<path:filename>')

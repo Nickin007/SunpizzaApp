@@ -532,3 +532,213 @@ class ActivityLog(db.Model):
         else:
             return f'{user_name} 执行了操作'
 
+
+class ElemeStoreDailyData(db.Model):
+    """饿了么门店每日数据表"""
+    __tablename__ = 'eleme_store_daily_data'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    
+    # 基础信息
+    data_date = db.Column(db.Date, nullable=False, index=True)
+    store_name = db.Column(db.String(200), nullable=False)
+    store_id = db.Column(db.String(50), index=True)
+    province = db.Column(db.String(50))
+    city = db.Column(db.String(50), index=True)
+    district = db.Column(db.String(50))
+    address = db.Column(db.String(500))
+    first_open_time = db.Column(db.DateTime)
+    is_direct = db.Column(db.String(10))
+    
+    # 运营时长
+    business_hours = db.Column(db.String(50))
+    peak_hours = db.Column(db.String(50))
+    abnormal_close_hours = db.Column(db.String(50))
+    is_valid_store = db.Column(db.String(10))
+    
+    # 订单财务（核心指标）
+    valid_orders = db.Column(db.Integer, default=0)
+    invalid_orders = db.Column(db.Integer, default=0)
+    merchant_invalid_orders = db.Column(db.Integer, default=0)
+    income = db.Column(db.Numeric(10, 2), default=0)
+    packaging_fee = db.Column(db.Numeric(10, 2), default=0)
+    platform_service_fee = db.Column(db.Numeric(10, 2), default=0)
+    delivery_subsidy = db.Column(db.Numeric(10, 2), default=0)
+    fulfillment_service_fee = db.Column(db.Numeric(10, 2), default=0)
+    refund_fee = db.Column(db.Numeric(10, 2), default=0)
+    customer_payment_total = db.Column(db.Numeric(10, 2), default=0)
+    avg_payment_per_order = db.Column(db.Numeric(10, 2), default=0)
+    avg_income_per_order = db.Column(db.Numeric(10, 2), default=0)
+    
+    # 营销漏斗
+    exposure_users = db.Column(db.Integer, default=0)
+    exposure_new_users = db.Column(db.Integer, default=0)
+    exposure_old_users = db.Column(db.Integer, default=0)
+    exposure_times = db.Column(db.Integer, default=0)
+    visit_users = db.Column(db.Integer, default=0)
+    visit_new_users = db.Column(db.Integer, default=0)
+    visit_old_users = db.Column(db.Integer, default=0)
+    visit_times = db.Column(db.Integer, default=0)
+    order_users = db.Column(db.Integer, default=0)
+    order_new_users = db.Column(db.Integer, default=0)
+    order_old_users = db.Column(db.Integer, default=0)
+    order_times = db.Column(db.Integer, default=0)
+    visit_conversion_rate = db.Column(db.Numeric(5, 2))
+    new_visit_conversion_rate = db.Column(db.Numeric(5, 2))
+    old_visit_conversion_rate = db.Column(db.Numeric(5, 2))
+    order_conversion_rate = db.Column(db.Numeric(5, 2))
+    new_order_conversion_rate = db.Column(db.Numeric(5, 2))
+    old_order_conversion_rate = db.Column(db.Numeric(5, 2))
+    
+    # 商品运营
+    online_products = db.Column(db.Integer, default=0)
+    sold_products = db.Column(db.Integer, default=0)
+    out_of_stock_products = db.Column(db.Integer, default=0)
+    new_products = db.Column(db.Integer, default=0)
+    promotion_products = db.Column(db.Integer, default=0)
+    discount_orders = db.Column(db.Integer, default=0)
+    repurchase_7d_users = db.Column(db.Integer, default=0)
+    repurchase_7d_rate = db.Column(db.Numeric(5, 2))
+    repurchase_30d_users = db.Column(db.Integer, default=0)
+    repurchase_30d_rate = db.Column(db.Numeric(5, 2))
+    
+    # 服务质量
+    bad_review_orders = db.Column(db.Integer, default=0)
+    complaint_orders = db.Column(db.Integer, default=0)
+    complaint_order_ids = db.Column(db.Text)
+    overtime_orders = db.Column(db.Integer, default=0)
+    overtime_order_ids = db.Column(db.Text)
+    avg_cooking_time = db.Column(db.Numeric(5, 2))
+    reject_orders = db.Column(db.Integer, default=0)
+    merchant_cancel_orders = db.Column(db.Integer, default=0)
+    merchant_cancel_rate = db.Column(db.Numeric(5, 2))
+    merchant_refund_orders = db.Column(db.Integer, default=0)
+    merchant_refund_rate = db.Column(db.Numeric(5, 2))
+    avg_pickup_time = db.Column(db.Numeric(5, 2))
+    
+    # 评分体系
+    store_score = db.Column(db.Numeric(3, 2))
+    satisfaction_score = db.Column(db.Numeric(3, 2))
+    taste_score = db.Column(db.Numeric(3, 2))
+    packaging_score = db.Column(db.Numeric(3, 2))
+    
+    # 近60日评价
+    good_rate_60d = db.Column(db.Numeric(5, 2))
+    good_count_60d = db.Column(db.Integer, default=0)
+    medium_rate_60d = db.Column(db.Numeric(5, 2))
+    medium_count_60d = db.Column(db.Integer, default=0)
+    bad_rate_60d = db.Column(db.Numeric(5, 2))
+    bad_count_60d = db.Column(db.Integer, default=0)
+    quality_rate_60d = db.Column(db.Numeric(5, 2))
+    quality_count_60d = db.Column(db.Integer, default=0)
+    review_rate_60d = db.Column(db.Numeric(5, 2))
+    review_count_60d = db.Column(db.Integer, default=0)
+    bad_reply_rate_60d = db.Column(db.Numeric(5, 2))
+    
+    # 近30日评价
+    good_rate_30d = db.Column(db.Numeric(5, 2))
+    good_count_30d = db.Column(db.Integer, default=0)
+    medium_rate_30d = db.Column(db.Numeric(5, 2))
+    medium_count_30d = db.Column(db.Integer, default=0)
+    bad_rate_30d = db.Column(db.Numeric(5, 2))
+    bad_count_30d = db.Column(db.Integer, default=0)
+    quality_rate_30d = db.Column(db.Numeric(5, 2))
+    quality_count_30d = db.Column(db.Integer, default=0)
+    review_rate_30d = db.Column(db.Numeric(5, 2))
+    review_count_30d = db.Column(db.Integer, default=0)
+    bad_reply_rate_30d = db.Column(db.Numeric(5, 2))
+    
+    # 元数据
+    import_batch_id = db.Column(db.String(50), index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'data_date': self.data_date.isoformat() if self.data_date else None,
+            'store_name': self.store_name,
+            'store_id': self.store_id,
+            'city': self.city,
+            'valid_orders': self.valid_orders,
+            'income': float(self.income) if self.income else 0,
+            'customer_payment_total': float(self.customer_payment_total) if self.customer_payment_total else 0,
+            'avg_payment_per_order': float(self.avg_payment_per_order) if self.avg_payment_per_order else 0,
+            'visit_conversion_rate': float(self.visit_conversion_rate) if self.visit_conversion_rate else 0,
+            'order_conversion_rate': float(self.order_conversion_rate) if self.order_conversion_rate else 0,
+            'store_score': float(self.store_score) if self.store_score else 0,
+            'good_rate_30d': float(self.good_rate_30d) if self.good_rate_30d else 0,
+        }
+
+
+class ElemeImportLog(db.Model):
+    """饿了么数据导入日志表"""
+    __tablename__ = 'eleme_import_logs'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    batch_id = db.Column(db.String(50), unique=True, nullable=False)
+    file_name = db.Column(db.String(200))
+    data_date = db.Column(db.Date, index=True)
+    total_rows = db.Column(db.Integer, default=0)
+    success_rows = db.Column(db.Integer, default=0)
+    failed_rows = db.Column(db.Integer, default=0)
+    status = db.Column(db.Enum('processing', 'completed', 'failed', name='import_status'), default='processing')
+    error_message = db.Column(db.Text)
+    imported_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
+    is_deleted = db.Column(db.Boolean, default=False)
+    deleted_at = db.Column(db.DateTime)
+    
+    # 关系
+    user = db.relationship('User', backref='eleme_imports')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'batch_id': self.batch_id,
+            'file_name': self.file_name,
+            'data_date': self.data_date.isoformat() if self.data_date else None,
+            'total_rows': self.total_rows,
+            'success_rows': self.success_rows,
+            'failed_rows': self.failed_rows,
+            'status': self.status,
+            'error_message': self.error_message,
+            'imported_by': self.imported_by,
+            'importer_name': self.user.real_name if self.user else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'is_deleted': self.is_deleted,
+            'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
+        }
+
+
+class ElemeFieldConfig(db.Model):
+    """饿了么字段配置表"""
+    __tablename__ = 'eleme_field_config'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    field_name = db.Column(db.String(100), unique=True, nullable=False)
+    display_name = db.Column(db.String(100), nullable=False)
+    field_type = db.Column(db.String(50), default='VARCHAR')
+    field_category = db.Column(db.String(50), index=True)
+    is_active = db.Column(db.Boolean, default=True)
+    sort_order = db.Column(db.Integer, default=0)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'field_name': self.field_name,
+            'display_name': self.display_name,
+            'field_type': self.field_type,
+            'field_category': self.field_category,
+            'is_active': self.is_active,
+            'sort_order': self.sort_order,
+            'description': self.description,
+        }
+
