@@ -30,5 +30,11 @@ export const usersApi = {
   // 删除用户
   deleteUser: (id: number) =>
     http.delete(`/users/${id}`),
+
+  // 重置用户密码
+  resetPassword: (id: number, data: {
+    admin_password: string;
+    new_password: string;
+  }) => http.post<{ user_id: number; username: string; new_password: string }>(`/users/${id}/reset-password`, data),
 };
 

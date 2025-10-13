@@ -50,7 +50,7 @@ def register(current_user):
         return error_response('用户名已存在', 400)
     
     # 验证角色
-    valid_roles = ['admin', 'regional_manager', 'shop_manager']
+    valid_roles = ['admin', 'regional_manager', 'shop_manager', 'delivery_operation']
     if data['role'] not in valid_roles:
         return error_response('无效的用户角色', 400)
     
@@ -152,4 +152,40 @@ def delete_user(current_user, user_id):
     except Exception as e:
         db.session.rollback()
         return error_response(f'删除失败: {str(e)}', 500)
+
+@bp.route('/<int:user_id>/reset-password', methods=['POST'])
+@admin_required
+def reset_password(current_user, user_id):
+    """重置用户密码（仅管理员可操作）"""
+    data = request.get_json()
+    
+    # 验证必填字段
+    if not data.get('admin_password') or not data.get('new_password'):
+        return error_response('管理员密码和新密码不能为空', 400)
+    
+    # 验证管理员密码
+    admin_user = User.query.get(current_user['user_id'])
+    if not admin_user or not admin_user.check_password(data['admin_password']):
+        return error_response('管理员密码错误', 401)
+    
+    # 获取目标用户
+    target_user = User.query.get(user_id)
+    if not target_user:
+        return error_response('目标用户不存在', 404)
+    
+    # 重置密码
+    try:
+        target_user.set_password(data['new_password'])
+        db.session.commit()
+        return success_response(
+            message='密码重置成功',
+            data={
+                'user_id': target_user.id,
+                'username': target_user.username,
+                'new_password': data['new_password']  # 返回新密码供管理员记录
+            }
+        )
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'密码重置失败: {str(e)}', 500)
 

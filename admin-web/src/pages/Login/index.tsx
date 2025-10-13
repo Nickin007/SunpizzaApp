@@ -20,17 +20,17 @@ const Login: React.FC = () => {
       console.log('✅ 登录响应:', response.data);
       
       const { token, user } = response.data.data;
-      
-      // 只允许管理员登录
-      if (user.role !== 'admin') {
-        message.error('只有管理员才能登录管理后台');
-        setLoading(false);
-        return;
-      }
 
       setAuth(token, user);
       message.success('登录成功！');
-      navigate('/dashboard');
+      
+      // 根据角色跳转到不同的系统
+      if (user.role === 'delivery_operation') {
+        navigate('/delivery/welcome');
+      } else {
+        // admin, regional_manager, shop_manager 跳转到管理后台
+        navigate('/admin/dashboard');
+      }
     } catch (error: any) {
       console.error('❌ 登录失败：', error);
       console.error('错误详情:', error.response);

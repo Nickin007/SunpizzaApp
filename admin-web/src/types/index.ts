@@ -3,7 +3,7 @@ export interface User {
   id: number;
   username: string;
   real_name: string;
-  role: 'admin' | 'regional_manager' | 'shop_manager' | 'staff';
+  role: 'admin' | 'regional_manager' | 'shop_manager' | 'delivery_operation';
   shop_id: number | null;
   created_at: string;
   shop?: Shop;

@@ -10,6 +10,8 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   BookOutlined,
+  AppstoreOutlined,
+  RocketOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -24,41 +26,74 @@ const MainLayout: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuthStore();
 
-  const menuItems = [
-    {
-      key: '/dashboard',
-      icon: <DashboardOutlined />,
-      label: '仪表板',
-    },
-    {
-      key: '/users',
-      icon: <UserOutlined />,
-      label: '用户管理',
-    },
-    {
-      key: '/shops',
-      icon: <ShopOutlined />,
-      label: '门店管理',
-    },
-    {
-      key: '/work-orders',
-      icon: <FileTextOutlined />,
-      label: '工单管理',
-    },
-    {
-      key: '/training',
-      icon: <BookOutlined />,
-      label: '培训管理',
-    },
-    {
-      key: '/dict',
-      icon: <SettingOutlined />,
-      label: '字典管理',
-    },
-  ];
+  // 构建菜单项，根据用户角色动态显示
+  const buildMenuItems = () => {
+    const items = [
+      {
+        key: '/admin/dashboard',
+        icon: <DashboardOutlined />,
+        label: '仪表板',
+      },
+      {
+        key: 'store-training',
+        icon: <AppstoreOutlined />,
+        label: '店务&培训',
+        children: [
+          {
+            key: '/admin/users',
+            icon: <UserOutlined />,
+            label: '用户管理',
+          },
+          {
+            key: '/admin/shops',
+            icon: <ShopOutlined />,
+            label: '门店管理',
+          },
+          {
+            key: '/admin/work-orders',
+            icon: <FileTextOutlined />,
+            label: '工单管理',
+          },
+          {
+            key: '/admin/training',
+            icon: <BookOutlined />,
+            label: '培训管理',
+          },
+          {
+            key: '/admin/dict',
+            icon: <SettingOutlined />,
+            label: '字典管理',
+          },
+        ],
+      },
+    ];
 
-  const handleMenuClick = (key: string) => {
-    navigate(key);
+    // 仅对admin角色显示"外卖运营管理"菜单
+    if (user?.role === 'admin') {
+      items.push({
+        key: 'delivery-management',
+        icon: <RocketOutlined />,
+        label: '外卖运营管理',
+        children: [
+          {
+            key: 'delivery-placeholder',
+            icon: <SettingOutlined />,
+            label: '功能开发中...',
+          },
+        ],
+      });
+    }
+
+    return items;
+  };
+
+  const menuItems = buildMenuItems();
+
+  const handleMenuClick = ({ key }: { key: string }) => {
+    // 只有叶子节点才进行导航
+    if (key.startsWith('/')) {
+      navigate(key);
+    }
   };
 
   const handleLogout = () => {
@@ -91,7 +126,7 @@ const MainLayout: React.FC = () => {
           mode="inline"
           selectedKeys={[location.pathname]}
           items={menuItems}
-          onClick={({ key }) => handleMenuClick(key)}
+          onClick={handleMenuClick}
           className="custom-menu"
         />
       </Sider>

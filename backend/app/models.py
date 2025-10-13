@@ -10,7 +10,7 @@ class User(db.Model):
     username = db.Column(db.String(50), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     real_name = db.Column(db.String(50), nullable=False)
-    role = db.Column(db.Enum('admin', 'regional_manager', 'shop_manager', name='user_role'), nullable=False)
+    role = db.Column(db.Enum('admin', 'regional_manager', 'shop_manager', 'delivery_operation', name='user_role'), nullable=False)
     shop_id = db.Column(db.Integer, db.ForeignKey('shops.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     

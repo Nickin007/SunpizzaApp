@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tag, Alert } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, KeyOutlined } from '@ant-design/icons';
 import { usersApi } from '../../api/users';
 import type { User } from '../../types';
 
@@ -13,6 +13,13 @@ const Users: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [form] = Form.useForm();
+  
+  // 重置密码相关状态
+  const [resetModalVisible, setResetModalVisible] = useState(false);
+  const [resetTargetUser, setResetTargetUser] = useState<User | null>(null);
+  const [resetForm] = Form.useForm();
+  const [resetSuccess, setResetSuccess] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
 
   useEffect(() => {
     loadUsers();
@@ -75,22 +82,65 @@ const Users: React.FC = () => {
     }
   };
 
+  // 打开重置密码模态框
+  const handleResetPassword = (record: User) => {
+    setResetTargetUser(record);
+    setResetSuccess(false);
+    setNewPassword('');
+    resetForm.resetFields();
+    setResetModalVisible(true);
+  };
+
+  // 提交重置密码
+  const handleResetSubmit = async () => {
+    try {
+      const values = await resetForm.validateFields();
+      
+      if (!resetTargetUser) return;
+      
+      const response = await usersApi.resetPassword(resetTargetUser.id, {
+        admin_password: values.admin_password,
+        new_password: values.new_password,
+      });
+      
+      // 显示成功状态和新密码
+      setNewPassword(response.data.data.new_password);
+      setResetSuccess(true);
+      message.success('密码重置成功！');
+    } catch (error: any) {
+      console.error('重置密码失败：', error);
+      message.error(error.response?.data?.message || '密码重置失败，请重试', 5);
+    }
+  };
+
+  // 关闭重置密码模态框
+  const handleResetCancel = () => {
+    setResetModalVisible(false);
+    setResetTargetUser(null);
+    setResetSuccess(false);
+    setNewPassword('');
+    resetForm.resetFields();
+  };
+
   const roleOptions = [
     { label: '管理员', value: 'admin' },
     { label: '区域经理', value: 'regional_manager' },
     { label: '店长', value: 'shop_manager' },
+    { label: '外卖运营', value: 'delivery_operation' },
   ];
 
   const roleColors: Record<string, string> = {
     admin: 'red',
     regional_manager: 'orange',
     shop_manager: 'blue',
+    delivery_operation: 'cyan',
   };
 
   const roleNames: Record<string, string> = {
     admin: '管理员',
     regional_manager: '区域经理',
     shop_manager: '店长',
+    delivery_operation: '外卖运营',
   };
 
   const columns = [
@@ -133,7 +183,7 @@ const Users: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 160,
+      width: 240,
       fixed: 'right' as const,
       render: (_: any, record: User) => (
         <Space size="small">
@@ -144,6 +194,14 @@ const Users: React.FC = () => {
             onClick={() => handleEdit(record)}
           >
             编辑
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<KeyOutlined />}
+            onClick={() => handleResetPassword(record)}
+          >
+            重置密码
           </Button>
           <Popconfirm
             title="确定要删除这个用户吗？"
@@ -237,6 +295,111 @@ const Users: React.FC = () => {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 重置密码模态框 */}
+      <Modal
+        title="重置用户密码"
+        open={resetModalVisible}
+        onOk={resetSuccess ? handleResetCancel : handleResetSubmit}
+        onCancel={handleResetCancel}
+        okText={resetSuccess ? '关闭' : '确认重置'}
+        cancelButtonProps={{ style: { display: resetSuccess ? 'none' : 'inline-block' } }}
+        width={550}
+        destroyOnClose
+      >
+        {resetSuccess ? (
+          // 重置成功后显示新密码
+          <div style={{ padding: '20px 0' }}>
+            <Alert
+              message="密码重置成功！"
+              description={
+                <div style={{ marginTop: 16 }}>
+                  <p>用户：<strong>{resetTargetUser?.real_name}</strong> ({resetTargetUser?.username})</p>
+                  <p style={{ fontSize: 16, marginTop: 16 }}>
+                    新密码：
+                    <span style={{ 
+                      display: 'inline-block',
+                      padding: '8px 16px',
+                      background: '#f5f5f5',
+                      border: '2px dashed #1890ff',
+                      borderRadius: 4,
+                      fontSize: 18,
+                      fontWeight: 'bold',
+                      color: '#1890ff',
+                      marginLeft: 8,
+                      letterSpacing: 2
+                    }}>
+                      {newPassword}
+                    </span>
+                  </p>
+                  <p style={{ color: '#ff4d4f', marginTop: 16 }}>
+                    ⚠️ 请务必记录此密码并告知用户，关闭后将无法再次查看！
+                  </p>
+                </div>
+              }
+              type="success"
+              showIcon
+            />
+          </div>
+        ) : (
+          // 重置密码表单
+          <Form form={resetForm} layout="vertical">
+            <Alert
+              message={`正在为用户 "${resetTargetUser?.real_name}" (${resetTargetUser?.username}) 重置密码`}
+              type="info"
+              showIcon
+              style={{ marginBottom: 20 }}
+            />
+            
+            <Form.Item
+              name="admin_password"
+              label="请输入您的管理员密码以确认身份"
+              rules={[{ required: true, message: '请输入管理员密码' }]}
+            >
+              <Input.Password 
+                placeholder="请输入您的管理员密码" 
+                size="large"
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="new_password"
+              label="新密码"
+              rules={[
+                { required: true, message: '请输入新密码' },
+                { min: 6, message: '密码至少6位' }
+              ]}
+            >
+              <Input.Password 
+                placeholder="请输入新密码（至少6位）" 
+                size="large"
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="confirm_password"
+              label="确认新密码"
+              dependencies={['new_password']}
+              rules={[
+                { required: true, message: '请确认新密码' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue('new_password') === value) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(new Error('两次输入的密码不一致'));
+                  },
+                }),
+              ]}
+            >
+              <Input.Password 
+                placeholder="请再次输入新密码" 
+                size="large"
+              />
+            </Form.Item>
+          </Form>
+        )}
       </Modal>
     </div>
   );
