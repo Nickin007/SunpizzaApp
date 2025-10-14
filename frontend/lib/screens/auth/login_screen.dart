@@ -406,48 +406,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   /// 底部提示
   Widget _buildBottomHint() {
-    return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.info_outline,
-                color: Colors.white.withOpacity(0.9),
-                size: 16,
-              ),
-              SizedBox(width: 8.w),
-              Text(
-                '默认账号: admin / admin123',
-                style: TextStyle(
-                  fontSize: 13.sp,
-                  color: Colors.white.withOpacity(0.9),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 16.h),
-        Text(
-          'Powered by SunPizza Technology',
-          style: TextStyle(
-            fontSize: 11.sp,
-            color: Colors.white.withOpacity(0.6),
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
+    return Text(
+      'Powered by SunPizza Technology',
+      style: TextStyle(
+        fontSize: 11.sp,
+        color: Colors.white.withOpacity(0.6),
+        letterSpacing: 0.5,
+      ),
     );
   }
 }

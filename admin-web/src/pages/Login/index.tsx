@@ -119,10 +119,6 @@ const Login: React.FC = () => {
             </Form>
 
             <div className="login-footer">
-              <div className="demo-account">
-                <p className="demo-label">测试账号</p>
-                <p className="demo-value">admin / admin123</p>
-              </div>
               <p className="copyright">
                 © 2024 圣比萨 SUN PIZZA. All rights reserved.
               </p>
