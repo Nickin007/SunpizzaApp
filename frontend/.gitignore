@@ -40,7 +40,8 @@ local.properties
 Icon?
 **/Pods/
 **/.symlinks/
-profile
+# 只忽略根目录下的 profile 性能分析文件，不忽略 profile 目录
+/profile
 xcuserdata
 **/.generated/
 Flutter/App.framework
