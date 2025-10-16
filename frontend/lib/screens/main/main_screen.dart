@@ -102,8 +102,8 @@ class _MainScreenState extends State<MainScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.symmetric(
-          horizontal: 10.w,
-          vertical: isTablet ? 1.h : 2.h, // iPad减小垂直padding
+          horizontal: isTablet ? 8.w : 10.w,
+          vertical: isTablet ? 0 : 2.h, // iPad去掉垂直padding
         ),
         decoration: BoxDecoration(
           gradient: isSelected
@@ -120,21 +120,30 @@ class _MainScreenState extends State<MainScreen> {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              isSelected ? activeIcon : icon,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              size: isTablet ? 22.w : 23.w, // iPad稍微减小图标
-            ),
-            SizedBox(height: isTablet ? 0.5.h : 1.h), // iPad减小间距
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: isTablet ? 9.sp : 9.5.sp, // iPad稍微减小字体
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            // 图标
+            Flexible(
+              child: Icon(
+                isSelected ? activeIcon : icon,
                 color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                size: isTablet ? 20.w : 23.w, // iPad进一步减小图标
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            ),
+            // 间距
+            if (!isTablet) SizedBox(height: 1.h),
+            // 文字 - iPad上使用更紧凑的布局
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: isTablet ? 8.5.sp : 9.5.sp, // iPad进一步减小字体
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  height: isTablet ? 1.0 : 1.2, // iPad减小行高
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
             ),
           ],
         ),
