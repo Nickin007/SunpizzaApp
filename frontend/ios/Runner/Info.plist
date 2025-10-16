@@ -73,11 +73,26 @@
 		<false/>
 		<key>NSExceptionDomains</key>
 		<dict>
+			<!-- 生产环境后端服务器 -->
 			<key>118.89.73.199</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
 				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+			<!-- 开发环境 - 本地电脑 -->
+			<key>192.168.31.164</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+			<!-- localhost（iOS模拟器测试用）-->
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
 			</dict>
 		</dict>
