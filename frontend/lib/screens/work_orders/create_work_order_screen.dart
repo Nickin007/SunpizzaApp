@@ -232,6 +232,18 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
       return;
     }
     
+    // ✅ 验证受理人必填
+    if (_assigneeUser == null) {
+      _showMessage('请输入并选择受理人');
+      return;
+    }
+    
+    // ✅ 验证不能选择admin
+    if (_assigneeUser!['role'] == 'admin') {
+      _showMessage('不能给管理员分配工单');
+      return;
+    }
+    
     setState(() {
       _isLoading = true;
     });
@@ -261,20 +273,20 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
         print('  类型ID: ${_selectedType!['id']}');
         print('  优先级ID: ${_selectedPriority!['id']}');
         print('  门店ID: ${_selectedShop?['id']}');
-        print('  受理人ID: ${_assigneeUser?['id']}');
-        print('  受理人姓名: ${_assigneeUser?['real_name']}');
+        print('  受理人ID: ${_assigneeUser!['id']}'); // ✅ 不再使用 ?，已确保非空
+        print('  受理人姓名: ${_assigneeUser!['real_name']}');
         
         // 调用真实的 API 创建工单
         final result = await _workOrderService.createWorkOrder(
           title: _titleController.text.trim(),
           typeId: _selectedType!['id'],
           priorityId: _selectedPriority!['id'],
+          assigneeId: _assigneeUser!['id'], // ✅ 必填参数，前面已验证非空
           description: _descriptionController.text.trim().isNotEmpty 
               ? _descriptionController.text.trim()
               : null,
           dueDate: _selectedDueDate?.toIso8601String(),
-          shopId: _selectedShop?['id'], // 传递门店 ID
-          assigneeId: _assigneeUser?['id'], // 传递受理人 ID
+          shopId: _selectedShop?['id'], // ✅ 可选参数（不再强制关联门店）
         );
         
         print('✅ 工单创建成功！');
@@ -415,8 +427,8 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                 SizedBox(height: 20.h),
               ],
               
-              // 受理人
-              _buildSectionTitle('受理人'),
+              // 受理人（✅ 改为必填）
+              _buildSectionTitle('受理人', required: true),
               SizedBox(height: 8.h),
               _buildAssigneeField(),
               SizedBox(height: 20.h),

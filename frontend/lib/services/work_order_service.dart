@@ -74,9 +74,9 @@ class WorkOrderService {
     required String title,
     required int typeId,
     required int priorityId,
+    required int assigneeId, // ✅ 改为必填（新权限要求）
     String? description,
-    int? shopId,
-    int? assigneeId,
+    int? shopId, // ✅ 改为可选（不再强制关联门店）
     String? dueDate,
   }) async {
     try {
@@ -84,9 +84,9 @@ class WorkOrderService {
         'title': title,
         'type_id': typeId,
         'priority_id': priorityId,
+        'assignee_id': assigneeId, // ✅ 必填，不再使用 if
         if (description != null) 'description': description,
         if (shopId != null) 'shop_id': shopId,
-        if (assigneeId != null) 'assignee_id': assigneeId,
         if (dueDate != null) 'due_date': dueDate,
       };
 

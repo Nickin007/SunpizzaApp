@@ -234,22 +234,38 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
       appBar: AppBar(
         title: const Text('工单详情'),
         actions: [
-          // 更多操作菜单（仅管理员可见）
+          // ✅ 更多操作菜单（创建者、被分配人、admin可见）
           Consumer<AuthProvider>(
             builder: (context, authProvider, _) {
               final user = authProvider.currentUser;
-              final isAdmin = user?.role == 'admin';
+              final workOrder = _workOrder;
               
-              if (!isAdmin) {
-                return const SizedBox.shrink(); // 非管理员不显示菜单
+              if (workOrder == null) {
+                return const SizedBox.shrink();
               }
+              
+              // ✅ 新权限：admin OR 创建者 OR 被分配人 可以编辑
+              final canEdit = user?.role == 'admin' ||
+                              workOrder['creator']?['id'] == user?.id ||
+                              workOrder['assignee']?['id'] == user?.id;
+              
+              if (!canEdit) {
+                return const SizedBox.shrink();
+              }
+              
+              final isAdmin = user?.role == 'admin';
               
               return PopupMenuButton<String>(
                 onSelected: (value) async {
                   if (value == 'edit') {
                     await _editWorkOrder();
                   } else if (value == 'delete') {
-                    await _deleteWorkOrder();
+                    // 删除功能仅admin可用
+                    if (isAdmin) {
+                      await _deleteWorkOrder();
+                    } else {
+                      _showMessage('只有管理员可以删除工单');
+                    }
                   }
                 },
                 itemBuilder: (context) => [
@@ -263,16 +279,18 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 20, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('删除工单', style: TextStyle(color: Colors.red)),
-                      ],
+                  // ✅ 删除选项仅admin可见
+                  if (isAdmin)
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('删除工单', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               );
             },
@@ -564,9 +582,16 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
   Widget _buildBottomActions() {
     // 获取当前用户信息
     final user = context.watch<AuthProvider>().currentUser;
-    final isAdmin = user?.role == 'admin';
-    final isShopManager = user?.role == 'shop_manager';
-    final currentStatusId = (_workOrder!['status'] as Map<String, dynamic>?)?['id'];
+    final workOrder = _workOrder;
+    
+    if (workOrder == null) return const SizedBox.shrink();
+    
+    // ✅ 新权限：admin OR 创建者 OR 被分配人 可以操作
+    final canOperate = user?.role == 'admin' ||
+                       workOrder['creator']?['id'] == user?.id ||
+                       workOrder['assignee']?['id'] == user?.id;
+    
+    final currentStatusId = (workOrder['status'] as Map<String, dynamic>?)?['id'];
     
     return Container(
       padding: EdgeInsets.all(16.w),
@@ -584,7 +609,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 评论输入框
+            // 评论输入框（所有人都可以评论）
             Row(
               children: [
                 Expanded(
@@ -611,8 +636,8 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
               ],
             ),
             
-            // 管理员状态更新按钮
-            if (isAdmin) ...[
+            // ✅ 状态更新按钮（创建者、被分配人、admin可见）
+            if (canOperate) ...[
               SizedBox(height: 12.h),
               Row(
                 children: [
@@ -679,29 +704,8 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
               ),
             ],
             
-            // 店长状态更新按钮（仅进行中→已完成）
-            if (!isAdmin && isShopManager && currentStatusId == 2) ...[
-              SizedBox(height: 12.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _updateStatus(3, '已完成'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.statusCompleted,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                      ),
-                      child: const Text('完成工单'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            
-            // 非管理员/店长用户的提示信息
-            if (!isAdmin && !isShopManager && currentStatusId != 3 && currentStatusId != 4) ...[
+            // ✅ 无权限提示（仅对无权限用户显示）
+            if (!canOperate && currentStatusId != 3 && currentStatusId != 4) ...[
               SizedBox(height: 12.h),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -723,7 +727,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                     SizedBox(width: 8.w),
                     Expanded(
                       child: Text(
-                        '您没有权限更新工单状态',
+                        '您不是该工单的创建者或受理人，无权更新状态',
                         style: TextStyle(
                           fontSize: 12.sp,
                           color: AppColors.textSecondary,

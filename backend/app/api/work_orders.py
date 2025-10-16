@@ -25,21 +25,15 @@ def get_work_orders(current_user):
     query = WorkOrder.query
     
     # 根据角色过滤
-    if current_user['role'] == 'shop_manager':
-        # 店长可以看到自己门店的所有工单
-        if current_user.get('shop_id'):
-            query = query.filter(WorkOrder.shop_id == current_user['shop_id'])
-        else:
-            # 如果店长没有关联门店，只能看到自己创建的或分配给自己的工单
-            query = query.filter(
-                (WorkOrder.creator_id == current_user['user_id']) |
-                (WorkOrder.assignee_id == current_user['user_id'])
-            )
-    elif current_user['role'] == 'regional_manager':
-        # 区域经理可以看到管辖门店的所有工单
-        from app.models import Shop
-        managed_shop_ids = [s.id for s in Shop.query.filter_by(regional_manager_id=current_user['user_id']).all()]
-        query = query.filter(WorkOrder.shop_id.in_(managed_shop_ids))
+    if current_user['role'] == 'admin':
+        # 管理员可以看到所有工单
+        pass
+    else:
+        # 区域经理/店长/外卖运营：只能看到自己创建的或分配给自己的工单
+        query = query.filter(
+            (WorkOrder.creator_id == current_user['user_id']) |
+            (WorkOrder.assignee_id == current_user['user_id'])
+        )
     
     # 应用筛选条件
     if status_id:
@@ -78,11 +72,10 @@ def get_work_order(current_user, work_order_id):
     if not work_order:
         return error_response('工单不存在', 404)
     
-    # 权限检查
+    # 权限检查：admin可以看所有工单，其他人只能看自己创建或被分配的工单
     if current_user['role'] != 'admin':
-        if current_user['role'] == 'shop_manager':
-            if work_order.creator_id != current_user['user_id'] and work_order.assignee_id != current_user['user_id']:
-                return error_response('无权访问该工单', 403)
+        if work_order.creator_id != current_user['user_id'] and work_order.assignee_id != current_user['user_id']:
+            return error_response('无权访问该工单', 403)
     
     return success_response(data=work_order.to_dict(include_details=True), message='获取工单详情成功')
 
@@ -92,22 +85,25 @@ def create_work_order(current_user):
     """创建工单"""
     data = request.get_json()
     
-    # 验证必填字段（只要求必须的字段）
-    required_fields = ['title', 'type_id', 'priority_id']
+    # 验证必填字段
+    required_fields = ['title', 'type_id', 'priority_id', 'assignee_id']
     for field in required_fields:
         if not data.get(field):
             return error_response(f'字段 {field} 不能为空', 400)
     
-    # 自动设置门店（从当前用户的门店）
-    shop_id = data.get('shop_id') or current_user.get('shop_id')
-    if not shop_id:
-        if current_user['role'] == 'admin':
-            return error_response('请指定工单所属门店（shop_id）', 400)
-        else:
-            return error_response('无法确定工单所属门店，请联系管理员', 400)
+    # 获取受理人ID
+    assignee_id = data.get('assignee_id')
     
-    # 自动设置受理人（如果未指定，默认分配给当前用户）
-    assignee_id = data.get('assignee_id') or current_user['user_id']
+    # 验证不能给admin分配工单
+    from app.models import User
+    assignee_user = User.query.get(assignee_id)
+    if not assignee_user:
+        return error_response('受理人不存在', 400)
+    if assignee_user.role == 'admin':
+        return error_response('不能给管理员分配工单', 400)
+    
+    # 门店ID可选（兼容旧数据，但不再强制要求）
+    shop_id = data.get('shop_id') or current_user.get('shop_id')
     
     # 解析截止日期（如果提供）
     due_date = None
@@ -181,31 +177,22 @@ def update_work_order(current_user, work_order_id):
     if not current_user_obj:
         return error_response('用户不存在', 404)
     
+    # 权限检查：只有创建者、被分配人或admin可以修改工单
+    if current_user['role'] != 'admin':
+        if work_order.creator_id != current_user['user_id'] and work_order.assignee_id != current_user['user_id']:
+            return error_response('无权修改该工单', 403)
+    
     old_status_id = work_order.status_id
     new_status_id = data.get('status_id')
     
-    # 权限控制：状态更新
-    if 'status_id' in data:
-        role = current_user['role']
-        
-        # admin 可以更新任何状态
-        if role == 'admin':
-            # admin 将工单归档时，必须先完成
-            if new_status_id == 4 and old_status_id != 3:
-                return error_response('只有已完成的工单才能归档', 400)
-        
-        # shop_manager 只能将"进行中"改为"已完成"
-        elif role == 'shop_manager':
-            if old_status_id != 2 or new_status_id != 3:
-                return error_response('店长只能将进行中的工单标记为已完成', 403)
-        
-        # 其他角色不能更新状态
-        else:
-            return error_response('您没有权限更新工单状态', 403)
+    # 状态转换规则：所有角色都可以转换状态，但有业务规则限制
+    if 'status_id' in data and new_status_id:
+        # 业务规则：只有"已完成"的工单才能"归档"
+        if new_status_id == 4 and old_status_id != 3:
+            return error_response('只有已完成的工单才能归档', 400)
     
-    # 权限控制：只有 admin 可以更新优先级
-    if 'priority_id' in data and current_user['role'] != 'admin':
-        return error_response('只有管理员可以更新工单优先级', 403)
+    # 优先级更新：所有角色都可以更新（去掉admin限制）
+    # 让团队成员可以根据实际情况调整工单优先级
     
     # 更新允许的字段
     status_changed = False
@@ -532,16 +519,15 @@ def get_work_order_stats(current_user):
     base_query = WorkOrder.query
     
     # 根据角色过滤数据
-    if current_user['role'] == 'shop_manager':
-        # 店长只看自己创建的或分配给自己的工单
+    if current_user['role'] == 'admin':
+        # 管理员看所有工单
+        pass
+    else:
+        # 其他角色只看自己创建的或分配给自己的工单
         base_query = base_query.filter(
             (WorkOrder.creator_id == current_user['user_id']) |
             (WorkOrder.assignee_id == current_user['user_id'])
         )
-    elif current_user['role'] == 'regional_manager':
-        # 区域经理看管辖门店的所有工单
-        managed_shop_ids = [s.id for s in Shop.query.filter_by(regional_manager_id=current_user['user_id']).all()]
-        base_query = base_query.filter(WorkOrder.shop_id.in_(managed_shop_ids))
     
     # 统计各状态的工单数量
     stats = {}
@@ -563,27 +549,15 @@ def get_statistics(current_user):
     base_query = WorkOrder.query
     
     # 根据角色过滤数据
-    if current_user['role'] == 'shop_manager':
-        if current_user.get('shop_id'):
-            base_query = base_query.filter(WorkOrder.shop_id == current_user['shop_id'])
-        else:
-            base_query = base_query.filter(
-                (WorkOrder.creator_id == current_user['user_id']) |
-                (WorkOrder.assignee_id == current_user['user_id'])
-            )
-    elif current_user['role'] == 'regional_manager':
-        managed_shop_ids = [s.id for s in Shop.query.filter_by(regional_manager_id=current_user['user_id']).all()]
-        if managed_shop_ids:
-            base_query = base_query.filter(WorkOrder.shop_id.in_(managed_shop_ids))
-        else:
-            # 如果没有管辖门店，返回空统计
-            return success_response(data={
-                'total': 0,
-                'pending': 0,
-                'in_progress': 0,
-                'completed': 0,
-                'archived': 0
-            })
+    if current_user['role'] == 'admin':
+        # 管理员看所有工单统计
+        pass
+    else:
+        # 其他角色只看自己创建的或分配给自己的工单
+        base_query = base_query.filter(
+            (WorkOrder.creator_id == current_user['user_id']) |
+            (WorkOrder.assignee_id == current_user['user_id'])
+        )
     
     # 获取各状态ID（假设：1=待受理, 2=进行中, 3=已完成, 4=已归档）
     total = base_query.count()
@@ -627,18 +601,26 @@ def get_assignable_users(current_user):
 @bp.route('/search-user-by-name', methods=['GET'])
 @token_required
 def search_user_by_name(current_user):
-    """根据真实姓名搜索用户"""
+    """根据真实姓名搜索用户（不包括admin）"""
     from app.models import User
     
     real_name = request.args.get('real_name', '').strip()
     if not real_name:
         return error_response('请输入受理人姓名', 400)
     
-    # 精确匹配真实姓名
-    user = User.query.filter_by(real_name=real_name).first()
+    # 精确匹配真实姓名，并排除admin角色
+    user = User.query.filter(
+        User.real_name == real_name,
+        User.role != 'admin'  # ✅ 过滤admin角色
+    ).first()
     
     if not user:
-        return error_response(f'未找到姓名为"{real_name}"的用户', 404)
+        # 检查是否存在该姓名的admin用户
+        admin_user = User.query.filter_by(real_name=real_name, role='admin').first()
+        if admin_user:
+            return error_response('不能给管理员分配工单', 400)
+        else:
+            return error_response(f'未找到姓名为"{real_name}"的用户', 404)
     
     # 返回用户信息
     return success_response(
@@ -691,45 +673,30 @@ def get_activities(current_user):
     query = ActivityLog.query.order_by(ActivityLog.created_at.desc())
     
     # 根据角色过滤数据
-    if current_user['role'] == 'shop_manager':
-        # 店长只看与自己相关的工单活动
-        # 1. 自己创建的工单
-        # 2. 分配给自己的工单
-        # 3. 自己门店的工单
-        current_user_obj = User.query.get(current_user['user_id'])
-        if current_user_obj and current_user_obj.shop_id:
-            # 获取该店长相关的所有工单ID
-            related_work_orders = WorkOrder.query.filter(
-                (WorkOrder.creator_id == current_user['user_id']) |
-                (WorkOrder.assignee_id == current_user['user_id']) |
-                (WorkOrder.shop_id == current_user_obj.shop_id)
-            ).all()
-            related_work_order_ids = [wo.id for wo in related_work_orders]
-            
-            if related_work_order_ids:
-                query = query.filter(ActivityLog.work_order_id.in_(related_work_order_ids))
-            else:
-                # 如果没有相关工单，返回空列表
-                return success_response(
-                    data=[],
-                    message='获取活动日志成功',
-                    page=1,
-                    pages=0,
-                    total=0,
-                    per_page=per_page
-                )
-        else:
-            # 如果没有门店，只看与自己直接相关的
-            query = query.join(WorkOrder).filter(
-                (WorkOrder.creator_id == current_user['user_id']) |
-                (WorkOrder.assignee_id == current_user['user_id'])
-            )
-    
-    elif current_user['role'] == 'regional_manager':
-        # 区域经理能看到所有活动（暂时）
+    if current_user['role'] == 'admin':
+        # admin 可以看到所有活动
         pass
-    
-    # admin 可以看到所有活动
+    else:
+        # 其他角色只看与自己相关的工单活动（自己创建的或分配给自己的）
+        related_work_orders = WorkOrder.query.filter(
+            (WorkOrder.creator_id == current_user['user_id']) |
+            (WorkOrder.assignee_id == current_user['user_id'])
+        ).all()
+        
+        related_work_order_ids = [wo.id for wo in related_work_orders]
+        
+        if related_work_order_ids:
+            query = query.filter(ActivityLog.work_order_id.in_(related_work_order_ids))
+        else:
+            # 如果没有相关工单，返回空列表
+            return success_response(
+                data=[],
+                message='获取活动日志成功',
+                page=1,
+                pages=0,
+                total=0,
+                per_page=per_page
+            )
     
     # 分页
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
