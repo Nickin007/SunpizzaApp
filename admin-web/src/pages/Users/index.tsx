@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tag, Alert } from 'antd';
+import { Table, Button, Space, Modal, Form, Input, Select, message, Tag, Alert, App } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, KeyOutlined } from '@ant-design/icons';
 import { usersApi } from '../../api/users';
 import type { User } from '../../types';
 
 const Users: React.FC = () => {
+  const { modal } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
@@ -54,13 +55,64 @@ const Users: React.FC = () => {
     setModalVisible(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = (id: number, userName: string, realName: string) => {
+    console.log('🗑️ 点击删除按钮', { id, userName, realName });
+    
     try {
-      await usersApi.deleteUser(id);
-      message.success('删除成功');
-      loadUsers();
+      const modalInstance = modal.confirm({
+        title: '⚠️ 删除用户确认',
+        icon: null,
+        centered: true,
+        zIndex: 10000,
+        maskClosable: false,
+        content: (
+          <div>
+            <p style={{ marginBottom: 16 }}>
+              您确定要删除用户 <strong style={{ color: '#ff4d4f' }}>{realName} ({userName})</strong> 吗？
+            </p>
+            <Alert
+              message="警告：此操作不可恢复！"
+              description={
+                <div>
+                  <p style={{ marginBottom: 8 }}>删除该用户后，以下数据将被<strong>永久清除</strong>：</p>
+                  <ul style={{ paddingLeft: 20, marginBottom: 0 }}>
+                    <li>该用户创建的所有工单</li>
+                    <li>分配给该用户的所有工单</li>
+                    <li>该用户发表的所有评论</li>
+                    <li>该用户的所有操作日志</li>
+                    <li>该用户上传的所有附件</li>
+                  </ul>
+                </div>
+              }
+              type="error"
+              showIcon
+            />
+          </div>
+        ),
+        okText: '确认删除',
+        cancelText: '取消',
+        okButtonProps: { danger: true },
+        width: 520,
+        onOk: async () => {
+          console.log('⏳ 开始删除用户...', id);
+          try {
+            await usersApi.deleteUser(id);
+            message.success('用户已删除');
+            loadUsers();
+            console.log('✅ 用户删除成功');
+          } catch (error: any) {
+            console.error('❌ 删除失败:', error);
+            message.error(error.response?.data?.message || '删除失败，请重试');
+          }
+        },
+        onCancel: () => {
+          console.log('❌ 取消删除');
+        },
+      });
+      console.log('✅ Modal.confirm 已调用, modalInstance:', modalInstance);
     } catch (error) {
-      console.error('删除失败：', error);
+      console.error('❌ Modal.confirm 调用失败:', error);
+      alert('弹窗调用失败，请查看控制台');
     }
   };
 
@@ -203,16 +255,15 @@ const Users: React.FC = () => {
           >
             重置密码
           </Button>
-          <Popconfirm
-            title="确定要删除这个用户吗？"
-            onConfirm={() => handleDelete(record.id)}
-            okText="确定"
-            cancelText="取消"
+          <Button
+            type="link"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record.id, record.username, record.real_name)}
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
-          </Popconfirm>
+            删除
+          </Button>
         </Space>
       ),
     },

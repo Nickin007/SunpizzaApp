@@ -140,15 +140,78 @@ def update_user(current_user, user_id):
 @bp.route('/<int:user_id>', methods=['DELETE'])
 @admin_required
 def delete_user(current_user, user_id):
-    """删除用户（仅管理员可操作）"""
+    """删除用户及其所有相关数据（仅管理员可操作）"""
+    from app.models import WorkOrder, TaskComment, TaskAttachment, ActivityLog
+    
     user = User.query.get(user_id)
     if not user:
         return error_response('用户不存在', 404)
     
+    # 防止删除自己
+    if user_id == current_user['user_id']:
+        return error_response('不能删除当前登录的用户', 400)
+    
     try:
+        # 统计将要删除的数据
+        work_orders_created = WorkOrder.query.filter_by(creator_id=user_id).count()
+        work_orders_assigned = WorkOrder.query.filter_by(assignee_id=user_id).count()
+        comments_count = TaskComment.query.filter_by(author_id=user_id).count()
+        
+        # 1. 删除该用户创建的工单及其关联数据
+        created_work_orders = WorkOrder.query.filter_by(creator_id=user_id).all()
+        for wo in created_work_orders:
+            # 删除工单的评论
+            TaskComment.query.filter_by(work_order_id=wo.id).delete()
+            # 删除工单的附件
+            TaskAttachment.query.filter_by(work_order_id=wo.id).delete()
+            # 删除工单的活动日志
+            ActivityLog.query.filter_by(work_order_id=wo.id).delete()
+            # 删除工单本身
+            db.session.delete(wo)
+        
+        # 2. 删除分配给该用户的工单及其关联数据
+        assigned_work_orders = WorkOrder.query.filter_by(assignee_id=user_id).all()
+        for wo in assigned_work_orders:
+            # 避免重复删除（如果用户既是创建者又是被分配人）
+            if wo.creator_id != user_id:
+                TaskComment.query.filter_by(work_order_id=wo.id).delete()
+                TaskAttachment.query.filter_by(work_order_id=wo.id).delete()
+                ActivityLog.query.filter_by(work_order_id=wo.id).delete()
+                db.session.delete(wo)
+        
+        # 3. 删除该用户发表的评论（其他人工单上的评论）
+        TaskComment.query.filter_by(author_id=user_id).delete()
+        
+        # 4. 删除该用户的活动日志
+        # - 删除该用户执行的操作日志
+        ActivityLog.query.filter_by(user_id=user_id).delete()
+        # - 删除目标是该用户的操作日志（如"分配给该用户"的日志）
+        ActivityLog.query.filter_by(target_user_id=user_id).delete()
+        
+        # 5. 删除该用户上传的附件（其他人工单上的附件）
+        TaskAttachment.query.filter_by(uploaded_by=user_id).delete()
+        
+        # 6. 最后删除用户本身
         db.session.delete(user)
+        
+        # 提交所有更改
         db.session.commit()
-        return success_response(message='用户删除成功')
+        
+        return success_response(
+            message='用户及其所有相关数据已删除',
+            data={
+                'deleted_user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'real_name': user.real_name
+                },
+                'statistics': {
+                    'work_orders_created': work_orders_created,
+                    'work_orders_assigned': work_orders_assigned,
+                    'comments': comments_count
+                }
+            }
+        )
     except Exception as e:
         db.session.rollback()
         return error_response(f'删除失败: {str(e)}', 500)
