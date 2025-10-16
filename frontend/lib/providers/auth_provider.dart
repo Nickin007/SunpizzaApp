@@ -58,7 +58,7 @@ class AuthProvider with ChangeNotifier {
         notifyListeners();
         
         if (kDebugMode) {
-          print('✅ Login Success: ${_currentUser?.name}');
+          print('✅ Login Success: ${_currentUser?.realName}');
         }
         return true;
       } else {
