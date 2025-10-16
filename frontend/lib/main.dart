@@ -9,6 +9,10 @@ import 'providers/work_order_provider.dart';
 import 'providers/shop_provider.dart';
 
 void main() {
+  // 🚀 强制使用生产环境进行测试
+  // 连接到远程服务器: http://118.89.73.199:5000
+  EnvironmentConfig.forceEnvironment(Environment.production);
+  
   // 打印环境信息（用于调试）
   EnvironmentConfig.printEnvironmentInfo();
   
