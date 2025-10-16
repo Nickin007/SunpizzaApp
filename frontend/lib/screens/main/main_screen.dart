@@ -88,6 +88,10 @@ class _MainScreenState extends State<MainScreen> {
   /// 构建导航项
   Widget _buildNavItem(int index, IconData icon, IconData activeIcon, String label) {
     final isSelected = _currentIndex == index;
+    
+    // 检测是否是iPad（屏幕宽度大于600）
+    final isTablet = MediaQuery.of(context).size.shortestSide >= 600;
+    
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -97,7 +101,10 @@ class _MainScreenState extends State<MainScreen> {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 2.h),
+        padding: EdgeInsets.symmetric(
+          horizontal: 10.w,
+          vertical: isTablet ? 1.h : 2.h, // iPad减小垂直padding
+        ),
         decoration: BoxDecoration(
           gradient: isSelected
               ? LinearGradient(
@@ -116,16 +123,18 @@ class _MainScreenState extends State<MainScreen> {
             Icon(
               isSelected ? activeIcon : icon,
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              size: 23.w,
+              size: isTablet ? 22.w : 23.w, // iPad稍微减小图标
             ),
-            SizedBox(height: 1.h),
+            SizedBox(height: isTablet ? 0.5.h : 1.h), // iPad减小间距
             Text(
               label,
               style: TextStyle(
-                fontSize: 9.5.sp,
+                fontSize: isTablet ? 9.sp : 9.5.sp, // iPad稍微减小字体
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 color: isSelected ? AppColors.primary : AppColors.textSecondary,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
