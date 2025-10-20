@@ -1,14 +1,15 @@
 """
 Excel文件解析服务
-用于解析饿了么门店数据Excel文件
+用于解析饿了么门店数据和订单数据Excel文件
 """
 
 import pandas as pd
 from datetime import datetime
 import re
 
+# ==================== 门店数据字段映射 ====================
 # 字段映射：Excel列名 -> 数据库字段名
-FIELD_MAPPING = {
+STORE_FIELD_MAPPING = {
     '日期': 'data_date',
     '门店名称': 'store_name',
     '门店编号': 'store_id',
@@ -118,17 +119,280 @@ FIELD_MAPPING = {
     '近30天差评人工回复率': 'bad_reply_rate_30d',
 }
 
+# ==================== 订单数据字段映射 ====================
+# 字段映射：Excel列名 -> 数据库字段名（来自食亨收银系统）
+ORDER_FIELD_MAPPING = {
+    # 基础信息
+    '门店名称': 'store_name',
+    '门店编号': 'store_id',
+    
+    # 订单核心信息
+    '订单号': 'order_id',
+    '订单状态': 'order_status',
+    '下单时间': 'order_time',
+    '预约/即时单': 'order_type',
+    
+    # 出餐信息
+    '出餐时间（分）': 'cooking_time',
+    '出餐类型': 'cooking_type',
+    
+    # 订单详情
+    '就餐人数': 'guest_count',
+    '商品信息': 'product_info',
+    '取餐号': 'pickup_number',
+    '订单备注': 'order_note',
+    '退款原因': 'refund_reason',
+    
+    # 财务信息
+    '预计收入（元）': 'estimated_income',
+    '平台服务费': 'platform_service_fee',
+    '其他费用': 'other_fee',
+    '配送费': 'delivery_fee',
+    '优惠名称': 'discount_name',
+    '餐盒费': 'package_fee',
+}
+
+# ==================== 商品数据字段映射 ====================
+# 字段映射：Excel列名 -> 数据库字段名
+PRODUCT_FIELD_MAPPING = {
+    # 基础信息
+    '日期': 'data_date',
+    '城市名称': 'city',
+    '门店名称': 'store_name',
+    '门店编号': 'store_id',
+    '商品名称': 'product_name',
+    
+    # 商品属性
+    '是否新品': 'is_new_product',
+    '是否招牌': 'is_signature',
+    '是否套餐': 'is_combo',
+    '是否配料': 'is_ingredient',
+    '是否售罄': 'is_sold_out',
+    
+    # 销售数据
+    '销售额': 'sales_amount',
+    '销量': 'sales_volume',
+    '下单人数': 'order_user_count',
+    '带来订单数': 'order_count',
+    '订单交易额': 'order_transaction_amount',
+    
+    # 复购数据
+    '近30日复购人数': 'repurchase_30d_users',
+    '近30日复购率': 'repurchase_30d_rate',
+    
+    # 新客数据
+    '新客人数': 'new_customer_count',
+    '新客占比': 'new_customer_ratio',
+    
+    # 用户行为数据
+    '曝光人数': 'exposure_users',
+    '点击人数': 'click_users',
+    '加购人数': 'add_to_cart_users',
+    '加购率': 'add_to_cart_rate',
+    '点赞数': 'like_count',
+}
+
+# ==================== 评价数据字段映射 ====================
+# 字段映射：Excel列名 -> 数据库字段名
+REVIEW_FIELD_MAPPING = {
+    # 基础信息
+    '日期': 'data_date',
+    '门店ID': 'store_id',
+    '门店名称': 'store_name',
+    '城市名称': 'city',
+    
+    # 订单与评价信息
+    '订单ID': 'order_id',
+    '评价时间': 'review_time',
+    
+    # 评分数据
+    '总体评分': 'overall_score',
+    '味道评分': 'taste_score',
+    '包装评分': 'packaging_score',
+    '配送评分': 'delivery_score',
+    
+    # 评价内容
+    '评价内容': 'review_content',
+    '回复内容': 'reply_content',
+    
+    # 商品反馈
+    '点赞商品': 'liked_products',
+    '点踩商品': 'disliked_products',
+    
+    # 状态字段
+    '是否申诉成功': 'is_appeal_success',
+    '是否计入总分': 'is_counted_in_score',
+    '顾客是否会看到': 'is_visible_to_customer',
+    '回评方式': 'reply_method',
+    
+    # 订单详情
+    '订单详情': 'order_details',
+}
+
+# ==================== 商家成长数据字段映射 ====================
+GROWTH_FIELD_MAPPING = {
+    # 基础信息
+    '日期': 'data_date',
+    '门店名称': 'store_name',
+    '门店id': 'store_id',
+    '省份': 'province',
+    '城市名称': 'city',
+    '区县名称': 'district',
+    '顶级连锁名称': 'chain_name',
+    '地址': 'address',
+    
+    # 店铺评级
+    'L等级分布': 'l_level',
+    '店铺分': 'store_score',
+    
+    # 近7日高峰营业时长
+    '近7日高峰营业时长当前值': 'peak_hours_7d_current',
+    '近7日高峰营业时长目标值': 'peak_hours_7d_target',
+    '近7日高峰营业时长指标得分': 'peak_hours_7d_score',
+    '近7日高峰营业时长指标权重': 'peak_hours_7d_weight',
+    
+    # 近7日营业时长
+    '近7日营业时长当前值': 'business_hours_7d_current',
+    '近7日营业时长目标值': 'business_hours_7d_target',
+    '近7日营业时长指标得分': 'business_hours_7d_score',
+    '近7日营业时长指标权重': 'business_hours_7d_weight',
+    
+    # 昨日店装丰富度
+    '昨日店装丰富度当前值': 'store_decoration_current',
+    '昨日店装丰富度目标值': 'store_decoration_target',
+    '昨日店装丰富度指标得分': 'store_decoration_score',
+    '昨日店装丰富度指标权重': 'store_decoration_weight',
+    
+    # 昨日最低起送价
+    '昨日最低起送价当前值': 'min_delivery_price_current',
+    '昨日最低起送价目标值': 'min_delivery_price_target',
+    '昨日最低起送价指标得分': 'min_delivery_price_score',
+    '昨日最低起送价指标权重': 'min_delivery_price_weight',
+    
+    # 昨日服务功能丰富度
+    '昨日服务功能丰富度当前值': 'service_features_current',
+    '昨日服务功能丰富度目标值': 'service_features_target',
+    '昨日服务功能丰富度指标得分': 'service_features_score',
+    '昨日服务功能丰富度指标权重': 'service_features_weight',
+    
+    # 昨日有效活动丰富度
+    '昨日有效活动丰富度当前值': 'promotion_richness_current',
+    '昨日有效活动丰富度目标值': 'promotion_richness_target',
+    '昨日有效活动丰富度指标得分': 'promotion_richness_score',
+    '昨日有效活动丰富度指标权重': 'promotion_richness_weight',
+    
+    # 近7日差评回复率
+    '近7日差评回复率当前值': 'negative_reply_rate_7d_current',
+    '近7日差评回复率目标值': 'negative_reply_rate_7d_target',
+    '近7日差评回复率指标得分': 'negative_reply_rate_7d_score',
+    '近7日差评回复率指标权重': 'negative_reply_rate_7d_weight',
+    
+    # 昨日商家评分
+    '昨日商家评分当前值': 'merchant_rating_current',
+    '昨日商家评分目标值': 'merchant_rating_target',
+    '昨日商家评分指标得分': 'merchant_rating_score',
+    '昨日商家评分指标权重': 'merchant_rating_weight',
+    
+    # 近7日在线联系回复率
+    '近7日在线联系回复率当前值': 'online_reply_rate_7d_current',
+    '近7日在线联系回复率目标值': 'online_reply_rate_7d_target',
+    '近7日在线联系回复率指标得分': 'online_reply_rate_7d_score',
+    '近7日在线联系回复率指标权重': 'online_reply_rate_7d_weight',
+    
+    # 昨日优质商品率
+    '昨日优质商品率当前值': 'quality_product_rate_current',
+    '昨日优质商品率目标值': 'quality_product_rate_target',
+    '昨日优质商品率指标得分': 'quality_product_rate_score',
+    '昨日优质商品率指标权重': 'quality_product_rate_weight',
+    
+    # 昨日菜单丰富度
+    '昨日菜单丰富度当前值': 'menu_richness_current',
+    '昨日菜单丰富度目标值': 'menu_richness_target',
+    '昨日菜单丰富度指标得分': 'menu_richness_score',
+    '昨日菜单丰富度指标权重': 'menu_richness_weight',
+    
+    # 商责取消率
+    '商责取消率当前值': 'merchant_cancel_rate_current',
+    '商责取消率目标值': 'merchant_cancel_rate_target',
+    '商责取消率指标得分': 'merchant_cancel_rate_score',
+    '商责取消率指标权重': 'merchant_cancel_rate_weight',
+    
+    # 近7日出餐完成上报率
+    '近7日出餐完成上报率当前值': 'meal_report_rate_7d_current',
+    '近7日出餐完成上报率目标值': 'meal_report_rate_7d_target',
+    '近7日出餐完成上报率指标得分': 'meal_report_rate_7d_score',
+}
+
+# ==================== 粉丝群数据字段映射 ====================
+FANS_FIELD_MAPPING = {
+    # 基础信息
+    '日期': 'data_date',
+    '门店名称': 'store_name',
+    '门店编号': 'store_id',
+    '门店所在城市': 'city',
+    
+    # 群基础信息
+    '是否达到建群门槛': 'reach_threshold',
+    '创建粉丝群类型': 'group_type',
+    '粉丝群数量': 'group_count',
+    
+    # 粉丝统计
+    '群粉丝人数': 'total_fans',
+    '活跃粉丝人数': 'active_fans',
+    '粉丝活跃率': 'fan_active_rate',
+    '群访问粉丝人数': 'visit_fans',
+    '粉丝群访问率': 'fan_visit_rate',
+    '新入群粉丝人数': 'new_fans',
+    '新入群粉丝占比': 'new_fan_ratio',
+    '老粉丝群访问人数': 'old_visit_fans',
+    '老粉丝群访问率': 'old_fan_visit_rate',
+    '退群粉丝数': 'quit_fans',
+    '退群粉丝占比': 'quit_fan_ratio',
+    
+    # 订单统计
+    '粉丝群订单量': 'group_order_count',
+    '门店有效订单量': 'store_order_count',
+    '粉丝群订单占比': 'group_order_ratio',
+    
+    # 入群礼
+    '入群礼订单量': 'welcome_gift_orders',
+    '入群礼领取量': 'welcome_gift_received',
+    
+    # 群普通红包
+    '群普通红包订单量': 'normal_redpack_orders',
+    '群普通红包领取人数': 'normal_redpack_receivers',
+    '群普通红包使用人数': 'normal_redpack_users',
+    '群普通红包领取量': 'normal_redpack_received',
+    
+    # 群口令红包
+    '群口令红包订单量': 'password_redpack_orders',
+    '群口令红包领取人数': 'password_redpack_receivers',
+    '群口令红包使用人数': 'password_redpack_users',
+    '群口令红包领取量': 'password_redpack_received',
+    
+    # 群活跃度
+    '活跃粉丝群数量': 'active_group_count',
+    '有商家发消息的粉丝群数量': 'merchant_message_group_count',
+    
+    # 群配置
+    '是否配置进群礼': 'has_welcome_gift',
+    '发送群专属优惠券次数': 'send_coupon_times',
+    '发送推荐商品次数': 'send_product_times',
+    '是否配置群公告': 'has_announcement',
+}
+
 
 class ExcelParser:
     """Excel解析器"""
     
     @staticmethod
-    def parse_excel(file_path):
+    def parse_excel(file_path, data_type='store'):
         """
-        解析Excel文件
+        解析Excel或CSV文件
         
         Args:
-            file_path: Excel文件路径
+            file_path: 文件路径（支持.xlsx, .xls, .csv）
+            data_type: 数据类型 ('store' 或 'order')
             
         Returns:
             tuple: (success, data, error_message)
@@ -137,11 +401,42 @@ class ExcelParser:
                 - error_message: 错误信息
         """
         try:
-            # 读取Excel文件
-            df = pd.read_excel(file_path, engine='openpyxl')
+            # 根据数据类型选择字段映射
+            if data_type == 'order':
+                field_mapping = ORDER_FIELD_MAPPING
+                required_columns = ['门店名称', '订单号']  # 订单数据必填
+            elif data_type == 'product':
+                field_mapping = PRODUCT_FIELD_MAPPING
+                required_columns = ['日期', '门店名称', '商品名称']  # 商品数据必填
+            elif data_type == 'review':
+                field_mapping = REVIEW_FIELD_MAPPING
+                required_columns = ['日期', '门店名称']  # 评价数据必填
+            elif data_type == 'growth':
+                field_mapping = GROWTH_FIELD_MAPPING
+                required_columns = ['日期', '门店名称']  # 商家成长数据必填
+            elif data_type == 'fans':
+                field_mapping = FANS_FIELD_MAPPING
+                required_columns = ['日期', '门店名称']  # 粉丝群数据必填
+            else:  # 'store' 或其他，默认使用门店映射
+                field_mapping = STORE_FIELD_MAPPING
+                required_columns = ['日期', '门店名称']  # 门店数据必填
+            
+            # 根据文件扩展名选择读取方式
+            file_extension = file_path.lower().rsplit('.', 1)[-1]
+            if file_extension == 'csv':
+                # 读取CSV文件（支持多种编码）
+                try:
+                    df = pd.read_csv(file_path, encoding='utf-8')
+                except UnicodeDecodeError:
+                    try:
+                        df = pd.read_csv(file_path, encoding='gbk')
+                    except UnicodeDecodeError:
+                        df = pd.read_csv(file_path, encoding='gb2312')
+            else:
+                # 读取Excel文件
+                df = pd.read_excel(file_path, engine='openpyxl')
             
             # 验证必填列
-            required_columns = ['日期', '门店名称']
             missing_columns = [col for col in required_columns if col not in df.columns]
             if missing_columns:
                 return False, None, f"缺少必填列: {', '.join(missing_columns)}"
@@ -150,7 +445,7 @@ class ExcelParser:
             result_data = []
             for index, row in df.iterrows():
                 try:
-                    row_data = ExcelParser._convert_row(row)
+                    row_data = ExcelParser._convert_row(row, field_mapping)
                     result_data.append(row_data)
                 except Exception as e:
                     print(f"警告：第{index+2}行数据转换失败: {str(e)}")
@@ -162,19 +457,20 @@ class ExcelParser:
             return False, None, f"Excel解析失败: {str(e)}"
     
     @staticmethod
-    def _convert_row(row):
+    def _convert_row(row, field_mapping):
         """
         转换单行数据
         
         Args:
             row: pandas Series对象
+            field_mapping: 字段映射字典
             
         Returns:
             dict: 转换后的数据字典
         """
         result = {}
         
-        for excel_col, db_field in FIELD_MAPPING.items():
+        for excel_col, db_field in field_mapping.items():
             if excel_col in row.index:
                 value = row[excel_col]
                 
@@ -187,19 +483,30 @@ class ExcelParser:
                     # 日期类型
                     if db_field == 'data_date':
                         value = ExcelParser._parse_date(value)
-                    elif db_field == 'first_open_time':
+                    elif db_field in ['first_open_time', 'order_time']:  # 订单的下单时间
                         value = ExcelParser._parse_datetime(value)
                     
                     # 数值类型（整数）
+                    elif db_field in ['cooking_time', 'guest_count']:  # 订单数据的整数字段
+                        value = ExcelParser._parse_int(value)
                     elif db_field.endswith('_orders') or db_field.endswith('_users') \
                         or db_field.endswith('_times') or db_field.endswith('_products') \
                         or db_field.endswith('_count_60d') or db_field.endswith('_count_30d'):
                         value = ExcelParser._parse_int(value)
                     
                     # 数值类型（小数）
+                    elif db_field in ['estimated_income', 'platform_service_fee', 'other_fee', 
+                                      'delivery_fee', 'package_fee']:  # 订单数据的金额字段
+                        value = ExcelParser._parse_decimal(value)
                     elif db_field.endswith('_rate') or db_field.endswith('_score') \
                         or db_field.endswith('_fee') or db_field in ['income', 'customer_payment_total', 
                         'avg_payment_per_order', 'avg_income_per_order', 'avg_cooking_time', 'avg_pickup_time']:
+                        value = ExcelParser._parse_decimal(value)
+                    # Growth数据的指标字段（current, target, weight）
+                    elif db_field.endswith('_current') or db_field.endswith('_target') or db_field.endswith('_weight'):
+                        value = ExcelParser._parse_decimal(value)
+                    # Growth数据的店铺分字段
+                    elif db_field == 'store_score':
                         value = ExcelParser._parse_decimal(value)
                     
                     # 字符串类型
@@ -212,29 +519,57 @@ class ExcelParser:
     
     @staticmethod
     def _parse_date(value):
-        """解析日期"""
+        """解析日期（支持多种格式）"""
         if isinstance(value, datetime):
             return value.date()
-        elif isinstance(value, str):
+        elif isinstance(value, (int, float)):
+            # 处理Excel中的纯数字日期（如 20251019）
             try:
-                return datetime.strptime(value, '%Y-%m-%d').date()
+                value_str = str(int(value))  # 转换为字符串，去除小数部分
+                if len(value_str) == 8:  # 确保是8位数字（YYYYMMDD）
+                    return datetime.strptime(value_str, '%Y%m%d').date()
             except:
-                return None
+                pass
+            return None
+        elif isinstance(value, str):
+            # 尝试多种日期格式
+            formats = [
+                '%Y%m%d',             # 20251019 (用户的格式！)
+                '%Y-%m-%d',           # 2025-10-19
+                '%Y/%m/%d',           # 2025/10/19
+                '%Y年%m月%d日',       # 2025年10月19日
+                '%Y-%m-%d %H:%M:%S',  # 2025-10-19 00:00:00
+                '%Y/%m/%d %H:%M:%S',  # 2025/10/19 00:00:00
+            ]
+            for fmt in formats:
+                try:
+                    return datetime.strptime(value, fmt).date()
+                except:
+                    continue
+            return None
         return None
     
     @staticmethod
     def _parse_datetime(value):
-        """解析日期时间"""
+        """解析日期时间（支持多种格式）"""
         if isinstance(value, datetime):
             return value
         elif isinstance(value, str):
-            try:
-                return datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
-            except:
+            # 尝试多种日期时间格式
+            formats = [
+                '%Y-%m-%d %H:%M:%S',  # 2025-01-13 10:27:00
+                '%Y/%m/%d %H:%M:%S',  # 2025/01/13 10:27:00
+                '%Y/%m/%d %H:%M',     # 2025/01/13 10:27
+                '%Y-%m-%d %H:%M',     # 2025-01-13 10:27
+                '%Y/%m/%d',           # 2025/01/13
+                '%Y-%m-%d',           # 2025-01-13
+            ]
+            for fmt in formats:
                 try:
-                    return datetime.strptime(value, '%Y-%m-%d')
+                    return datetime.strptime(value, fmt)
                 except:
-                    return None
+                    continue
+            return None
         return None
     
     @staticmethod
@@ -266,22 +601,56 @@ class ExcelParser:
         return 0.0
     
     @staticmethod
-    def validate_data(data):
+    def validate_data(data, data_type='store'):
         """
         验证数据完整性
         
         Args:
             data: 数据字典
+            data_type: 数据类型 ('store', 'order', 'product', 'review')
             
         Returns:
             tuple: (is_valid, error_message)
         """
-        # 检查必填字段
-        if not data.get('data_date'):
-            return False, "缺少日期字段"
-        
-        if not data.get('store_name'):
-            return False, "缺少门店名称"
+        # 根据数据类型检查必填字段
+        if data_type == 'order':
+            # 订单数据必填字段
+            if not data.get('store_name'):
+                return False, "缺少门店名称"
+            if not data.get('order_id'):
+                return False, "缺少订单号"
+        elif data_type == 'product':
+            # 商品数据必填字段
+            if not data.get('data_date'):
+                return False, "缺少日期字段"
+            if not data.get('store_name'):
+                return False, "缺少门店名称"
+            if not data.get('product_name'):
+                return False, "缺少商品名称"
+        elif data_type == 'review':
+            # 评价数据必填字段
+            if not data.get('data_date'):
+                return False, "缺少日期字段"
+            if not data.get('store_name'):
+                return False, "缺少门店名称"
+        elif data_type == 'growth':
+            # 商家成长数据必填字段
+            if not data.get('data_date'):
+                return False, "缺少日期字段"
+            if not data.get('store_name'):
+                return False, "缺少门店名称"
+        elif data_type == 'fans':
+            # 粉丝群数据必填字段
+            if not data.get('data_date'):
+                return False, "缺少日期字段"
+            if not data.get('store_name'):
+                return False, "缺少门店名称"
+        else:
+            # 门店数据必填字段
+            if not data.get('data_date'):
+                return False, "缺少日期字段"
+            if not data.get('store_name'):
+                return False, "缺少门店名称"
         
         return True, None
 

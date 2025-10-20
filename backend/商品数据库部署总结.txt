@@ -1,0 +1,249 @@
+================================================================================
+  饿了么商品数据库设计完成 ✅
+  完成时间：2025-10-20
+================================================================================
+
+📋 完成内容
+--------------------------------------------------------------------------------
+
+1. ✅ 数据库模型设计
+   文件：backend/app/models.py
+   新增：ElemeProductData 类
+   字段：24个核心字段，覆盖所有Excel列
+   
+2. ✅ Excel字段映射
+   文件：backend/app/services/excel_parser.py
+   新增：PRODUCT_FIELD_MAPPING 字典
+   支持：商品数据Excel/CSV解析
+   
+3. ✅ 数据验证逻辑
+   文件：backend/app/services/excel_parser.py
+   更新：validate_data() 方法
+   支持：product 数据类型验证
+   
+4. ✅ 数据库迁移脚本
+   文件：backend/deploy/migrate_add_product_table.py
+   功能：自动创建 eleme_product_data 表
+   
+5. ✅ 部署脚本
+   文件：backend/deploy_product_database.ps1
+   功能：一键部署商品数据库到服务器
+   
+6. ✅ 设计文档
+   文件：backend/商品数据库设计.md
+   内容：完整的字段说明、使用示例、分析维度
+
+================================================================================
+
+📊 数据表结构总览
+--------------------------------------------------------------------------------
+
+表名：eleme_product_data
+
+[1] 基础信息（5个字段）
+    ├─ data_date          日期 ⭐必填
+    ├─ city               城市名称
+    ├─ store_name         门店名称 ⭐必填
+    ├─ store_id           门店编号
+    └─ product_name       商品名称 ⭐必填
+
+[2] 商品属性（5个字段）
+    ├─ is_new_product     是否新品
+    ├─ is_signature       是否招牌
+    ├─ is_combo           是否套餐
+    ├─ is_ingredient      是否配料
+    └─ is_sold_out        是否售罄
+
+[3] 销售数据（5个字段）
+    ├─ sales_amount            销售额（元）
+    ├─ sales_volume            销量
+    ├─ order_user_count        下单人数
+    ├─ order_count             带来订单数
+    └─ order_transaction_amount 订单交易额（元）
+
+[4] 复购数据（2个字段）
+    ├─ repurchase_30d_users    近30日复购人数
+    └─ repurchase_30d_rate     近30日复购率（%）
+
+[5] 新客数据（2个字段）
+    ├─ new_customer_count      新客人数
+    └─ new_customer_ratio      新客占比（%）
+
+[6] 用户行为（5个字段）
+    ├─ exposure_users          曝光人数
+    ├─ click_users             点击人数
+    ├─ add_to_cart_users       加购人数
+    ├─ add_to_cart_rate        加购率（%）
+    └─ like_count              点赞数
+
+总计：24 个核心字段 ✅
+
+================================================================================
+
+🗂️ 索引设计
+--------------------------------------------------------------------------------
+
+索引字段（共6个）：
+  1. data_date          - 按日期查询
+  2. city               - 按城市筛选
+  3. store_name         - 按门店查询
+  4. store_id           - 按门店ID查询
+  5. product_name       - 按商品名查询
+  6. import_batch_id    - 批量删除
+
+================================================================================
+
+📦 Excel字段映射
+--------------------------------------------------------------------------------
+
+Excel列名                 数据库字段名                   数据类型
+--------------------------------------------------------------------------------
+日期                     data_date                    DATE
+城市名称                 city                         VARCHAR(50)
+门店名称                 store_name                   VARCHAR(200)
+门店编号                 store_id                     VARCHAR(50)
+商品名称                 product_name                 VARCHAR(200)
+是否新品                 is_new_product               VARCHAR(10)
+是否招牌                 is_signature                 VARCHAR(10)
+是否套餐                 is_combo                     VARCHAR(10)
+是否配料                 is_ingredient                VARCHAR(10)
+是否售罄                 is_sold_out                  VARCHAR(10)
+销售额                   sales_amount                 DECIMAL(12,2)
+销量                     sales_volume                 INT
+下单人数                 order_user_count             INT
+带来订单数               order_count                  INT
+订单交易额               order_transaction_amount     DECIMAL(12,2)
+近30日复购人数           repurchase_30d_users         INT
+近30日复购率             repurchase_30d_rate          DECIMAL(5,2)
+新客人数                 new_customer_count           INT
+新客占比                 new_customer_ratio           DECIMAL(5,2)
+曝光人数                 exposure_users               INT
+点击人数                 click_users                  INT
+加购人数                 add_to_cart_users            INT
+加购率                   add_to_cart_rate             DECIMAL(5,2)
+点赞数                   like_count                   INT
+
+================================================================================
+
+🚀 部署步骤
+--------------------------------------------------------------------------------
+
+方式一：使用部署脚本（推荐）
+  
+  cd backend
+  .\deploy_product_database.ps1
+  
+  脚本会自动完成：
+  ✅ 上传 models.py
+  ✅ 上传 excel_parser.py
+  ✅ 上传迁移脚本
+  ✅ 执行数据库迁移
+  ✅ 重启后端服务
+
+方式二：手动部署
+
+  1. 上传文件
+     scp app/models.py ubuntu@118.89.73.199:~/SunpizzaApp/backend/app/
+     scp app/services/excel_parser.py ubuntu@118.89.73.199:~/SunpizzaApp/backend/app/services/
+     scp deploy/migrate_add_product_table.py ubuntu@118.89.73.199:~/SunpizzaApp/backend/deploy/
+  
+  2. 执行迁移
+     ssh ubuntu@118.89.73.199
+     cd ~/SunpizzaApp/backend
+     source venv/bin/activate
+     python deploy/migrate_add_product_table.py
+  
+  3. 重启服务
+     sudo systemctl restart sunpizza-backend
+
+================================================================================
+
+🔍 验证步骤
+--------------------------------------------------------------------------------
+
+1. 检查表是否创建成功
+   
+   mysql -u root -p sunpizza_db
+   DESC eleme_product_data;
+   
+2. 查看表结构
+   
+   SHOW CREATE TABLE eleme_product_data;
+
+3. 测试数据导入
+   
+   - 准备商品数据Excel文件
+   - 登录管理后台
+   - 进入"外卖运营 > 饿了么 > 数据上传"
+   - 选择数据类型："商品数据"
+   - 上传Excel文件
+   - 验证导入成功
+
+================================================================================
+
+📈 后续开发任务
+--------------------------------------------------------------------------------
+
+[ ] 1. 更新后端API (backend/app/api/eleme.py)
+       - 在 upload_excel() 中添加 'product' 分支
+       - 实现商品数据插入逻辑
+       - 支持基于商品名+日期+门店的去重
+
+[ ] 2. 更新前端上传组件 (admin-web)
+       - 确认"商品数据"选项已添加到数据类型下拉框
+       - 测试商品数据上传流程
+
+[ ] 3. 实现商品数据查看 (admin-web)
+       - 在 DataViewTab.tsx 中添加"商品数据"tab
+       - 实现 getProductData API
+       - 创建商品数据表格（24列）
+       - 添加筛选功能（日期、门店、商品名）
+
+[ ] 4. 实现商品数据删除
+       - 在 delete_data_by_batch() 中添加 ElemeProductData 删除逻辑
+
+[ ] 5. 商品数据统计
+       - 销售TOP商品排行
+       - 复购率最高商品
+       - 新品表现分析
+       - 招牌商品销售占比
+
+================================================================================
+
+📝 注意事项
+--------------------------------------------------------------------------------
+
+1. 数据去重策略
+   - 建议使用：(product_name + data_date + store_id) 作为唯一性约束
+   - 或在业务逻辑层实现去重
+
+2. 数据类型说明
+   - 是否类字段：使用 VARCHAR(10) 存储"是"/"否"
+   - 金额字段：使用 DECIMAL(12,2) 保证精度
+   - 百分比字段：使用 DECIMAL(5,2) 存储（如：15.50 表示 15.50%）
+
+3. 性能优化
+   - 已为常用查询字段添加索引
+   - 建议定期清理历史数据
+   - 可考虑按月份分表
+
+4. 数据完整性
+   - 必填字段：日期、门店名称、商品名称
+   - 其他字段允许为空
+   - 数字类型字段默认值为 0
+
+================================================================================
+
+📚 相关文档
+--------------------------------------------------------------------------------
+
+- 详细设计文档：backend/商品数据库设计.md
+- 模型定义：backend/app/models.py (Line 835-920)
+- 字段映射：backend/app/services/excel_parser.py (Line 155-193)
+- 迁移脚本：backend/deploy/migrate_add_product_table.py
+
+================================================================================
+
+✅ 设计完成，可以开始部署！
+
+

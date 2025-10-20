@@ -4,12 +4,12 @@
 
 from flask import Blueprint, request, current_app
 from app import db
-from app.models import ElemeStoreDailyData, ElemeImportLog, ElemeFieldConfig
+from app.models import ElemeStoreDailyData, ElemeOrderData, ElemeProductData, ElemeReviewData, ElemeGrowthData, ElemeFansData, ElemeImportLog, ElemeFieldConfig
 from app.services.excel_parser import ExcelParser
 from app.utils.auth import token_required, admin_required
 from app.utils.response import success_response, error_response
 from werkzeug.utils import secure_filename
-from datetime import datetime, date
+from datetime import datetime, date, time
 from sqlalchemy import func, and_, or_
 import os
 import uuid
@@ -17,7 +17,7 @@ import uuid
 bp = Blueprint('eleme', __name__, url_prefix='/api/eleme')
 
 # 允许的文件扩展名
-ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
+ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv'}
 
 def allowed_file(filename):
     """检查文件扩展名是否允许"""
@@ -39,7 +39,15 @@ def upload_excel(current_user):
         return error_response('文件名为空', 400)
     
     if not allowed_file(file.filename):
-        return error_response('不支持的文件格式，仅支持 .xlsx 和 .xls', 400)
+        return error_response('不支持的文件格式，仅支持 .xlsx、.xls 和 .csv', 400)
+    
+    # 获取数据类型
+    data_type = request.form.get('data_type', 'store')
+    print(f"📊 接收到的数据类型: {data_type}")  # 调试日志
+    print(f"📋 表单数据: {dict(request.form)}")  # 查看所有表单数据
+    
+    if data_type not in ['store', 'order', 'product', 'review', 'growth', 'fans']:
+        return error_response('无效的数据类型', 400)
     
     try:
         # 生成批次ID
@@ -56,14 +64,15 @@ def upload_excel(current_user):
         import_log = ElemeImportLog(
             batch_id=batch_id,
             file_name=filename,
+            data_type=data_type,
             imported_by=current_user['user_id'],
             status='processing'
         )
         db.session.add(import_log)
         db.session.commit()
         
-        # 解析Excel
-        success, data, error_msg = ExcelParser.parse_excel(file_path)
+        # 解析Excel（传入数据类型）
+        success, data, error_msg = ExcelParser.parse_excel(file_path, data_type)
         if not success:
             import_log.status = 'failed'
             import_log.error_message = error_msg
@@ -78,62 +87,166 @@ def upload_excel(current_user):
             
             return error_response(error_msg, 400)
         
-        # 检查数据日期是否已存在（去重检查）
-        data_dates = set()
-        for row_data in data:
-            if row_data.get('data_date'):
-                data_dates.add(row_data['data_date'])
-        
-        if data_dates:
-            # 查询数据库中是否已存在这些日期的数据
-            existing_dates = db.session.query(
-                ElemeStoreDailyData.data_date
-            ).filter(
-                ElemeStoreDailyData.data_date.in_(data_dates)
-            ).distinct().all()
+        # 去重检查（根据数据类型）
+        if data_type == 'store':
+            # 门店数据：按日期去重
+            data_dates = set()
+            for row_data in data:
+                if row_data.get('data_date'):
+                    data_dates.add(row_data['data_date'])
             
-            if existing_dates:
-                existing_dates_list = [d[0].isoformat() for d in existing_dates]
-                import_log.status = 'failed'
-                import_log.error_message = f'数据已存在，请勿重复上传。已存在的日期: {", ".join(existing_dates_list)}'
-                import_log.completed_at = datetime.now()
-                db.session.commit()
+            if data_dates:
+                # 查询数据库中是否已存在这些日期的数据
+                existing_dates = db.session.query(
+                    ElemeStoreDailyData.data_date
+                ).filter(
+                    ElemeStoreDailyData.data_date.in_(data_dates)
+                ).distinct().all()
                 
-                # 删除临时文件
-                try:
-                    os.remove(file_path)
-                except:
-                    pass
+                if existing_dates:
+                    existing_dates_list = [d[0].isoformat() for d in existing_dates]
+                    import_log.status = 'failed'
+                    import_log.error_message = f'数据已存在，请勿重复上传。已存在的日期: {", ".join(existing_dates_list)}'
+                    import_log.completed_at = datetime.now()
+                    db.session.commit()
+                    
+                    # 删除临时文件
+                    try:
+                        os.remove(file_path)
+                    except:
+                        pass
+                    
+                    return error_response(
+                        f'数据已存在，请勿重复上传！\n\n已存在的日期：{", ".join(existing_dates_list)}\n\n如需更新数据，请先删除旧数据，再重新上传。',
+                        400
+                    )
+        elif data_type == 'order':
+            # 订单数据：按订单号去重（检查当前Excel中是否有已存在的订单号）
+            order_ids = set()
+            for row_data in data:
+                if row_data.get('order_id'):
+                    order_ids.add(row_data['order_id'])
+            
+            if order_ids:
+                # 查询数据库中是否已存在这些订单号
+                existing_orders = db.session.query(
+                    ElemeOrderData.order_id
+                ).filter(
+                    ElemeOrderData.order_id.in_(order_ids)
+                ).all()
                 
-                return error_response(
-                    f'数据已存在，请勿重复上传！\n\n已存在的日期：{", ".join(existing_dates_list)}\n\n如需更新数据，请先删除旧数据，再重新上传。',
-                    400
-                )
+                if existing_orders:
+                    existing_order_ids = [o[0] for o in existing_orders]
+                    # 订单数据允许部分重复，自动跳过已存在的订单
+                    print(f"检测到 {len(existing_order_ids)} 个重复订单，将自动跳过")
+                    # 不返回错误，继续处理，在插入时会自动跳过重复订单
         
-        # 批量插入数据
+        # 批量插入数据（根据数据类型）
         success_count = 0
         failed_count = 0
+        skipped_count = 0  # 跳过的重复数据
         data_date = None
         
         for row_data in data:
             try:
-                # 验证数据
-                is_valid, error_msg = ExcelParser.validate_data(row_data)
+                # 验证数据（传入数据类型）
+                is_valid, error_msg = ExcelParser.validate_data(row_data, data_type)
                 if not is_valid:
                     failed_count += 1
                     continue
                 
-                # 记录数据日期
-                if row_data.get('data_date'):
-                    data_date = row_data['data_date']
-                
                 # 添加批次ID
                 row_data['import_batch_id'] = batch_id
                 
-                # 创建数据对象
-                store_data = ElemeStoreDailyData(**row_data)
-                db.session.add(store_data)
-                success_count += 1
+                # 根据数据类型创建不同的数据对象
+                if data_type == 'store':
+                    # 门店数据
+                    if row_data.get('data_date'):
+                        data_date = row_data['data_date']
+                    data_obj = ElemeStoreDailyData(**row_data)
+                    db.session.add(data_obj)
+                    success_count += 1
+                    
+                elif data_type == 'order':
+                    # 订单数据：需要检查订单号是否已存在
+                    order_id = row_data.get('order_id')
+                    if order_id:
+                        # 检查订单是否已存在
+                        existing = ElemeOrderData.query.filter_by(order_id=order_id).first()
+                        if existing:
+                            skipped_count += 1
+                            continue  # 跳过重复订单
+                    
+                    # 记录第一个订单的下单时间作为data_date（用于导入历史显示）
+                    if not data_date and row_data.get('order_time'):
+                        order_time = row_data['order_time']
+                        if isinstance(order_time, datetime):
+                            data_date = order_time.date()
+                        elif isinstance(order_time, date):
+                            data_date = order_time
+                        elif isinstance(order_time, str):
+                            # 如果是字符串，尝试解析
+                            try:
+                                parsed_time = datetime.strptime(order_time, '%Y-%m-%d %H:%M:%S')
+                                data_date = parsed_time.date()
+                            except:
+                                try:
+                                    parsed_time = datetime.strptime(order_time, '%Y/%m/%d %H:%M')
+                                    data_date = parsed_time.date()
+                                except:
+                                    pass
+                    
+                    data_obj = ElemeOrderData(**row_data)
+                    db.session.add(data_obj)
+                    success_count += 1
+                
+                elif data_type == 'product':
+                    # 商品数据：允许重复数据（同一商品可能有多次上架记录）
+                    data_date_val = row_data.get('data_date')
+                    
+                    # 记录data_date用于导入历史显示
+                    if not data_date and data_date_val:
+                        data_date = data_date_val
+                    
+                    data_obj = ElemeProductData(**row_data)
+                    db.session.add(data_obj)
+                    success_count += 1
+                
+                elif data_type == 'review':
+                    # 评价数据：允许重复数据（同一评价可能多次导出）
+                    data_date_val = row_data.get('data_date')
+                    
+                    # 记录data_date用于导入历史显示
+                    if not data_date and data_date_val:
+                        data_date = data_date_val
+                    
+                    data_obj = ElemeReviewData(**row_data)
+                    db.session.add(data_obj)
+                    success_count += 1
+                
+                elif data_type == 'growth':
+                    # 商家成长数据：允许重复数据（同一门店同一日期可能有多次数据更新）
+                    data_date_val = row_data.get('data_date')
+                    
+                    # 记录data_date用于导入历史显示
+                    if not data_date and data_date_val:
+                        data_date = data_date_val
+                    
+                    data_obj = ElemeGrowthData(**row_data)
+                    db.session.add(data_obj)
+                    success_count += 1
+                
+                elif data_type == 'fans':
+                    # 粉丝群数据：允许重复数据（同一门店同一日期可能有多次数据更新）
+                    data_date_val = row_data.get('data_date')
+                    
+                    # 记录data_date用于导入历史显示
+                    if not data_date and data_date_val:
+                        data_date = data_date_val
+                    
+                    data_obj = ElemeFansData(**row_data)
+                    db.session.add(data_obj)
+                    success_count += 1
                 
             except Exception as e:
                 print(f"插入数据失败: {str(e)}")
@@ -159,13 +272,19 @@ def upload_excel(current_user):
             except:
                 pass
             
+            # 构建返回消息
+            message = f'数据导入成功，成功 {success_count} 条，失败 {failed_count} 条'
+            if skipped_count > 0:
+                message += f'，跳过重复 {skipped_count} 条'
+            
             return success_response(
-                message=f'数据导入成功，成功 {success_count} 条，失败 {failed_count} 条',
+                message=message,
                 data={
                     'batch_id': batch_id,
                     'total_rows': len(data),
                     'success_rows': success_count,
                     'failed_rows': failed_count,
+                    'skipped_rows': skipped_count,
                     'data_date': data_date.isoformat() if data_date else None
                 }
             )
@@ -279,6 +398,375 @@ def get_store_data(current_user):
         
     except Exception as e:
         return error_response(f'获取数据失败: {str(e)}', 500)
+
+
+@bp.route('/order-data', methods=['GET'])
+@token_required
+def get_order_data(current_user):
+    """
+    获取订单数据（支持筛选）
+    
+    Query参数:
+    - start_date: 开始日期
+    - end_date: 结束日期
+    - store_id: 门店ID
+    - store_name: 门店名称（模糊搜索）
+    - order_status: 订单状态
+    - order_id: 订单号
+    - page: 页码
+    - per_page: 每页数量
+    """
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        
+        # 构建查询
+        query = ElemeOrderData.query
+        
+        # 日期筛选（根据下单时间）
+        start_date = request.args.get('start_date')
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                query = query.filter(ElemeOrderData.order_time >= start_dt)
+            except ValueError:
+                pass
+        
+        end_date = request.args.get('end_date')
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                # 包含结束日期的整天
+                end_dt = end_dt.replace(hour=23, minute=59, second=59)
+                query = query.filter(ElemeOrderData.order_time <= end_dt)
+            except ValueError:
+                pass
+        
+        # 门店ID筛选
+        store_id = request.args.get('store_id')
+        if store_id:
+            query = query.filter(ElemeOrderData.store_id == store_id)
+        
+        # 门店名称筛选（模糊搜索）
+        store_name = request.args.get('store_name')
+        if store_name:
+            query = query.filter(ElemeOrderData.store_name.like(f'%{store_name}%'))
+        
+        # 订单状态筛选
+        order_status = request.args.get('order_status')
+        if order_status:
+            query = query.filter(ElemeOrderData.order_status == order_status)
+        
+        # 订单号筛选
+        order_id = request.args.get('order_id')
+        if order_id:
+            query = query.filter(ElemeOrderData.order_id.like(f'%{order_id}%'))
+        
+        # 排序（最新订单在前）
+        query = query.order_by(ElemeOrderData.order_time.desc())
+        
+        # 分页
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return success_response(data={
+            'data': [item.to_dict() for item in pagination.items],
+            'total': pagination.total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': pagination.pages
+        })
+        
+    except Exception as e:
+        return error_response(f'获取订单数据失败: {str(e)}', 500)
+
+
+@bp.route('/product-data', methods=['GET'])
+@token_required
+def get_product_data(current_user):
+    """
+    获取商品数据（支持筛选）
+    
+    Query参数:
+    - start_date: 开始日期
+    - end_date: 结束日期
+    - city: 城市名称
+    - store_id: 门店ID
+    - store_name: 门店名称（模糊搜索）
+    - product_name: 商品名称（模糊搜索）
+    - is_new_product: 是否新品（是/否）
+    - is_signature: 是否招牌（是/否）
+    - page: 页码
+    - per_page: 每页数量
+    """
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        
+        # 构建查询
+        query = ElemeProductData.query
+        
+        # 日期筛选
+        start_date = request.args.get('start_date')
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+                query = query.filter(ElemeProductData.data_date >= start_dt)
+            except ValueError:
+                pass
+        
+        end_date = request.args.get('end_date')
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+                query = query.filter(ElemeProductData.data_date <= end_dt)
+            except ValueError:
+                pass
+        
+        # 城市筛选
+        city = request.args.get('city')
+        if city:
+            query = query.filter(ElemeProductData.city == city)
+        
+        # 门店ID筛选
+        store_id = request.args.get('store_id')
+        if store_id:
+            query = query.filter(ElemeProductData.store_id == store_id)
+        
+        # 门店名称筛选（模糊搜索）
+        store_name = request.args.get('store_name')
+        if store_name:
+            query = query.filter(ElemeProductData.store_name.like(f'%{store_name}%'))
+        
+        # 商品名称筛选（模糊搜索）
+        product_name = request.args.get('product_name')
+        if product_name:
+            query = query.filter(ElemeProductData.product_name.like(f'%{product_name}%'))
+        
+        # 是否新品筛选
+        is_new_product = request.args.get('is_new_product')
+        if is_new_product:
+            query = query.filter(ElemeProductData.is_new_product == is_new_product)
+        
+        # 是否招牌筛选
+        is_signature = request.args.get('is_signature')
+        if is_signature:
+            query = query.filter(ElemeProductData.is_signature == is_signature)
+        
+        # 排序（最新日期在前，销售额降序）
+        query = query.order_by(
+            ElemeProductData.data_date.desc(),
+            ElemeProductData.sales_amount.desc()
+        )
+        
+        # 分页
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return success_response(data={
+            'data': [item.to_dict() for item in pagination.items],
+            'total': pagination.total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': pagination.pages
+        })
+        
+    except Exception as e:
+        return error_response(f'获取商品数据失败: {str(e)}', 500)
+
+
+@bp.route('/review-data', methods=['GET'])
+@token_required
+def get_review_data(current_user):
+    """
+    获取评价数据（支持筛选）
+    
+    Query参数:
+    - start_date: 开始日期
+    - end_date: 结束日期
+    - city: 城市名称
+    - store_id: 门店ID
+    - store_name: 门店名称（模糊搜索）
+    - order_id: 订单ID
+    - min_score: 最低评分（1-5）
+    - max_score: 最高评分（1-5）
+    - is_counted_in_score: 是否计入总分（是/否）
+    - page: 页码
+    - per_page: 每页数量
+    """
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        
+        # 构建查询
+        query = ElemeReviewData.query
+        
+        # 日期筛选
+        start_date = request.args.get('start_date')
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+                query = query.filter(ElemeReviewData.data_date >= start_dt)
+            except ValueError:
+                pass
+        
+        end_date = request.args.get('end_date')
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+                query = query.filter(ElemeReviewData.data_date <= end_dt)
+            except ValueError:
+                pass
+        
+        # 城市筛选
+        city = request.args.get('city')
+        if city:
+            query = query.filter(ElemeReviewData.city == city)
+        
+        # 门店ID筛选
+        store_id = request.args.get('store_id')
+        if store_id:
+            query = query.filter(ElemeReviewData.store_id == store_id)
+        
+        # 门店名称筛选（模糊搜索）
+        store_name = request.args.get('store_name')
+        if store_name:
+            query = query.filter(ElemeReviewData.store_name.like(f'%{store_name}%'))
+        
+        # 订单ID筛选
+        order_id = request.args.get('order_id')
+        if order_id:
+            query = query.filter(ElemeReviewData.order_id == order_id)
+        
+        # 评分筛选
+        min_score = request.args.get('min_score', type=float)
+        if min_score is not None:
+            query = query.filter(ElemeReviewData.overall_score >= min_score)
+        
+        max_score = request.args.get('max_score', type=float)
+        if max_score is not None:
+            query = query.filter(ElemeReviewData.overall_score <= max_score)
+        
+        # 是否计入总分筛选
+        is_counted_in_score = request.args.get('is_counted_in_score')
+        if is_counted_in_score:
+            query = query.filter(ElemeReviewData.is_counted_in_score == is_counted_in_score)
+        
+        # 排序（最新评价在前，评分降序）
+        query = query.order_by(
+            ElemeReviewData.review_time.desc(),
+            ElemeReviewData.overall_score.desc()
+        )
+        
+        # 分页
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return success_response(data={
+            'data': [item.to_dict() for item in pagination.items],
+            'total': pagination.total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': pagination.pages
+        })
+        
+    except Exception as e:
+        return error_response(f'获取评价数据失败: {str(e)}', 500)
+
+
+@bp.route('/growth-data', methods=['GET'])
+@token_required
+def get_growth_data(current_user):
+    """
+    获取商家成长数据（支持筛选）
+    
+    Query参数:
+    - start_date: 开始日期
+    - end_date: 结束日期
+    - city: 城市名称
+    - province: 省份
+    - store_id: 门店ID
+    - store_name: 门店名称（模糊搜索）
+    - min_score: 最低店铺分
+    - max_score: 最高店铺分
+    - l_level: L等级分布
+    - page: 页码
+    - per_page: 每页数量
+    """
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        
+        # 构建查询
+        query = ElemeGrowthData.query
+        
+        # 日期筛选
+        start_date = request.args.get('start_date')
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+                query = query.filter(ElemeGrowthData.data_date >= start_dt)
+            except ValueError:
+                pass
+        
+        end_date = request.args.get('end_date')
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+                query = query.filter(ElemeGrowthData.data_date <= end_dt)
+            except ValueError:
+                pass
+        
+        # 省份筛选
+        province = request.args.get('province')
+        if province:
+            query = query.filter(ElemeGrowthData.province == province)
+        
+        # 城市筛选
+        city = request.args.get('city')
+        if city:
+            query = query.filter(ElemeGrowthData.city == city)
+        
+        # 门店ID筛选
+        store_id = request.args.get('store_id')
+        if store_id:
+            query = query.filter(ElemeGrowthData.store_id == store_id)
+        
+        # 门店名称筛选（模糊搜索）
+        store_name = request.args.get('store_name')
+        if store_name:
+            query = query.filter(ElemeGrowthData.store_name.like(f'%{store_name}%'))
+        
+        # L等级筛选
+        l_level = request.args.get('l_level')
+        if l_level:
+            query = query.filter(ElemeGrowthData.l_level == l_level)
+        
+        # 店铺分筛选
+        min_score = request.args.get('min_score', type=float)
+        if min_score is not None:
+            query = query.filter(ElemeGrowthData.store_score >= min_score)
+        
+        max_score = request.args.get('max_score', type=float)
+        if max_score is not None:
+            query = query.filter(ElemeGrowthData.store_score <= max_score)
+        
+        # 排序（最新日期在前，店铺分降序）
+        query = query.order_by(
+            ElemeGrowthData.data_date.desc(),
+            ElemeGrowthData.store_score.desc()
+        )
+        
+        # 分页
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return success_response(data={
+            'data': [item.to_dict() for item in pagination.items],
+            'total': pagination.total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': pagination.pages
+        })
+        
+    except Exception as e:
+        return error_response(f'获取商家成长数据失败: {str(e)}', 500)
 
 
 @bp.route('/statistics', methods=['GET'])
@@ -598,6 +1086,12 @@ def delete_data_by_batch(current_user, batch_id):
     """
     删除指定批次的所有数据（管理员和外卖运营可操作）
     
+    智能删除逻辑：
+    - 如果有数据：删除数据 + 标记日志为已删除
+    - 如果无数据：只标记日志为已删除 + 提示无数据
+    
+    支持不同数据类型（门店/订单）
+    
     Args:
         batch_id: 导入批次ID
     """
@@ -611,27 +1105,137 @@ def delete_data_by_batch(current_user, batch_id):
         if import_log.is_deleted:
             return error_response(f'批次 {batch_id} 的数据已被删除', 400)
         
-        # 查询该批次的数据
-        count = ElemeStoreDailyData.query.filter_by(import_batch_id=batch_id).count()
+        # 根据数据类型查询相应表的数据
+        data_type = import_log.data_type
+        if data_type == 'order':
+            count = ElemeOrderData.query.filter_by(import_batch_id=batch_id).count()
+        elif data_type == 'product':
+            count = ElemeProductData.query.filter_by(import_batch_id=batch_id).count()
+        elif data_type == 'review':
+            count = ElemeReviewData.query.filter_by(import_batch_id=batch_id).count()
+        elif data_type == 'growth':
+            count = ElemeGrowthData.query.filter_by(import_batch_id=batch_id).count()
+        elif data_type == 'fans':
+            count = ElemeFansData.query.filter_by(import_batch_id=batch_id).count()
+        else:  # 'store' 或其他，默认门店数据
+            count = ElemeStoreDailyData.query.filter_by(import_batch_id=batch_id).count()
         
+        # 智能删除逻辑
         if count == 0:
-            return error_response(f'未找到批次 {batch_id} 的数据', 404)
-        
-        # 删除数据
-        ElemeStoreDailyData.query.filter_by(import_batch_id=batch_id).delete()
-        
-        # 更新导入日志状态（标记为已删除，但不删除日志记录）
-        import_log.is_deleted = True
-        import_log.deleted_at = datetime.now()
-        
-        db.session.commit()
-        
-        return success_response(
-            message=f'成功删除批次 {batch_id} 的数据',
-            data={'deleted_count': count, 'batch_id': batch_id}
-        )
+            # 无数据：只删除记录，并提示用户
+            import_log.is_deleted = True
+            import_log.deleted_at = datetime.now()
+            db.session.commit()
+            
+            return success_response(
+                message=f'该批次无数据，已删除导入记录',
+                data={
+                    'deleted_count': 0, 
+                    'batch_id': batch_id,
+                    'has_data': False  # 标记：无数据
+                }
+            )
+        else:
+            # 有数据：根据数据类型删除相应表的数据
+            if data_type == 'order':
+                ElemeOrderData.query.filter_by(import_batch_id=batch_id).delete()
+            elif data_type == 'product':
+                ElemeProductData.query.filter_by(import_batch_id=batch_id).delete()
+            elif data_type == 'review':
+                ElemeReviewData.query.filter_by(import_batch_id=batch_id).delete()
+            elif data_type == 'growth':
+                ElemeGrowthData.query.filter_by(import_batch_id=batch_id).delete()
+            elif data_type == 'fans':
+                ElemeFansData.query.filter_by(import_batch_id=batch_id).delete()
+            else:  # 'store' 或其他
+                ElemeStoreDailyData.query.filter_by(import_batch_id=batch_id).delete()
+            
+            import_log.is_deleted = True
+            import_log.deleted_at = datetime.now()
+            db.session.commit()
+            
+            return success_response(
+                message=f'成功删除批次 {batch_id} 的 {count} 条数据',
+                data={
+                    'deleted_count': count, 
+                    'batch_id': batch_id,
+                    'has_data': True  # 标记：有数据
+                }
+            )
         
     except Exception as e:
         db.session.rollback()
         return error_response(f'删除数据失败: {str(e)}', 500)
+
+
+@bp.route('/fans-data', methods=['GET'])
+@token_required
+def get_fans_data(current_user):
+    """
+    获取粉丝群数据（支持筛选）
+    
+    Query参数:
+    - start_date: 开始日期
+    - end_date: 结束日期
+    - city: 城市名称
+    - store_id: 门店ID
+    - store_name: 门店名称（模糊搜索）
+    - page: 页码
+    - per_page: 每页数量
+    """
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        
+        # 构建查询
+        query = ElemeFansData.query
+        
+        # 日期筛选
+        start_date = request.args.get('start_date')
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+                query = query.filter(ElemeFansData.data_date >= start_dt)
+            except ValueError:
+                pass
+        
+        end_date = request.args.get('end_date')
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+                query = query.filter(ElemeFansData.data_date <= end_dt)
+            except ValueError:
+                pass
+        
+        # 城市筛选
+        city = request.args.get('city')
+        if city:
+            query = query.filter(ElemeFansData.city == city)
+        
+        # 门店ID筛选
+        store_id = request.args.get('store_id')
+        if store_id:
+            query = query.filter(ElemeFansData.store_id == store_id)
+        
+        # 门店名称筛选（模糊搜索）
+        store_name = request.args.get('store_name')
+        if store_name:
+            query = query.filter(ElemeFansData.store_name.like(f'%{store_name}%'))
+        
+        # 排序（最新日期在前）
+        query = query.order_by(ElemeFansData.data_date.desc())
+        
+        # 分页
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return success_response(data={
+            'data': [item.to_dict() for item in pagination.items],
+            'total': pagination.total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': pagination.pages
+        })
+        
+    except Exception as e:
+        return error_response(f'获取粉丝群数据失败: {str(e)}', 500)
 

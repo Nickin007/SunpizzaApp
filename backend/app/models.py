@@ -653,21 +653,550 @@ class ElemeStoreDailyData(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
-        """转换为字典"""
+        """转换为字典（包含所有90+个字段）"""
         return {
             'id': self.id,
+            # 基础信息
             'data_date': self.data_date.isoformat() if self.data_date else None,
             'store_name': self.store_name,
             'store_id': self.store_id,
+            'province': self.province,
             'city': self.city,
+            'district': self.district,
+            'address': self.address,
+            'first_open_time': self.first_open_time.isoformat() if self.first_open_time else None,
+            'is_direct': self.is_direct,
+            
+            # 运营时长
+            'business_hours': self.business_hours,
+            'peak_hours': self.peak_hours,
+            'abnormal_close_hours': self.abnormal_close_hours,
+            'is_valid_store': self.is_valid_store,
+            
+            # 订单财务
             'valid_orders': self.valid_orders,
+            'invalid_orders': self.invalid_orders,
+            'merchant_invalid_orders': self.merchant_invalid_orders,
             'income': float(self.income) if self.income else 0,
+            'packaging_fee': float(self.packaging_fee) if self.packaging_fee else 0,
+            'platform_service_fee': float(self.platform_service_fee) if self.platform_service_fee else 0,
+            'delivery_subsidy': float(self.delivery_subsidy) if self.delivery_subsidy else 0,
+            'fulfillment_service_fee': float(self.fulfillment_service_fee) if self.fulfillment_service_fee else 0,
+            'refund_fee': float(self.refund_fee) if self.refund_fee else 0,
             'customer_payment_total': float(self.customer_payment_total) if self.customer_payment_total else 0,
             'avg_payment_per_order': float(self.avg_payment_per_order) if self.avg_payment_per_order else 0,
+            'avg_income_per_order': float(self.avg_income_per_order) if self.avg_income_per_order else 0,
+            
+            # 营销漏斗
+            'exposure_users': self.exposure_users,
+            'exposure_new_users': self.exposure_new_users,
+            'exposure_old_users': self.exposure_old_users,
+            'exposure_times': self.exposure_times,
+            'visit_users': self.visit_users,
+            'visit_new_users': self.visit_new_users,
+            'visit_old_users': self.visit_old_users,
+            'visit_times': self.visit_times,
+            'order_users': self.order_users,
+            'order_new_users': self.order_new_users,
+            'order_old_users': self.order_old_users,
+            'order_times': self.order_times,
             'visit_conversion_rate': float(self.visit_conversion_rate) if self.visit_conversion_rate else 0,
+            'new_visit_conversion_rate': float(self.new_visit_conversion_rate) if self.new_visit_conversion_rate else 0,
+            'old_visit_conversion_rate': float(self.old_visit_conversion_rate) if self.old_visit_conversion_rate else 0,
             'order_conversion_rate': float(self.order_conversion_rate) if self.order_conversion_rate else 0,
+            'new_order_conversion_rate': float(self.new_order_conversion_rate) if self.new_order_conversion_rate else 0,
+            'old_order_conversion_rate': float(self.old_order_conversion_rate) if self.old_order_conversion_rate else 0,
+            
+            # 商品运营
+            'online_products': self.online_products,
+            'sold_products': self.sold_products,
+            'out_of_stock_products': self.out_of_stock_products,
+            'new_products': self.new_products,
+            'promotion_products': self.promotion_products,
+            'discount_orders': self.discount_orders,
+            'repurchase_7d_users': self.repurchase_7d_users,
+            'repurchase_7d_rate': float(self.repurchase_7d_rate) if self.repurchase_7d_rate else 0,
+            'repurchase_30d_users': self.repurchase_30d_users,
+            'repurchase_30d_rate': float(self.repurchase_30d_rate) if self.repurchase_30d_rate else 0,
+            
+            # 服务质量
+            'bad_review_orders': self.bad_review_orders,
+            'complaint_orders': self.complaint_orders,
+            'complaint_order_ids': self.complaint_order_ids,
+            'overtime_orders': self.overtime_orders,
+            'overtime_order_ids': self.overtime_order_ids,
+            'avg_cooking_time': float(self.avg_cooking_time) if self.avg_cooking_time else 0,
+            'reject_orders': self.reject_orders,
+            'merchant_cancel_orders': self.merchant_cancel_orders,
+            'merchant_cancel_rate': float(self.merchant_cancel_rate) if self.merchant_cancel_rate else 0,
+            'merchant_refund_orders': self.merchant_refund_orders,
+            'merchant_refund_rate': float(self.merchant_refund_rate) if self.merchant_refund_rate else 0,
+            'avg_pickup_time': float(self.avg_pickup_time) if self.avg_pickup_time else 0,
+            
+            # 评分体系
             'store_score': float(self.store_score) if self.store_score else 0,
+            'satisfaction_score': float(self.satisfaction_score) if self.satisfaction_score else 0,
+            'taste_score': float(self.taste_score) if self.taste_score else 0,
+            'packaging_score': float(self.packaging_score) if self.packaging_score else 0,
+            
+            # 近60日评价
+            'good_rate_60d': float(self.good_rate_60d) if self.good_rate_60d else 0,
+            'good_count_60d': self.good_count_60d,
+            'medium_rate_60d': float(self.medium_rate_60d) if self.medium_rate_60d else 0,
+            'medium_count_60d': self.medium_count_60d,
+            'bad_rate_60d': float(self.bad_rate_60d) if self.bad_rate_60d else 0,
+            'bad_count_60d': self.bad_count_60d,
+            'quality_rate_60d': float(self.quality_rate_60d) if self.quality_rate_60d else 0,
+            'quality_count_60d': self.quality_count_60d,
+            'review_rate_60d': float(self.review_rate_60d) if self.review_rate_60d else 0,
+            'review_count_60d': self.review_count_60d,
+            'bad_reply_rate_60d': float(self.bad_reply_rate_60d) if self.bad_reply_rate_60d else 0,
+            
+            # 近30日评价
             'good_rate_30d': float(self.good_rate_30d) if self.good_rate_30d else 0,
+            'good_count_30d': self.good_count_30d,
+            'medium_rate_30d': float(self.medium_rate_30d) if self.medium_rate_30d else 0,
+            'medium_count_30d': self.medium_count_30d,
+            'bad_rate_30d': float(self.bad_rate_30d) if self.bad_rate_30d else 0,
+            'bad_count_30d': self.bad_count_30d,
+            'quality_rate_30d': float(self.quality_rate_30d) if self.quality_rate_30d else 0,
+            'quality_count_30d': self.quality_count_30d,
+            'review_rate_30d': float(self.review_rate_30d) if self.review_rate_30d else 0,
+            'review_count_30d': self.review_count_30d,
+            'bad_reply_rate_30d': float(self.bad_reply_rate_30d) if self.bad_reply_rate_30d else 0,
+        }
+
+
+class ElemeOrderData(db.Model):
+    """饿了么订单明细数据表（来自食亨收银系统）"""
+    __tablename__ = 'eleme_order_data'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    
+    # 基础信息
+    store_name = db.Column(db.String(200), nullable=False, index=True)
+    store_id = db.Column(db.String(50), index=True)
+    
+    # 订单核心信息
+    order_id = db.Column(db.String(100), unique=True, nullable=False, index=True)  # 订单号：唯一索引，去重依据
+    order_status = db.Column(db.String(50))  # 订单状态：已完成、已退款等
+    order_time = db.Column(db.DateTime, index=True)  # 下单时间
+    order_type = db.Column(db.String(20))  # 预约/即时单
+    
+    # 出餐信息
+    cooking_time = db.Column(db.Integer)  # 出餐时间（分钟）
+    cooking_type = db.Column(db.String(50))  # 出餐类型：正常、延迟等
+    
+    # 订单详情
+    guest_count = db.Column(db.Integer, default=0)  # 就餐人数
+    product_info = db.Column(db.Text)  # 商品信息（长文本，后续需要正则拆解）
+    pickup_number = db.Column(db.String(50))  # 取餐号
+    order_note = db.Column(db.Text)  # 订单备注
+    refund_reason = db.Column(db.String(200))  # 退款原因（可为空）
+    
+    # 财务信息（核心指标）
+    estimated_income = db.Column(db.Numeric(12, 2), default=0)  # 预计收入（元）- 核心指标
+    platform_service_fee = db.Column(db.Numeric(10, 2), default=0)  # 平台服务费
+    other_fee = db.Column(db.Numeric(10, 2), default=0)  # 其他费用
+    delivery_fee = db.Column(db.Numeric(10, 2), default=0)  # 配送费
+    discount_name = db.Column(db.String(500))  # 优惠名称
+    package_fee = db.Column(db.Numeric(10, 2), default=0)  # 餐盒费
+    
+    # 元数据
+    import_batch_id = db.Column(db.String(50), index=True)  # 导入批次ID
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'store_name': self.store_name,
+            'store_id': self.store_id,
+            'order_id': self.order_id,
+            'order_status': self.order_status,
+            'order_time': self.order_time.isoformat() if self.order_time else None,
+            'order_type': self.order_type,
+            'cooking_time': self.cooking_time,
+            'cooking_type': self.cooking_type,
+            'guest_count': self.guest_count,
+            'product_info': self.product_info,
+            'pickup_number': self.pickup_number,
+            'order_note': self.order_note,
+            'refund_reason': self.refund_reason,
+            'estimated_income': float(self.estimated_income) if self.estimated_income else 0,
+            'platform_service_fee': float(self.platform_service_fee) if self.platform_service_fee else 0,
+            'other_fee': float(self.other_fee) if self.other_fee else 0,
+            'delivery_fee': float(self.delivery_fee) if self.delivery_fee else 0,
+            'discount_name': self.discount_name,
+            'package_fee': float(self.package_fee) if self.package_fee else 0,
+        }
+
+
+class ElemeProductData(db.Model):
+    """饿了么商品数据表"""
+    __tablename__ = 'eleme_product_data'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    
+    # 基础信息
+    data_date = db.Column(db.Date, nullable=False, index=True)  # 日期
+    city = db.Column(db.String(50), index=True)  # 城市名称
+    store_name = db.Column(db.String(200), nullable=False, index=True)  # 门店名称
+    store_id = db.Column(db.String(50), index=True)  # 门店编号
+    product_name = db.Column(db.String(200), nullable=False, index=True)  # 商品名称
+    
+    # 商品属性（布尔类型字段）
+    is_new_product = db.Column(db.String(10))  # 是否新品
+    is_signature = db.Column(db.String(10))  # 是否招牌
+    is_combo = db.Column(db.String(10))  # 是否套餐
+    is_ingredient = db.Column(db.String(10))  # 是否配料
+    is_sold_out = db.Column(db.String(10))  # 是否售罄
+    
+    # 销售数据
+    sales_amount = db.Column(db.Numeric(12, 2), default=0)  # 销售额（元）
+    sales_volume = db.Column(db.Integer, default=0)  # 销量
+    order_user_count = db.Column(db.Integer, default=0)  # 下单人数
+    order_count = db.Column(db.Integer, default=0)  # 带来订单数
+    order_transaction_amount = db.Column(db.Numeric(12, 2), default=0)  # 订单交易额（元）
+    
+    # 复购数据
+    repurchase_30d_users = db.Column(db.Integer, default=0)  # 近30日复购人数
+    repurchase_30d_rate = db.Column(db.Numeric(5, 2))  # 近30日复购率（%）
+    
+    # 新客数据
+    new_customer_count = db.Column(db.Integer, default=0)  # 新客人数
+    new_customer_ratio = db.Column(db.Numeric(5, 2))  # 新客占比（%）
+    
+    # 用户行为数据
+    exposure_users = db.Column(db.Integer, default=0)  # 曝光人数
+    click_users = db.Column(db.Integer, default=0)  # 点击人数
+    add_to_cart_users = db.Column(db.Integer, default=0)  # 加购人数
+    add_to_cart_rate = db.Column(db.Numeric(5, 2))  # 加购率（%）
+    like_count = db.Column(db.Integer, default=0)  # 点赞数
+    
+    # 元数据
+    import_batch_id = db.Column(db.String(50), index=True)  # 导入批次ID
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        """转换为字典（包含所有24个字段）"""
+        return {
+            'id': self.id,
+            # 基础信息
+            'data_date': self.data_date.isoformat() if self.data_date else None,
+            'city': self.city,
+            'store_name': self.store_name,
+            'store_id': self.store_id,
+            'product_name': self.product_name,
+            
+            # 商品属性
+            'is_new_product': self.is_new_product,
+            'is_signature': self.is_signature,
+            'is_combo': self.is_combo,
+            'is_ingredient': self.is_ingredient,
+            'is_sold_out': self.is_sold_out,
+            
+            # 销售数据
+            'sales_amount': float(self.sales_amount) if self.sales_amount else 0,
+            'sales_volume': self.sales_volume,
+            'order_user_count': self.order_user_count,
+            'order_count': self.order_count,
+            'order_transaction_amount': float(self.order_transaction_amount) if self.order_transaction_amount else 0,
+            
+            # 复购数据
+            'repurchase_30d_users': self.repurchase_30d_users,
+            'repurchase_30d_rate': float(self.repurchase_30d_rate) if self.repurchase_30d_rate else 0,
+            
+            # 新客数据
+            'new_customer_count': self.new_customer_count,
+            'new_customer_ratio': float(self.new_customer_ratio) if self.new_customer_ratio else 0,
+            
+            # 用户行为数据
+            'exposure_users': self.exposure_users,
+            'click_users': self.click_users,
+            'add_to_cart_users': self.add_to_cart_users,
+            'add_to_cart_rate': float(self.add_to_cart_rate) if self.add_to_cart_rate else 0,
+            'like_count': self.like_count,
+        }
+
+
+class ElemeReviewData(db.Model):
+    """饿了么评价数据表"""
+    __tablename__ = 'eleme_review_data'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    
+    # 基础信息
+    data_date = db.Column(db.Date, nullable=False, index=True)  # 日期
+    store_id = db.Column(db.String(50), index=True)  # 门店ID
+    store_name = db.Column(db.String(200), nullable=False, index=True)  # 门店名称
+    city = db.Column(db.String(50), index=True)  # 城市名称
+    
+    # 订单与评价信息
+    order_id = db.Column(db.String(100), index=True)  # 订单ID（允许重复，一个订单可能多次导出）
+    review_time = db.Column(db.DateTime, index=True)  # 评价时间
+    
+    # 评分数据（1-5分制）
+    overall_score = db.Column(db.Numeric(3, 1))  # 总体评分
+    taste_score = db.Column(db.Numeric(3, 1))  # 味道评分
+    packaging_score = db.Column(db.Numeric(3, 1))  # 包装评分
+    delivery_score = db.Column(db.Numeric(3, 1))  # 配送评分
+    
+    # 评价内容
+    review_content = db.Column(db.Text)  # 评价内容（长文本）
+    reply_content = db.Column(db.Text)  # 回复内容（长文本）
+    
+    # 商品反馈
+    liked_products = db.Column(db.Text)  # 点赞商品（可能是商品列表）
+    disliked_products = db.Column(db.Text)  # 点踩商品（可能是商品列表）
+    
+    # 状态字段
+    is_appeal_success = db.Column(db.String(10))  # 是否申诉成功（是/否）
+    is_counted_in_score = db.Column(db.String(10))  # 是否计入总分（是/否）
+    is_visible_to_customer = db.Column(db.String(10))  # 顾客是否会看到（是/否）
+    reply_method = db.Column(db.String(50))  # 回评方式
+    
+    # 订单详情
+    order_details = db.Column(db.Text)  # 订单详情（长文本）
+    
+    # 元数据
+    import_batch_id = db.Column(db.String(50), index=True)  # 导入批次ID
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        """转换为字典（包含所有19个字段）"""
+        return {
+            'id': self.id,
+            # 基础信息
+            'data_date': self.data_date.isoformat() if self.data_date else None,
+            'store_id': self.store_id,
+            'store_name': self.store_name,
+            'city': self.city,
+            
+            # 订单与评价信息
+            'order_id': self.order_id,
+            'review_time': self.review_time.isoformat() if self.review_time else None,
+            
+            # 评分数据
+            'overall_score': float(self.overall_score) if self.overall_score else 0,
+            'taste_score': float(self.taste_score) if self.taste_score else 0,
+            'packaging_score': float(self.packaging_score) if self.packaging_score else 0,
+            'delivery_score': float(self.delivery_score) if self.delivery_score else 0,
+            
+            # 评价内容
+            'review_content': self.review_content,
+            'reply_content': self.reply_content,
+            
+            # 商品反馈
+            'liked_products': self.liked_products,
+            'disliked_products': self.disliked_products,
+            
+            # 状态字段
+            'is_appeal_success': self.is_appeal_success,
+            'is_counted_in_score': self.is_counted_in_score,
+            'is_visible_to_customer': self.is_visible_to_customer,
+            'reply_method': self.reply_method,
+            
+            # 订单详情
+            'order_details': self.order_details,
+        }
+
+
+class ElemeGrowthData(db.Model):
+    """饿了么商家成长数据表"""
+    __tablename__ = 'eleme_growth_data'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    
+    # 基础信息
+    data_date = db.Column(db.Date, nullable=False, index=True)  # 日期
+    store_name = db.Column(db.String(200), nullable=False, index=True)  # 门店名称
+    store_id = db.Column(db.String(50), index=True)  # 门店ID
+    province = db.Column(db.String(50), index=True)  # 省份
+    city = db.Column(db.String(50), index=True)  # 城市名称
+    district = db.Column(db.String(50))  # 区县名称
+    chain_name = db.Column(db.String(200))  # 顶级连锁名称
+    address = db.Column(db.Text)  # 地址
+    
+    # 店铺评级
+    l_level = db.Column(db.String(50))  # L等级分布
+    store_score = db.Column(db.Numeric(10, 2))  # 店铺分
+    
+    # 近7日高峰营业时长
+    peak_hours_7d_current = db.Column(db.Numeric(10, 2))  # 当前值
+    peak_hours_7d_target = db.Column(db.Numeric(10, 2))  # 目标值
+    peak_hours_7d_score = db.Column(db.Numeric(10, 2))  # 得分
+    peak_hours_7d_weight = db.Column(db.Numeric(10, 2))  # 权重
+    
+    # 近7日营业时长
+    business_hours_7d_current = db.Column(db.Numeric(10, 2))
+    business_hours_7d_target = db.Column(db.Numeric(10, 2))
+    business_hours_7d_score = db.Column(db.Numeric(10, 2))
+    business_hours_7d_weight = db.Column(db.Numeric(10, 2))
+    
+    # 昨日店装丰富度
+    store_decoration_current = db.Column(db.Numeric(10, 2))
+    store_decoration_target = db.Column(db.Numeric(10, 2))
+    store_decoration_score = db.Column(db.Numeric(10, 2))
+    store_decoration_weight = db.Column(db.Numeric(10, 2))
+    
+    # 昨日最低起送价
+    min_delivery_price_current = db.Column(db.Numeric(10, 2))
+    min_delivery_price_target = db.Column(db.Numeric(10, 2))
+    min_delivery_price_score = db.Column(db.Numeric(10, 2))
+    min_delivery_price_weight = db.Column(db.Numeric(10, 2))
+    
+    # 昨日服务功能丰富度
+    service_features_current = db.Column(db.Numeric(10, 2))
+    service_features_target = db.Column(db.Numeric(10, 2))
+    service_features_score = db.Column(db.Numeric(10, 2))
+    service_features_weight = db.Column(db.Numeric(10, 2))
+    
+    # 昨日有效活动丰富度
+    promotion_richness_current = db.Column(db.Numeric(10, 2))
+    promotion_richness_target = db.Column(db.Numeric(10, 2))
+    promotion_richness_score = db.Column(db.Numeric(10, 2))
+    promotion_richness_weight = db.Column(db.Numeric(10, 2))
+    
+    # 近7日差评回复率
+    negative_reply_rate_7d_current = db.Column(db.Numeric(10, 2))
+    negative_reply_rate_7d_target = db.Column(db.Numeric(10, 2))
+    negative_reply_rate_7d_score = db.Column(db.Numeric(10, 2))
+    negative_reply_rate_7d_weight = db.Column(db.Numeric(10, 2))
+    
+    # 昨日商家评分
+    merchant_rating_current = db.Column(db.Numeric(10, 2))
+    merchant_rating_target = db.Column(db.Numeric(10, 2))
+    merchant_rating_score = db.Column(db.Numeric(10, 2))
+    merchant_rating_weight = db.Column(db.Numeric(10, 2))
+    
+    # 近7日在线联系回复率
+    online_reply_rate_7d_current = db.Column(db.Numeric(10, 2))
+    online_reply_rate_7d_target = db.Column(db.Numeric(10, 2))
+    online_reply_rate_7d_score = db.Column(db.Numeric(10, 2))
+    online_reply_rate_7d_weight = db.Column(db.Numeric(10, 2))
+    
+    # 昨日优质商品率
+    quality_product_rate_current = db.Column(db.Numeric(10, 2))
+    quality_product_rate_target = db.Column(db.Numeric(10, 2))
+    quality_product_rate_score = db.Column(db.Numeric(10, 2))
+    quality_product_rate_weight = db.Column(db.Numeric(10, 2))
+    
+    # 昨日菜单丰富度
+    menu_richness_current = db.Column(db.Numeric(10, 2))
+    menu_richness_target = db.Column(db.Numeric(10, 2))
+    menu_richness_score = db.Column(db.Numeric(10, 2))
+    menu_richness_weight = db.Column(db.Numeric(10, 2))
+    
+    # 商责取消率
+    merchant_cancel_rate_current = db.Column(db.Numeric(10, 2))
+    merchant_cancel_rate_target = db.Column(db.Numeric(10, 2))
+    merchant_cancel_rate_score = db.Column(db.Numeric(10, 2))
+    merchant_cancel_rate_weight = db.Column(db.Numeric(10, 2))
+    
+    # 近7日出餐完成上报率
+    meal_report_rate_7d_current = db.Column(db.Numeric(10, 2))
+    meal_report_rate_7d_target = db.Column(db.Numeric(10, 2))
+    meal_report_rate_7d_score = db.Column(db.Numeric(10, 2))
+    
+    # 元数据
+    import_batch_id = db.Column(db.String(50), index=True)  # 导入批次ID
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        """转换为字典（包含所有61个字段）"""
+        return {
+            'id': self.id,
+            # 基础信息
+            'data_date': self.data_date.isoformat() if self.data_date else None,
+            'store_name': self.store_name,
+            'store_id': self.store_id,
+            'province': self.province,
+            'city': self.city,
+            'district': self.district,
+            'chain_name': self.chain_name,
+            'address': self.address,
+            
+            # 店铺评级
+            'l_level': self.l_level,
+            'store_score': float(self.store_score) if self.store_score else 0,
+            
+            # 近7日高峰营业时长
+            'peak_hours_7d_current': float(self.peak_hours_7d_current) if self.peak_hours_7d_current else 0,
+            'peak_hours_7d_target': float(self.peak_hours_7d_target) if self.peak_hours_7d_target else 0,
+            'peak_hours_7d_score': float(self.peak_hours_7d_score) if self.peak_hours_7d_score else 0,
+            'peak_hours_7d_weight': float(self.peak_hours_7d_weight) if self.peak_hours_7d_weight else 0,
+            
+            # 近7日营业时长
+            'business_hours_7d_current': float(self.business_hours_7d_current) if self.business_hours_7d_current else 0,
+            'business_hours_7d_target': float(self.business_hours_7d_target) if self.business_hours_7d_target else 0,
+            'business_hours_7d_score': float(self.business_hours_7d_score) if self.business_hours_7d_score else 0,
+            'business_hours_7d_weight': float(self.business_hours_7d_weight) if self.business_hours_7d_weight else 0,
+            
+            # 昨日店装丰富度
+            'store_decoration_current': float(self.store_decoration_current) if self.store_decoration_current else 0,
+            'store_decoration_target': float(self.store_decoration_target) if self.store_decoration_target else 0,
+            'store_decoration_score': float(self.store_decoration_score) if self.store_decoration_score else 0,
+            'store_decoration_weight': float(self.store_decoration_weight) if self.store_decoration_weight else 0,
+            
+            # 昨日最低起送价
+            'min_delivery_price_current': float(self.min_delivery_price_current) if self.min_delivery_price_current else 0,
+            'min_delivery_price_target': float(self.min_delivery_price_target) if self.min_delivery_price_target else 0,
+            'min_delivery_price_score': float(self.min_delivery_price_score) if self.min_delivery_price_score else 0,
+            'min_delivery_price_weight': float(self.min_delivery_price_weight) if self.min_delivery_price_weight else 0,
+            
+            # 昨日服务功能丰富度
+            'service_features_current': float(self.service_features_current) if self.service_features_current else 0,
+            'service_features_target': float(self.service_features_target) if self.service_features_target else 0,
+            'service_features_score': float(self.service_features_score) if self.service_features_score else 0,
+            'service_features_weight': float(self.service_features_weight) if self.service_features_weight else 0,
+            
+            # 昨日有效活动丰富度
+            'promotion_richness_current': float(self.promotion_richness_current) if self.promotion_richness_current else 0,
+            'promotion_richness_target': float(self.promotion_richness_target) if self.promotion_richness_target else 0,
+            'promotion_richness_score': float(self.promotion_richness_score) if self.promotion_richness_score else 0,
+            'promotion_richness_weight': float(self.promotion_richness_weight) if self.promotion_richness_weight else 0,
+            
+            # 近7日差评回复率
+            'negative_reply_rate_7d_current': float(self.negative_reply_rate_7d_current) if self.negative_reply_rate_7d_current else 0,
+            'negative_reply_rate_7d_target': float(self.negative_reply_rate_7d_target) if self.negative_reply_rate_7d_target else 0,
+            'negative_reply_rate_7d_score': float(self.negative_reply_rate_7d_score) if self.negative_reply_rate_7d_score else 0,
+            'negative_reply_rate_7d_weight': float(self.negative_reply_rate_7d_weight) if self.negative_reply_rate_7d_weight else 0,
+            
+            # 昨日商家评分
+            'merchant_rating_current': float(self.merchant_rating_current) if self.merchant_rating_current else 0,
+            'merchant_rating_target': float(self.merchant_rating_target) if self.merchant_rating_target else 0,
+            'merchant_rating_score': float(self.merchant_rating_score) if self.merchant_rating_score else 0,
+            'merchant_rating_weight': float(self.merchant_rating_weight) if self.merchant_rating_weight else 0,
+            
+            # 近7日在线联系回复率
+            'online_reply_rate_7d_current': float(self.online_reply_rate_7d_current) if self.online_reply_rate_7d_current else 0,
+            'online_reply_rate_7d_target': float(self.online_reply_rate_7d_target) if self.online_reply_rate_7d_target else 0,
+            'online_reply_rate_7d_score': float(self.online_reply_rate_7d_score) if self.online_reply_rate_7d_score else 0,
+            'online_reply_rate_7d_weight': float(self.online_reply_rate_7d_weight) if self.online_reply_rate_7d_weight else 0,
+            
+            # 昨日优质商品率
+            'quality_product_rate_current': float(self.quality_product_rate_current) if self.quality_product_rate_current else 0,
+            'quality_product_rate_target': float(self.quality_product_rate_target) if self.quality_product_rate_target else 0,
+            'quality_product_rate_score': float(self.quality_product_rate_score) if self.quality_product_rate_score else 0,
+            'quality_product_rate_weight': float(self.quality_product_rate_weight) if self.quality_product_rate_weight else 0,
+            
+            # 昨日菜单丰富度
+            'menu_richness_current': float(self.menu_richness_current) if self.menu_richness_current else 0,
+            'menu_richness_target': float(self.menu_richness_target) if self.menu_richness_target else 0,
+            'menu_richness_score': float(self.menu_richness_score) if self.menu_richness_score else 0,
+            'menu_richness_weight': float(self.menu_richness_weight) if self.menu_richness_weight else 0,
+            
+            # 商责取消率
+            'merchant_cancel_rate_current': float(self.merchant_cancel_rate_current) if self.merchant_cancel_rate_current else 0,
+            'merchant_cancel_rate_target': float(self.merchant_cancel_rate_target) if self.merchant_cancel_rate_target else 0,
+            'merchant_cancel_rate_score': float(self.merchant_cancel_rate_score) if self.merchant_cancel_rate_score else 0,
+            'merchant_cancel_rate_weight': float(self.merchant_cancel_rate_weight) if self.merchant_cancel_rate_weight else 0,
+            
+            # 近7日出餐完成上报率
+            'meal_report_rate_7d_current': float(self.meal_report_rate_7d_current) if self.meal_report_rate_7d_current else 0,
+            'meal_report_rate_7d_target': float(self.meal_report_rate_7d_target) if self.meal_report_rate_7d_target else 0,
+            'meal_report_rate_7d_score': float(self.meal_report_rate_7d_score) if self.meal_report_rate_7d_score else 0,
         }
 
 
@@ -678,6 +1207,7 @@ class ElemeImportLog(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     batch_id = db.Column(db.String(50), unique=True, nullable=False)
     file_name = db.Column(db.String(200))
+    data_type = db.Column(db.Enum('store', 'order', 'product', 'review', 'growth', 'fans', name='eleme_data_type'), default='store', nullable=False)
     data_date = db.Column(db.Date, index=True)
     total_rows = db.Column(db.Integer, default=0)
     success_rows = db.Column(db.Integer, default=0)
@@ -699,6 +1229,7 @@ class ElemeImportLog(db.Model):
             'id': self.id,
             'batch_id': self.batch_id,
             'file_name': self.file_name,
+            'data_type': self.data_type,
             'data_date': self.data_date.isoformat() if self.data_date else None,
             'total_rows': self.total_rows,
             'success_rows': self.success_rows,
@@ -740,5 +1271,131 @@ class ElemeFieldConfig(db.Model):
             'is_active': self.is_active,
             'sort_order': self.sort_order,
             'description': self.description,
+        }
+
+
+class ElemeFansData(db.Model):
+    """饿了么粉丝群数据表"""
+    __tablename__ = 'eleme_fans_data'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    
+    # 基础信息
+    data_date = db.Column(db.Date, nullable=False, index=True)
+    store_name = db.Column(db.String(200), nullable=False, index=True)
+    store_id = db.Column(db.String(50), index=True)
+    city = db.Column(db.String(50), index=True)
+    
+    # 群基础信息
+    reach_threshold = db.Column(db.String(50))
+    group_type = db.Column(db.String(50))
+    group_count = db.Column(db.Integer, default=0)
+    
+    # 粉丝统计
+    total_fans = db.Column(db.Integer, default=0)
+    active_fans = db.Column(db.Integer, default=0)
+    fan_active_rate = db.Column(db.Numeric(10, 2), default=0)
+    visit_fans = db.Column(db.Integer, default=0)
+    fan_visit_rate = db.Column(db.Numeric(10, 2), default=0)
+    new_fans = db.Column(db.Integer, default=0)
+    new_fan_ratio = db.Column(db.Numeric(10, 2), default=0)
+    old_visit_fans = db.Column(db.Integer, default=0)
+    old_fan_visit_rate = db.Column(db.Numeric(10, 2), default=0)
+    quit_fans = db.Column(db.Integer, default=0)
+    quit_fan_ratio = db.Column(db.Numeric(10, 2), default=0)
+    
+    # 订单统计
+    group_order_count = db.Column(db.Integer, default=0)
+    store_order_count = db.Column(db.Integer, default=0)
+    group_order_ratio = db.Column(db.Numeric(10, 2), default=0)
+    
+    # 入群礼
+    welcome_gift_orders = db.Column(db.Integer, default=0)
+    welcome_gift_received = db.Column(db.Integer, default=0)
+    
+    # 群普通红包
+    normal_redpack_orders = db.Column(db.Integer, default=0)
+    normal_redpack_receivers = db.Column(db.Integer, default=0)
+    normal_redpack_users = db.Column(db.Integer, default=0)
+    normal_redpack_received = db.Column(db.Integer, default=0)
+    
+    # 群口令红包
+    password_redpack_orders = db.Column(db.Integer, default=0)
+    password_redpack_receivers = db.Column(db.Integer, default=0)
+    password_redpack_users = db.Column(db.Integer, default=0)
+    password_redpack_received = db.Column(db.Integer, default=0)
+    
+    # 群活跃度
+    active_group_count = db.Column(db.Integer, default=0)
+    merchant_message_group_count = db.Column(db.Integer, default=0)
+    
+    # 群配置
+    has_welcome_gift = db.Column(db.String(50))
+    send_coupon_times = db.Column(db.Integer, default=0)
+    send_product_times = db.Column(db.Integer, default=0)
+    has_announcement = db.Column(db.String(50))
+    
+    # 元数据
+    import_batch_id = db.Column(db.String(50), index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        """转换为字典（包含所有37个字段）"""
+        return {
+            'id': self.id,
+            # 基础信息
+            'data_date': self.data_date.isoformat() if self.data_date else None,
+            'store_name': self.store_name,
+            'store_id': self.store_id,
+            'city': self.city,
+            
+            # 群基础信息
+            'reach_threshold': self.reach_threshold,
+            'group_type': self.group_type,
+            'group_count': self.group_count,
+            
+            # 粉丝统计
+            'total_fans': self.total_fans,
+            'active_fans': self.active_fans,
+            'fan_active_rate': float(self.fan_active_rate) if self.fan_active_rate else 0,
+            'visit_fans': self.visit_fans,
+            'fan_visit_rate': float(self.fan_visit_rate) if self.fan_visit_rate else 0,
+            'new_fans': self.new_fans,
+            'new_fan_ratio': float(self.new_fan_ratio) if self.new_fan_ratio else 0,
+            'old_visit_fans': self.old_visit_fans,
+            'old_fan_visit_rate': float(self.old_fan_visit_rate) if self.old_fan_visit_rate else 0,
+            'quit_fans': self.quit_fans,
+            'quit_fan_ratio': float(self.quit_fan_ratio) if self.quit_fan_ratio else 0,
+            
+            # 订单统计
+            'group_order_count': self.group_order_count,
+            'store_order_count': self.store_order_count,
+            'group_order_ratio': float(self.group_order_ratio) if self.group_order_ratio else 0,
+            
+            # 入群礼
+            'welcome_gift_orders': self.welcome_gift_orders,
+            'welcome_gift_received': self.welcome_gift_received,
+            
+            # 群普通红包
+            'normal_redpack_orders': self.normal_redpack_orders,
+            'normal_redpack_receivers': self.normal_redpack_receivers,
+            'normal_redpack_users': self.normal_redpack_users,
+            'normal_redpack_received': self.normal_redpack_received,
+            
+            # 群口令红包
+            'password_redpack_orders': self.password_redpack_orders,
+            'password_redpack_receivers': self.password_redpack_receivers,
+            'password_redpack_users': self.password_redpack_users,
+            'password_redpack_received': self.password_redpack_received,
+            
+            # 群活跃度
+            'active_group_count': self.active_group_count,
+            'merchant_message_group_count': self.merchant_message_group_count,
+            
+            # 群配置
+            'has_welcome_gift': self.has_welcome_gift,
+            'send_coupon_times': self.send_coupon_times,
+            'send_product_times': self.send_product_times,
+            'has_announcement': self.has_announcement,
         }
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Tabs, DatePicker, Select, Button, Space } from 'antd';
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
+import UploadCalendarTab from './components/UploadCalendarTab';
 import DataUploadTab from './components/DataUploadTab';
 import DatabaseEditTab from './components/DatabaseEditTab';
 import BasicInfoTab from './components/BasicInfoTab';
@@ -22,6 +23,11 @@ const ElemeStore: React.FC = () => {
 
   // Tab配置
   const tabItems = [
+    {
+      key: 'calendar',
+      label: '📅 上传日历',
+      children: <UploadCalendarTab />,
+    },
     {
       key: 'upload',
       label: '数据上传',
@@ -110,8 +116,8 @@ const ElemeStore: React.FC = () => {
     console.log('导出数据', { dateRange, selectedStores, selectedCities });
   };
 
-  // 是否显示筛选栏（数据上传和数据库编辑不显示）
-  const showFilters = !['upload', 'database'].includes(activeTab);
+  // 是否显示筛选栏（上传日历、数据上传和数据库编辑不显示）
+  const showFilters = !['calendar', 'upload', 'database'].includes(activeTab);
 
   return (
     <div className="eleme-store-analysis">

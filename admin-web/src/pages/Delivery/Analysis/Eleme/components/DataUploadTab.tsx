@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Table, message, Tag, Space, Card, Alert, Button, Popconfirm } from 'antd';
+import { Upload, Table, message, Tag, Space, Card, Alert, Button, Popconfirm, Select } from 'antd';
 import { InboxOutlined, UploadOutlined, DeleteOutlined } from '@ant-design/icons';
 import elemeApi from '../../../../../api/eleme';
 import type { ImportLog } from '../../../../../api/eleme';
@@ -7,9 +7,40 @@ import dayjs from 'dayjs';
 
 const { Dragger } = Upload;
 
+// 数据类型选项
+const DATA_TYPE_OPTIONS = [
+  { label: '门店数据', value: 'store' },
+  { label: '订单数据', value: 'order' },
+  { label: '商品数据', value: 'product' },
+  { label: '评价数据', value: 'review' },
+  { label: '商家成长数据', value: 'growth' },
+  { label: '粉丝群数据', value: 'fans' },
+];
+
+// 数据类型显示名称映射
+const DATA_TYPE_NAMES: Record<string, string> = {
+  store: '门店数据',
+  order: '订单数据',
+  product: '商品数据',
+  review: '评价数据',
+  growth: '商家成长数据',
+  fans: '粉丝群数据',
+};
+
+// 数据类型标签颜色映射
+const DATA_TYPE_COLORS: Record<string, string> = {
+  store: 'blue',
+  order: 'green',
+  product: 'orange',
+  review: 'purple',
+  growth: 'cyan',
+  fans: 'magenta',
+};
+
 const DataUploadTab: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [dataType, setDataType] = useState<string>('store'); // 默认选择门店数据
   const [logs, setLogs] = useState<ImportLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
@@ -47,17 +78,23 @@ const DataUploadTab: React.FC = () => {
       return;
     }
 
+    if (!dataType) {
+      message.warning('请选择数据类型');
+      return;
+    }
+
     try {
       setUploading(true);
       message.loading({ content: '正在上传并解析Excel文件...', key: 'upload', duration: 0 });
       
-      const response = await elemeApi.uploadExcel(selectedFile);
+      const response = await elemeApi.uploadExcel(selectedFile, dataType);
       const resData = response.data as any;
       
       message.success({ content: resData.message || '上传成功！', key: 'upload', duration: 3 });
       
-      // 清空已选文件
+      // 清空已选文件和数据类型
       setSelectedFile(null);
+      setDataType('store'); // 重置为默认值
       
       // 刷新导入历史
       fetchLogs();
@@ -90,16 +127,18 @@ const DataUploadTab: React.FC = () => {
   const uploadProps = {
     name: 'file',
     multiple: false,
-    accept: '.xlsx,.xls',
+    accept: '.xlsx,.xls,.csv',
     beforeUpload: (file: File) => {
-      const isExcel =
+      const isValidFile =
         file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
         file.type === 'application/vnd.ms-excel' ||
+        file.type === 'text/csv' ||
         file.name.endsWith('.xlsx') ||
-        file.name.endsWith('.xls');
+        file.name.endsWith('.xls') ||
+        file.name.endsWith('.csv');
       
-      if (!isExcel) {
-        message.error('只能上传 Excel 文件（.xlsx 或 .xls）！');
+      if (!isValidFile) {
+        message.error('只能上传 Excel 或 CSV 文件（.xlsx、.xls 或 .csv）！');
         return false;
       }
 
@@ -131,9 +170,25 @@ const DataUploadTab: React.FC = () => {
       message.loading({ content: '正在删除...', key: 'delete', duration: 0 });
       
       // 使用批次ID删除
-      await elemeApi.deleteDataByBatch(record.batch_id);
+      const response = await elemeApi.deleteDataByBatch(record.batch_id);
       
-      message.success({ content: '删除成功！', key: 'delete', duration: 2 });
+      // 根据是否有数据显示不同的提示
+      if (response.data?.has_data === false) {
+        // 无数据：只删除了记录
+        message.warning({ 
+          content: '该批次无数据，已删除导入记录', 
+          key: 'delete', 
+          duration: 3 
+        });
+      } else {
+        // 有数据：删除了数据和记录
+        const count = response.data?.deleted_count || 0;
+        message.success({ 
+          content: `删除成功！已删除 ${count} 条数据`, 
+          key: 'delete', 
+          duration: 2 
+        });
+      }
       
       // 刷新列表
       fetchLogs();
@@ -162,6 +217,17 @@ const DataUploadTab: React.FC = () => {
       dataIndex: 'file_name',
       key: 'file_name',
       width: 250,
+    },
+    {
+      title: '数据类型',
+      dataIndex: 'data_type',
+      key: 'data_type',
+      width: 120,
+      render: (dataType: string) => {
+        const typeName = DATA_TYPE_NAMES[dataType] || '未知';
+        const color = DATA_TYPE_COLORS[dataType] || 'default';
+        return <Tag color={color}>{typeName}</Tag>;
+      },
     },
     {
       title: '数据日期',
@@ -279,19 +345,40 @@ const DataUploadTab: React.FC = () => {
             
             {selectedFile && (
               <div style={{ textAlign: 'center' }}>
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={<UploadOutlined />}
-                  onClick={handleUpload}
-                  loading={uploading}
-                  disabled={!selectedFile}
-                >
-                  {uploading ? '正在上传...' : '确认上传'}
-                </Button>
-                <div style={{ marginTop: 8, color: '#666' }}>
-                  已选择：{selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                </div>
+                <Space direction="vertical" size="middle" style={{ width: '100%', maxWidth: 500, margin: '0 auto' }}>
+                  <div style={{ color: '#666' }}>
+                    已选择：{selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </div>
+                  
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ marginBottom: 8, fontWeight: 500, color: '#262626' }}>
+                      <span style={{ color: 'red' }}>*</span> 数据类型：
+                    </div>
+                    <Select
+                      value={dataType}
+                      onChange={setDataType}
+                      options={DATA_TYPE_OPTIONS}
+                      style={{ width: '100%' }}
+                      size="large"
+                      placeholder="请选择数据类型"
+                    />
+                    <div style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}>
+                      💡 请根据Excel文件内容选择对应的数据类型
+                    </div>
+                  </div>
+                  
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<UploadOutlined />}
+                    onClick={handleUpload}
+                    loading={uploading}
+                    disabled={!selectedFile || !dataType}
+                    block
+                  >
+                    {uploading ? '正在上传...' : '确认上传'}
+                  </Button>
+                </Space>
               </div>
             )}
           </Space>

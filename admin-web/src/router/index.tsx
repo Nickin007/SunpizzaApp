@@ -9,20 +9,16 @@ import WorkOrders from '../pages/WorkOrders';
 import Dict from '../pages/Dict';
 import Training from '../pages/Training';
 import DeliveryWelcome from '../pages/Delivery/Welcome';
-// 饿了么数据分析页面
-import ElemeStore from '../pages/Delivery/Analysis/Eleme/Store';
-import ElemeOrder from '../pages/Delivery/Analysis/Eleme/Order';
-import ElemeProduct from '../pages/Delivery/Analysis/Eleme/Product';
-import ElemeReview from '../pages/Delivery/Analysis/Eleme/Review';
-import ElemeGrowth from '../pages/Delivery/Analysis/Eleme/Growth';
-import ElemeFans from '../pages/Delivery/Analysis/Eleme/Fans';
-// 美团外卖数据分析页面
-import MeituanBrand from '../pages/Delivery/Analysis/Meituan/Brand';
-import MeituanStore from '../pages/Delivery/Analysis/Meituan/Store';
-import MeituanOrder from '../pages/Delivery/Analysis/Meituan/Order';
-import MeituanProduct from '../pages/Delivery/Analysis/Meituan/Product';
-import MeituanReview from '../pages/Delivery/Analysis/Meituan/Review';
-import MeituanFans from '../pages/Delivery/Analysis/Meituan/Fans';
+// 饿了么页面（新架构）
+import ElemeDataBoard from '../pages/Delivery/Eleme/DataBoard';
+import ElemeDiagnosis from '../pages/Delivery/Eleme/Diagnosis';
+import ElemeCostMapping from '../pages/Delivery/Eleme/CostMapping';
+import ElemeDataUpload from '../pages/Delivery/Eleme/DataUpload';
+// 美团外卖页面（新架构）
+import MeituanDataBoard from '../pages/Delivery/Meituan/DataBoard';
+import MeituanDiagnosis from '../pages/Delivery/Meituan/Diagnosis';
+import MeituanCostMapping from '../pages/Delivery/Meituan/CostMapping';
+import MeituanDataUpload from '../pages/Delivery/Meituan/DataUpload';
 import { useAuthStore } from '../store/authStore';
 
 // 路由守卫组件 - 检查是否登录
@@ -105,55 +101,39 @@ const router = createBrowserRouter([
         path: 'welcome',
         element: <DeliveryWelcome />,
       },
-      // 饿了么数据分析路由
+      // 饿了么路由（新架构）
       {
-        path: 'eleme/store',
-        element: <ElemeStore />,
+        path: 'eleme/databoard',
+        element: <ElemeDataBoard />,
       },
       {
-        path: 'eleme/order',
-        element: <ElemeOrder />,
+        path: 'eleme/diagnosis',
+        element: <ElemeDiagnosis />,
       },
       {
-        path: 'eleme/product',
-        element: <ElemeProduct />,
+        path: 'eleme/cost-mapping',
+        element: <ElemeCostMapping />,
       },
       {
-        path: 'eleme/review',
-        element: <ElemeReview />,
+        path: 'eleme/upload',
+        element: <ElemeDataUpload />,
+      },
+      // 美团外卖路由（新架构）
+      {
+        path: 'meituan/databoard',
+        element: <MeituanDataBoard />,
       },
       {
-        path: 'eleme/growth',
-        element: <ElemeGrowth />,
+        path: 'meituan/diagnosis',
+        element: <MeituanDiagnosis />,
       },
       {
-        path: 'eleme/fans',
-        element: <ElemeFans />,
-      },
-      // 美团外卖数据分析路由
-      {
-        path: 'meituan/brand',
-        element: <MeituanBrand />,
+        path: 'meituan/cost-mapping',
+        element: <MeituanCostMapping />,
       },
       {
-        path: 'meituan/store',
-        element: <MeituanStore />,
-      },
-      {
-        path: 'meituan/order',
-        element: <MeituanOrder />,
-      },
-      {
-        path: 'meituan/product',
-        element: <MeituanProduct />,
-      },
-      {
-        path: 'meituan/review',
-        element: <MeituanReview />,
-      },
-      {
-        path: 'meituan/fans',
-        element: <MeituanFans />,
+        path: 'meituan/upload',
+        element: <MeituanDataUpload />,
       },
     ],
   },
