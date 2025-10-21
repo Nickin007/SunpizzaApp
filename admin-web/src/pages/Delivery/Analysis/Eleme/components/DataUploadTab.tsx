@@ -10,7 +10,8 @@ const { Dragger } = Upload;
 // 数据类型选项
 const DATA_TYPE_OPTIONS = [
   { label: '门店数据', value: 'store' },
-  { label: '订单数据', value: 'order' },
+  { label: '订单数据（食亨）', value: 'order_shiheng' },
+  { label: '订单数据（饿了么）', value: 'order_eleme' },
   { label: '商品数据', value: 'product' },
   { label: '评价数据', value: 'review' },
   { label: '商家成长数据', value: 'growth' },
@@ -20,7 +21,8 @@ const DATA_TYPE_OPTIONS = [
 // 数据类型显示名称映射
 const DATA_TYPE_NAMES: Record<string, string> = {
   store: '门店数据',
-  order: '订单数据',
+  order_shiheng: '订单数据（食亨）',
+  order_eleme: '订单数据（饿了么）',
   product: '商品数据',
   review: '评价数据',
   growth: '商家成长数据',
@@ -30,7 +32,8 @@ const DATA_TYPE_NAMES: Record<string, string> = {
 // 数据类型标签颜色映射
 const DATA_TYPE_COLORS: Record<string, string> = {
   store: 'blue',
-  order: 'green',
+  order_shiheng: 'green',
+  order_eleme: 'lime',
   product: 'orange',
   review: 'purple',
   growth: 'cyan',

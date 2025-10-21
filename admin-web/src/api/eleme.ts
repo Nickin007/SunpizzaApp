@@ -111,7 +111,7 @@ const elemeApi = {
       total_pages: number;
     }>('/eleme/data', { params }),
 
-  // 获取订单数据
+  // 获取订单数据（食亨）
   getOrderData: (params: {
     page?: number;
     per_page?: number;
@@ -129,6 +129,22 @@ const elemeApi = {
       per_page: number;
       total_pages: number;
     }>('/eleme/order-data', { params }),
+
+  // 获取订单数据（饿了么）
+  getOrderElemeData: (params: {
+    page?: number;
+    per_page?: number;
+    start_date?: string;
+    end_date?: string;
+    order_id?: string;
+  }) =>
+    http.get<{
+      data: any[];
+      total: number;
+      page: number;
+      per_page: number;
+      total_pages: number;
+    }>('/eleme/order-eleme-data', { params }),
 
   // 获取商品数据
   getProductData: (params: {
@@ -255,6 +271,72 @@ const elemeApi = {
 
   deleteDataByBatch: (batchId: string) =>
     http.delete<{ deleted_count: number; batch_id: string; has_data: boolean }>(`/eleme/data/batch/${batchId}`),
+
+  // 在营门店管理
+  /**
+   * 获取在营门店列表
+   */
+  getActiveStores: (params: {
+    page?: number;
+    per_page?: number;
+    is_active?: boolean;
+    search?: string;
+  }) => {
+    return http.get('/eleme/active-stores', { params });
+  },
+
+  /**
+   * 创建在营门店
+   */
+  createActiveStore: (data: { store_name: string; is_active?: boolean }) => {
+    return http.post('/eleme/active-stores', data);
+  },
+
+  /**
+   * 更新在营门店
+   */
+  updateActiveStore: (storeId: number, data: { store_name?: string; is_active?: boolean }) => {
+    return http.put(`/eleme/active-stores/${storeId}`, data);
+  },
+
+  /**
+   * 删除在营门店
+   */
+  deleteActiveStore: (storeId: number) => {
+    return http.delete(`/eleme/active-stores/${storeId}`);
+  },
+
+  /**
+   * 批量创建在营门店
+   */
+  batchCreateActiveStores: (stores: string[]) => {
+    return http.post('/eleme/active-stores/batch', { stores });
+  },
+
+  /**
+   * 检查数据上传状态
+   * @param date 日期 YYYY-MM-DD，可选，默认昨天
+   */
+  getDataUploadStatus: (date?: string) => {
+    return http.get('/eleme/data-upload-status', { params: { date } });
+  },
+
+  /**
+   * 获取异常监控数据
+   * @param date 日期 YYYY-MM-DD，可选，默认昨天
+   */
+  getAnomalyMonitor: (date?: string) => {
+    return http.get('/eleme/anomaly-monitor', { params: { date } });
+  },
+
+  /**
+   * 获取异常门店详细列表
+   * @param anomalyType 异常类型
+   * @param date 日期 YYYY-MM-DD，可选，默认昨天
+   */
+  getAnomalyDetails: (anomalyType: string, date?: string) => {
+    return http.get('/eleme/anomaly-details', { params: { anomaly_type: anomalyType, date } });
+  },
 };
 
 export default elemeApi;

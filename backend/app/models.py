@@ -832,6 +832,33 @@ class ElemeOrderData(db.Model):
         }
 
 
+class ElemeOrderElemeData(db.Model):
+    """饿了么订单数据表（直接从饿了么后台导出）"""
+    __tablename__ = 'eleme_order_eleme_data'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    
+    # 基础信息（4列）
+    data_date = db.Column(db.Date, nullable=False, index=True)  # 日期
+    store_name = db.Column(db.String(200), index=True)  # 门店名称
+    order_id = db.Column(db.String(100), nullable=False, index=True)  # 订单单号
+    product_info = db.Column(db.Text)  # 商品信息（包含套餐内所有小项目，用于正则拆解）
+    
+    # 元数据
+    import_batch_id = db.Column(db.String(50), index=True)  # 导入批次ID
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'data_date': self.data_date.isoformat() if self.data_date else None,
+            'store_name': self.store_name,
+            'order_id': self.order_id,
+            'product_info': self.product_info,
+        }
+
+
 class ElemeProductData(db.Model):
     """饿了么商品数据表"""
     __tablename__ = 'eleme_product_data'
@@ -1207,7 +1234,7 @@ class ElemeImportLog(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     batch_id = db.Column(db.String(50), unique=True, nullable=False)
     file_name = db.Column(db.String(200))
-    data_type = db.Column(db.Enum('store', 'order', 'product', 'review', 'growth', 'fans', name='eleme_data_type'), default='store', nullable=False)
+    data_type = db.Column(db.Enum('store', 'order_shiheng', 'order_eleme', 'product', 'review', 'growth', 'fans', name='eleme_data_type'), default='store', nullable=False)
     data_date = db.Column(db.Date, index=True)
     total_rows = db.Column(db.Integer, default=0)
     success_rows = db.Column(db.Integer, default=0)
@@ -1397,5 +1424,28 @@ class ElemeFansData(db.Model):
             'send_coupon_times': self.send_coupon_times,
             'send_product_times': self.send_product_times,
             'has_announcement': self.has_announcement,
+        }
+
+
+class ElemeActiveStore(db.Model):
+    """饿了么在营门店列表"""
+    __tablename__ = 'eleme_active_stores'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    store_name = db.Column(db.String(200), nullable=False, unique=True, index=True, comment='门店名称（饿了么）')
+    store_name_shiheng = db.Column(db.String(200), comment='门店名称（食亨）')
+    is_active = db.Column(db.Boolean, default=True, comment='是否在营')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'store_name': self.store_name,
+            'store_name_shiheng': self.store_name_shiheng,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
 

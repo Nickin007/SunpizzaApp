@@ -4,6 +4,7 @@ import UploadCalendarTab from '../Analysis/Eleme/components/UploadCalendarTab';
 import DataUploadTab from '../Analysis/Eleme/components/DataUploadTab';
 import DatabaseEditTab from '../Analysis/Eleme/components/DatabaseEditTab';
 import DataViewTab from '../Analysis/Eleme/components/DataViewTab';
+import ActiveStoreTab from '../Analysis/Eleme/components/ActiveStoreTab';
 import './DataUpload.css';
 
 /**
@@ -31,6 +32,11 @@ const ElemeDataUpload: React.FC = () => {
       key: 'database',
       label: '🗄️ 数据库配置',
       children: <DatabaseEditTab />,
+    },
+    {
+      key: 'active-stores',
+      label: '🏪 在营门店列表',
+      children: <ActiveStoreTab />,
     },
   ];
 

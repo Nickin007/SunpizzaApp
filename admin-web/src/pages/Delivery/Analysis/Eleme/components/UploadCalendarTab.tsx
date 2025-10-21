@@ -16,7 +16,8 @@ import type { ImportLog } from '../../../../../api/eleme';
 // 数据类型配置
 const DATA_TYPES = [
   { key: 'store', label: '门店数据', color: 'blue' },
-  { key: 'order', label: '订单数据', color: 'green' },
+  { key: 'order_shiheng', label: '订单数据（食亨）', color: 'green' },
+  { key: 'order_eleme', label: '订单数据（饿了么）', color: 'lime' },
   { key: 'product', label: '商品数据', color: 'orange' },
   { key: 'review', label: '评价数据', color: 'purple' },
   { key: 'growth', label: '商家成长数据', color: 'cyan' },

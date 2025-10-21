@@ -4,7 +4,7 @@
 
 from flask import Blueprint, request, current_app
 from app import db
-from app.models import ElemeStoreDailyData, ElemeOrderData, ElemeProductData, ElemeReviewData, ElemeGrowthData, ElemeFansData, ElemeImportLog, ElemeFieldConfig
+from app.models import ElemeStoreDailyData, ElemeOrderData, ElemeOrderElemeData, ElemeProductData, ElemeReviewData, ElemeGrowthData, ElemeFansData, ElemeImportLog, ElemeFieldConfig, ElemeActiveStore
 from app.services.excel_parser import ExcelParser
 from app.utils.auth import token_required, admin_required
 from app.utils.response import success_response, error_response
@@ -46,7 +46,7 @@ def upload_excel(current_user):
     print(f"📊 接收到的数据类型: {data_type}")  # 调试日志
     print(f"📋 表单数据: {dict(request.form)}")  # 查看所有表单数据
     
-    if data_type not in ['store', 'order', 'product', 'review', 'growth', 'fans']:
+    if data_type not in ['store', 'order_shiheng', 'order_eleme', 'product', 'review', 'growth', 'fans']:
         return error_response('无效的数据类型', 400)
     
     try:
@@ -120,8 +120,8 @@ def upload_excel(current_user):
                         f'数据已存在，请勿重复上传！\n\n已存在的日期：{", ".join(existing_dates_list)}\n\n如需更新数据，请先删除旧数据，再重新上传。',
                         400
                     )
-        elif data_type == 'order':
-            # 订单数据：按订单号去重（检查当前Excel中是否有已存在的订单号）
+        elif data_type == 'order_shiheng':
+            # 订单数据（食亨）：按订单号去重（检查当前Excel中是否有已存在的订单号）
             order_ids = set()
             for row_data in data:
                 if row_data.get('order_id'):
@@ -138,7 +138,27 @@ def upload_excel(current_user):
                 if existing_orders:
                     existing_order_ids = [o[0] for o in existing_orders]
                     # 订单数据允许部分重复，自动跳过已存在的订单
-                    print(f"检测到 {len(existing_order_ids)} 个重复订单，将自动跳过")
+                    print(f"检测到 {len(existing_order_ids)} 个重复订单（食亨），将自动跳过")
+                    # 不返回错误，继续处理，在插入时会自动跳过重复订单
+        elif data_type == 'order_eleme':
+            # 订单数据（饿了么）：按订单号去重
+            order_ids = set()
+            for row_data in data:
+                if row_data.get('order_id'):
+                    order_ids.add(row_data['order_id'])
+            
+            if order_ids:
+                # 查询数据库中是否已存在这些订单号
+                existing_orders = db.session.query(
+                    ElemeOrderElemeData.order_id
+                ).filter(
+                    ElemeOrderElemeData.order_id.in_(order_ids)
+                ).all()
+                
+                if existing_orders:
+                    existing_order_ids = [o[0] for o in existing_orders]
+                    # 订单数据允许部分重复，自动跳过已存在的订单
+                    print(f"检测到 {len(existing_order_ids)} 个重复订单（饿了么），将自动跳过")
                     # 不返回错误，继续处理，在插入时会自动跳过重复订单
         
         # 批量插入数据（根据数据类型）
@@ -167,8 +187,8 @@ def upload_excel(current_user):
                     db.session.add(data_obj)
                     success_count += 1
                     
-                elif data_type == 'order':
-                    # 订单数据：需要检查订单号是否已存在
+                elif data_type == 'order_shiheng':
+                    # 订单数据（食亨）：需要检查订单号是否已存在
                     order_id = row_data.get('order_id')
                     if order_id:
                         # 检查订单是否已存在
@@ -197,6 +217,24 @@ def upload_excel(current_user):
                                     pass
                     
                     data_obj = ElemeOrderData(**row_data)
+                    db.session.add(data_obj)
+                    success_count += 1
+                
+                elif data_type == 'order_eleme':
+                    # 订单数据（饿了么）：需要检查订单号是否已存在
+                    order_id = row_data.get('order_id')
+                    if order_id:
+                        # 检查订单是否已存在
+                        existing = ElemeOrderElemeData.query.filter_by(order_id=order_id).first()
+                        if existing:
+                            skipped_count += 1
+                            continue  # 跳过重复订单
+                    
+                    # 记录第一个订单的日期作为data_date（用于导入历史显示）
+                    if not data_date and row_data.get('data_date'):
+                        data_date = row_data['data_date']
+                    
+                    data_obj = ElemeOrderElemeData(**row_data)
                     db.session.add(data_obj)
                     success_count += 1
                 
@@ -307,13 +345,14 @@ def upload_excel(current_user):
 @token_required
 def get_import_logs(current_user):
     """
-    获取导入日志列表
+    获取导入日志列表（不包含已删除的记录）
     """
     try:
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
         
-        query = ElemeImportLog.query.order_by(ElemeImportLog.created_at.desc())
+        # 只查询未删除的记录
+        query = ElemeImportLog.query.filter_by(is_deleted=False).order_by(ElemeImportLog.created_at.desc())
         
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         
@@ -478,6 +517,66 @@ def get_order_data(current_user):
         
     except Exception as e:
         return error_response(f'获取订单数据失败: {str(e)}', 500)
+
+
+@bp.route('/order-eleme-data', methods=['GET'])
+@token_required
+def get_order_eleme_data(current_user):
+    """
+    获取饿了么订单数据（支持筛选）
+    
+    Query参数:
+    - start_date: 开始日期
+    - end_date: 结束日期
+    - order_id: 订单号
+    - page: 页码
+    - per_page: 每页数量
+    """
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        
+        # 构建查询
+        query = ElemeOrderElemeData.query
+        
+        # 日期筛选
+        start_date = request.args.get('start_date')
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+                query = query.filter(ElemeOrderElemeData.data_date >= start_dt)
+            except ValueError:
+                pass
+        
+        end_date = request.args.get('end_date')
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+                query = query.filter(ElemeOrderElemeData.data_date <= end_dt)
+            except ValueError:
+                pass
+        
+        # 订单号筛选
+        order_id = request.args.get('order_id')
+        if order_id:
+            query = query.filter(ElemeOrderElemeData.order_id.like(f'%{order_id}%'))
+        
+        # 排序（最新订单在前）
+        query = query.order_by(ElemeOrderElemeData.data_date.desc())
+        
+        # 分页
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return success_response(data={
+            'data': [item.to_dict() for item in pagination.items],
+            'total': pagination.total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': pagination.pages
+        })
+        
+    except Exception as e:
+        return error_response(f'获取饿了么订单数据失败: {str(e)}', 500)
 
 
 @bp.route('/product-data', methods=['GET'])
@@ -1107,8 +1206,10 @@ def delete_data_by_batch(current_user, batch_id):
         
         # 根据数据类型查询相应表的数据
         data_type = import_log.data_type
-        if data_type == 'order':
+        if data_type == 'order_shiheng':
             count = ElemeOrderData.query.filter_by(import_batch_id=batch_id).count()
+        elif data_type == 'order_eleme':
+            count = ElemeOrderElemeData.query.filter_by(import_batch_id=batch_id).count()
         elif data_type == 'product':
             count = ElemeProductData.query.filter_by(import_batch_id=batch_id).count()
         elif data_type == 'review':
@@ -1137,8 +1238,10 @@ def delete_data_by_batch(current_user, batch_id):
             )
         else:
             # 有数据：根据数据类型删除相应表的数据
-            if data_type == 'order':
+            if data_type == 'order_shiheng':
                 ElemeOrderData.query.filter_by(import_batch_id=batch_id).delete()
+            elif data_type == 'order_eleme':
+                ElemeOrderElemeData.query.filter_by(import_batch_id=batch_id).delete()
             elif data_type == 'product':
                 ElemeProductData.query.filter_by(import_batch_id=batch_id).delete()
             elif data_type == 'review':
@@ -1238,4 +1341,872 @@ def get_fans_data(current_user):
         
     except Exception as e:
         return error_response(f'获取粉丝群数据失败: {str(e)}', 500)
+
+
+@bp.route('/active-stores', methods=['GET'])
+@token_required
+def get_active_stores(current_user):
+    """
+    获取在营门店列表
+    
+    Query参数:
+    - page: 页码（默认1）
+    - per_page: 每页数量（默认50）
+    - is_active: 是否在营（true/false）
+    - search: 门店名称搜索
+    """
+    try:
+        from app.models import ElemeActiveStore
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        is_active = request.args.get('is_active', None, type=str)
+        search = request.args.get('search', '', type=str)
+        
+        # 构建查询
+        query = ElemeActiveStore.query
+        
+        # 过滤条件
+        if is_active is not None:
+            query = query.filter(ElemeActiveStore.is_active == (is_active.lower() == 'true'))
+        
+        if search:
+            query = query.filter(ElemeActiveStore.store_name.like(f'%{search}%'))
+        
+        # 排序
+        query = query.order_by(ElemeActiveStore.is_active.desc(), ElemeActiveStore.store_name.asc())
+        
+        # 分页
+        pagination = query.paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        return success_response({
+            'stores': [store.to_dict() for store in pagination.items],
+            'total': pagination.total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': pagination.pages
+        })
+        
+    except Exception as e:
+        return error_response(f'获取在营门店列表失败: {str(e)}', 500)
+
+
+@bp.route('/active-stores', methods=['POST'])
+@token_required
+def create_active_store(current_user):
+    """
+    创建新的在营门店
+    
+    Body参数:
+    - store_name: 门店名称（饿了么）（必填）
+    - store_name_shiheng: 门店名称（食亨）（可选）
+    - is_active: 是否在营（可选，默认true）
+    """
+    try:
+        from app.models import ElemeActiveStore
+        
+        data = request.get_json()
+        store_name = data.get('store_name', '').strip()
+        store_name_shiheng = data.get('store_name_shiheng', '').strip() or None
+        is_active = data.get('is_active', True)
+        
+        if not store_name:
+            return error_response('门店名称不能为空', 400)
+        
+        # 检查是否已存在
+        existing = ElemeActiveStore.query.filter_by(store_name=store_name).first()
+        if existing:
+            return error_response('该门店已存在', 400)
+        
+        # 创建新门店
+        new_store = ElemeActiveStore(
+            store_name=store_name,
+            store_name_shiheng=store_name_shiheng,
+            is_active=is_active
+        )
+        
+        db.session.add(new_store)
+        db.session.commit()
+        
+        return success_response({
+            'store': new_store.to_dict(),
+            'message': '门店创建成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'创建门店失败: {str(e)}', 500)
+
+
+@bp.route('/active-stores/<int:store_id>', methods=['PUT'])
+@token_required
+def update_active_store(current_user, store_id):
+    """
+    更新在营门店信息
+    
+    Path参数:
+    - store_id: 门店ID
+    
+    Body参数:
+    - store_name: 门店名称（饿了么）（可选）
+    - store_name_shiheng: 门店名称（食亨）（可选）
+    - is_active: 是否在营（可选）
+    """
+    try:
+        from app.models import ElemeActiveStore
+        
+        store = ElemeActiveStore.query.get(store_id)
+        if not store:
+            return error_response('门店不存在', 404)
+        
+        data = request.get_json()
+        
+        # 更新门店名称（饿了么）
+        if 'store_name' in data:
+            new_name = data['store_name'].strip()
+            if not new_name:
+                return error_response('门店名称不能为空', 400)
+            
+            # 检查新名称是否已被其他门店使用
+            existing = ElemeActiveStore.query.filter(
+                ElemeActiveStore.store_name == new_name,
+                ElemeActiveStore.id != store_id
+            ).first()
+            if existing:
+                return error_response('该门店名称已被使用', 400)
+            
+            store.store_name = new_name
+        
+        # 更新门店名称（食亨）
+        if 'store_name_shiheng' in data:
+            shiheng_name = data['store_name_shiheng']
+            if shiheng_name:
+                store.store_name_shiheng = shiheng_name.strip()
+            else:
+                store.store_name_shiheng = None
+        
+        # 更新在营状态
+        if 'is_active' in data:
+            store.is_active = data['is_active']
+        
+        db.session.commit()
+        
+        return success_response({
+            'store': store.to_dict(),
+            'message': '门店更新成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'更新门店失败: {str(e)}', 500)
+
+
+@bp.route('/active-stores/<int:store_id>', methods=['DELETE'])
+@token_required
+def delete_active_store(current_user, store_id):
+    """
+    删除在营门店
+    
+    Path参数:
+    - store_id: 门店ID
+    """
+    try:
+        from app.models import ElemeActiveStore
+        
+        store = ElemeActiveStore.query.get(store_id)
+        if not store:
+            return error_response('门店不存在', 404)
+        
+        store_name = store.store_name
+        db.session.delete(store)
+        db.session.commit()
+        
+        return success_response({
+            'message': f'门店 "{store_name}" 删除成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'删除门店失败: {str(e)}', 500)
+
+
+@bp.route('/active-stores/batch', methods=['POST'])
+@token_required
+def batch_create_active_stores(current_user):
+    """
+    批量创建在营门店
+    
+    Body参数:
+    - stores: 门店名称列表（数组）
+    """
+    try:
+        from app.models import ElemeActiveStore
+        
+        data = request.get_json()
+        store_names = data.get('stores', [])
+        
+        if not store_names or not isinstance(store_names, list):
+            return error_response('请提供门店名称列表', 400)
+        
+        created_count = 0
+        skipped_count = 0
+        errors = []
+        
+        for store_name in store_names:
+            store_name = store_name.strip()
+            if not store_name:
+                continue
+            
+            # 检查是否已存在
+            existing = ElemeActiveStore.query.filter_by(store_name=store_name).first()
+            if existing:
+                skipped_count += 1
+                continue
+            
+            try:
+                new_store = ElemeActiveStore(
+                    store_name=store_name,
+                    is_active=True
+                )
+                db.session.add(new_store)
+                created_count += 1
+            except Exception as e:
+                errors.append(f'{store_name}: {str(e)}')
+        
+        db.session.commit()
+        
+        return success_response({
+            'created_count': created_count,
+            'skipped_count': skipped_count,
+            'errors': errors,
+            'message': f'批量创建完成：成功 {created_count} 个，跳过 {skipped_count} 个'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'批量创建失败: {str(e)}', 500)
+
+
+@bp.route('/data-upload-status', methods=['GET'])
+@token_required
+def get_data_upload_status(current_user):
+    """
+    检查数据上传状态
+    返回7种数据类型的上传状态
+    参数：
+        date (str, optional): 查询日期 YYYY-MM-DD，默认为昨天
+    """
+    try:
+        from datetime import datetime, timedelta
+        
+        # 获取日期参数，如果没有则使用昨天
+        date_str = request.args.get('date')
+        if date_str:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        else:
+            target_date = (datetime.now() - timedelta(days=1)).date()
+        
+        # 定义7种数据类型
+        data_types = [
+            'store',
+            'order_shiheng',
+            'order_eleme',
+            'product',
+            'review',
+            'growth',
+            'fans'
+        ]
+        
+        # 检查每种数据类型的上传状态
+        upload_status = {}
+        for data_type in data_types:
+            # 查询是否有指定日期的数据被成功导入（不管什么时候导入的，但要排除已删除的）
+            log = ElemeImportLog.query.filter(
+                ElemeImportLog.data_type == data_type,
+                ElemeImportLog.data_date == target_date,  # 检查数据日期
+                ElemeImportLog.status == 'completed',
+                ElemeImportLog.success_rows > 0,
+                ElemeImportLog.is_deleted == False  # 排除已删除的记录
+            ).order_by(ElemeImportLog.created_at.desc()).first()  # 取最新的一条
+            
+            upload_status[data_type] = {
+                'uploaded': log is not None,
+                'import_time': log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log else None
+            }
+        
+        # 判断是否全部上传完成
+        all_uploaded = all(status['uploaded'] for status in upload_status.values())
+        
+        return success_response({
+            'date': target_date.strftime('%Y-%m-%d'),
+            'all_uploaded': all_uploaded,
+            'upload_status': upload_status
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'检查数据上传状态失败: {str(e)}')
+        return error_response(f'检查数据上传状态失败: {str(e)}', 500)
+
+
+@bp.route('/anomaly-monitor', methods=['GET'])
+@token_required
+def get_anomaly_monitor(current_user):
+    """
+    获取门店异常监控数据
+    返回12种异常类型及其对应的异常数量
+    参数：
+        date (str, optional): 查询日期 YYYY-MM-DD，默认为昨天
+    
+    注意：所有异常统计都会自动过滤，只包含"在营门店列表"中is_active=True的门店
+    """
+    try:
+        from datetime import datetime, timedelta
+        from sqlalchemy import func
+        
+        # 获取日期参数，如果没有则使用昨天
+        date_str = request.args.get('date')
+        if date_str:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            previous_date = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=1)).date()
+        else:
+            target_date = (datetime.now() - timedelta(days=1)).date()
+            previous_date = (datetime.now() - timedelta(days=2)).date()
+        
+        # 获取在营门店列表（只包含is_active=True的门店）
+        active_stores = ElemeActiveStore.query.filter_by(is_active=True).all()
+        
+        # 分别创建饿了么和食亨的门店名称列表
+        active_store_names_eleme = [store.store_name for store in active_stores]
+        active_store_names_shiheng = [store.store_name_shiheng for store in active_stores 
+                                      if store.store_name_shiheng]  # 只包含设置了食亨名称的门店
+        
+        # 如果没有在营门店，返回空数据
+        if not active_store_names_eleme:
+            return success_response({
+                'date': target_date.strftime('%Y-%m-%d'),
+                'anomalies': [],
+                'filtered_by_active_stores': True,
+                'active_store_count': 0
+            })
+        
+        result = []
+        
+        # ========== 前8个异常：来自门店数据表 ==========
+        # 定义异常检测规则
+        store_anomaly_checks = {
+            'store_closed': {
+                'name': '闭店异常',
+                'field': 'abnormal_close_hours',
+                'condition': lambda x: x != '0' and x is not None and x != '',
+                'color': '#ff4d4f',
+                'isUrgent': False
+            },
+            'out_of_stock': {
+                'name': '库存不足',
+                'field': 'out_of_stock_products',
+                'condition': lambda x: x is not None and x > 0,
+                'color': '#faad14',
+                'isUrgent': True
+            },
+            'overtime_orders': {
+                'name': '出餐超时',
+                'field': 'overtime_orders',
+                'condition': lambda x: x is not None and x > 0,
+                'color': '#ff7a45',
+                'isUrgent': True
+            },
+            'reject_orders': {
+                'name': '门店拒单',
+                'field': 'reject_orders',
+                'condition': lambda x: x is not None and x > 0,
+                'color': '#f5222d',
+                'isUrgent': False
+            },
+            'merchant_cancel': {
+                'name': '商责取消',
+                'field': 'merchant_cancel_orders',
+                'condition': lambda x: x is not None and x > 0,
+                'color': '#fa541c',
+                'isUrgent': False
+            },
+            'merchant_refund': {
+                'name': '商责退单',
+                'field': 'merchant_refund_orders',
+                'condition': lambda x: x is not None and x > 0,
+                'color': '#fa8c16',
+                'isUrgent': False
+            },
+            'low_score': {
+                'name': '评分过低',
+                'field': 'store_score',
+                'condition': lambda x: x is not None and float(x) < 4.9,
+                'color': '#722ed1',
+                'isUrgent': True
+            },
+            'bad_reply': {
+                'name': '差评未回',
+                'field': 'bad_reply_rate_60d',
+                'condition': lambda x: x is not None and float(x) != 1.0,
+                'color': '#eb2f96',
+                'isUrgent': False
+            }
+        }
+        
+        for key, config in store_anomaly_checks.items():
+            # 获取目标日期的异常门店数量（只统计在营门店）
+            target_data = ElemeStoreDailyData.query.filter(
+                ElemeStoreDailyData.data_date == target_date,
+                ElemeStoreDailyData.store_name.in_(active_store_names_eleme)
+            ).all()
+            
+            target_count = 0
+            for record in target_data:
+                field_value = getattr(record, config['field'], None)
+                if config['condition'](field_value):
+                    target_count += 1
+            
+            # 获取前一天的异常门店数量（只统计在营门店）
+            previous_data = ElemeStoreDailyData.query.filter(
+                ElemeStoreDailyData.data_date == previous_date,
+                ElemeStoreDailyData.store_name.in_(active_store_names_eleme)
+            ).all()
+            
+            previous_count = 0
+            for record in previous_data:
+                field_value = getattr(record, config['field'], None)
+                if config['condition'](field_value):
+                    previous_count += 1
+            
+            # 计算变化
+            change = target_count - previous_count
+            
+            result.append({
+                'key': key,
+                'type': config['name'],
+                'count': target_count,
+                'change': change,
+                'color': config['color'],
+                'isUrgent': target_count > 0 and config['isUrgent'],
+                'unit': '家'
+            })
+        
+        # ========== 第9个异常：申请退款（来自订单数据食亨，只统计在营门店） ==========
+        # 统计目标日期的退款订单数（使用食亨门店名称）
+        target_refund_count = 0
+        if active_store_names_shiheng:  # 只有在有食亨门店名称时才查询
+            target_refund_count = ElemeOrderData.query.filter(
+                func.date(ElemeOrderData.order_time) == target_date,
+                ElemeOrderData.store_name.in_(active_store_names_shiheng),
+                ElemeOrderData.refund_reason.isnot(None),
+                ElemeOrderData.refund_reason != ''
+            ).count()
+        
+        # 统计前一天的退款订单数（使用食亨门店名称）
+        previous_refund_count = 0
+        if active_store_names_shiheng:  # 只有在有食亨门店名称时才查询
+            previous_refund_count = ElemeOrderData.query.filter(
+                func.date(ElemeOrderData.order_time) == previous_date,
+                ElemeOrderData.store_name.in_(active_store_names_shiheng),
+                ElemeOrderData.refund_reason.isnot(None),
+                ElemeOrderData.refund_reason != ''
+            ).count()
+        
+        result.append({
+            'key': 'refund_orders',
+            'type': '申请退款',
+            'count': target_refund_count,
+            'change': target_refund_count - previous_refund_count,
+            'color': '#ff4d4f',
+            'isUrgent': target_refund_count > 5,
+            'unit': '单'
+        })
+        
+        # ========== 第10个异常：顾客差评（来自评价数据，只统计在营门店） ==========
+        # 统计目标日期的差评数（使用饿了么门店名称）
+        target_bad_review_count = ElemeReviewData.query.filter(
+            ElemeReviewData.data_date == target_date,
+            ElemeReviewData.store_name.in_(active_store_names_eleme),
+            ElemeReviewData.overall_score.isnot(None),
+            ElemeReviewData.overall_score < 5.0
+        ).count()
+        
+        # 统计前一天的差评数（使用饿了么门店名称）
+        previous_bad_review_count = ElemeReviewData.query.filter(
+            ElemeReviewData.data_date == previous_date,
+            ElemeReviewData.store_name.in_(active_store_names_eleme),
+            ElemeReviewData.overall_score.isnot(None),
+            ElemeReviewData.overall_score < 5.0
+        ).count()
+        
+        result.append({
+            'key': 'bad_reviews',
+            'type': '顾客差评',
+            'count': target_bad_review_count,
+            'change': target_bad_review_count - previous_bad_review_count,
+            'color': '#f5222d',
+            'isUrgent': target_bad_review_count > 3,
+            'unit': '条'
+        })
+        
+        # ========== 第11个异常：低店铺分（来自商家成长数据，只统计在营门店） ==========
+        # 统计目标日期的低店铺分门店数（使用饿了么门店名称）
+        target_low_growth_count = ElemeGrowthData.query.filter(
+            ElemeGrowthData.data_date == target_date,
+            ElemeGrowthData.store_name.in_(active_store_names_eleme),
+            ElemeGrowthData.store_score.isnot(None),
+            ElemeGrowthData.store_score < 100
+        ).count()
+        
+        # 统计前一天的低店铺分门店数（使用饿了么门店名称）
+        previous_low_growth_count = ElemeGrowthData.query.filter(
+            ElemeGrowthData.data_date == previous_date,
+            ElemeGrowthData.store_name.in_(active_store_names_eleme),
+            ElemeGrowthData.store_score.isnot(None),
+            ElemeGrowthData.store_score < 100
+        ).count()
+        
+        result.append({
+            'key': 'low_growth_score',
+            'type': '低店铺分',
+            'count': target_low_growth_count,
+            'change': target_low_growth_count - previous_low_growth_count,
+            'color': '#722ed1',
+            'isUrgent': target_low_growth_count > 5,
+            'unit': '家'
+        })
+        
+        # ========== 第12个异常：粉丝群未创建（来自粉丝群数据，只统计在营门店） ==========
+        # 统计目标日期的粉丝群未创建门店数（使用饿了么门店名称）
+        target_fans_not_created_count = ElemeFansData.query.filter(
+            ElemeFansData.data_date == target_date,
+            ElemeFansData.store_name.in_(active_store_names_eleme),
+            ElemeFansData.group_type == '未创建'
+        ).count()
+        
+        # 统计前一天的粉丝群未创建门店数（使用饿了么门店名称）
+        previous_fans_not_created_count = ElemeFansData.query.filter(
+            ElemeFansData.data_date == previous_date,
+            ElemeFansData.store_name.in_(active_store_names_eleme),
+            ElemeFansData.group_type == '未创建'
+        ).count()
+        
+        result.append({
+            'key': 'fans_not_created',
+            'type': '粉丝群未创建',
+            'count': target_fans_not_created_count,
+            'change': target_fans_not_created_count - previous_fans_not_created_count,
+            'color': '#13c2c2',
+            'isUrgent': target_fans_not_created_count > 3,
+            'unit': '家'
+        })
+        
+        return success_response({
+            'date': target_date.strftime('%Y-%m-%d'),
+            'anomalies': result,
+            'filtered_by_active_stores': True,
+            'active_store_count': len(active_store_names_eleme)
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取异常监控数据失败: {str(e)}')
+        return error_response(f'获取异常监控数据失败: {str(e)}', 500)
+
+
+@bp.route('/anomaly-details', methods=['GET'])
+@token_required
+def get_anomaly_details(current_user):
+    """
+    获取异常详细列表
+    参数：
+        anomaly_type (str): 异常类型
+        date (str, optional): 查询日期 YYYY-MM-DD，默认为昨天
+    
+    注意：所有异常详情都会自动过滤，只包含"在营门店列表"中is_active=True的门店
+    """
+    try:
+        from datetime import datetime, timedelta
+        from sqlalchemy import func
+        
+        # 获取参数
+        anomaly_type = request.args.get('anomaly_type')
+        if not anomaly_type:
+            return error_response('缺少异常类型参数', 400)
+        
+        # 获取日期参数
+        date_str = request.args.get('date')
+        if date_str:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        else:
+            target_date = (datetime.now() - timedelta(days=1)).date()
+        
+        # 获取在营门店列表（只包含is_active=True的门店）
+        active_stores = ElemeActiveStore.query.filter_by(is_active=True).all()
+        
+        # 分别创建饿了么和食亨的门店名称列表
+        active_store_names_eleme = [store.store_name for store in active_stores]
+        active_store_names_shiheng = [store.store_name_shiheng for store in active_stores 
+                                      if store.store_name_shiheng]  # 只包含设置了食亨名称的门店
+        
+        # 如果没有在营门店，返回空数据
+        if not active_store_names_eleme:
+            return success_response({
+                'anomaly_type': anomaly_type,
+                'anomaly_name': '',
+                'date': target_date.strftime('%Y-%m-%d'),
+                'total_count': 0,
+                'data': []
+            })
+        
+        # ========== 处理前8个异常类型（来自门店数据） ==========
+        store_anomaly_types = ['store_closed', 'out_of_stock', 'overtime_orders', 'reject_orders', 
+                                'merchant_cancel', 'merchant_refund', 'low_score', 'bad_reply']
+        
+        if anomaly_type in store_anomaly_types:
+            # 定义配置
+            anomaly_configs = {
+                'store_closed': {
+                    'name': '闭店异常',
+                    'field': 'abnormal_close_hours',
+                    'condition': lambda x: x != '0' and x is not None and x != '',
+                    'display_field': 'abnormal_close_hours',
+                    'display_name': '异常关店时长'
+                },
+                'out_of_stock': {
+                    'name': '库存不足',
+                    'field': 'out_of_stock_products',
+                    'condition': lambda x: x is not None and x > 0,
+                    'display_field': 'out_of_stock_products',
+                    'display_name': '库存不足商品数'
+                },
+                'overtime_orders': {
+                    'name': '出餐超时',
+                    'field': 'overtime_orders',
+                    'condition': lambda x: x is not None and x > 0,
+                    'display_field': 'overtime_orders',
+                    'display_name': '出餐超时订单数'
+                },
+                'reject_orders': {
+                    'name': '门店拒单',
+                    'field': 'reject_orders',
+                    'condition': lambda x: x is not None and x > 0,
+                    'display_field': 'reject_orders',
+                    'display_name': '拒单数'
+                },
+                'merchant_cancel': {
+                    'name': '商责取消',
+                    'field': 'merchant_cancel_orders',
+                    'condition': lambda x: x is not None and x > 0,
+                    'display_field': 'merchant_cancel_orders',
+                    'display_name': '商责取消数'
+                },
+                'merchant_refund': {
+                    'name': '商责退单',
+                    'field': 'merchant_refund_orders',
+                    'condition': lambda x: x is not None and x > 0,
+                    'display_field': 'merchant_refund_orders',
+                    'display_name': '商责退单数'
+                },
+                'low_score': {
+                    'name': '评分过低',
+                    'field': 'store_score',
+                    'condition': lambda x: x is not None and float(x) < 4.9,
+                    'display_field': 'store_score',
+                    'display_name': '店铺评分'
+                },
+                'bad_reply': {
+                    'name': '差评未回',
+                    'field': 'bad_reply_rate_60d',
+                    'condition': lambda x: x is not None and float(x) != 1.0,
+                    'display_field': 'bad_reply_rate_60d',
+                    'display_name': '近60日差评人工回复率(%)'
+                }
+            }
+            
+            config = anomaly_configs[anomaly_type]
+            
+            # 查询该日期的所有门店数据（只查询在营门店）
+            stores = ElemeStoreDailyData.query.filter(
+                ElemeStoreDailyData.data_date == target_date,
+                ElemeStoreDailyData.store_name.in_(active_store_names_eleme)
+            ).all()
+            
+            # 筛选出异常的门店
+            anomaly_stores = []
+            for store in stores:
+                field_value = getattr(store, config['field'], None)
+                if config['condition'](field_value):
+                    anomaly_stores.append({
+                        'id': store.id,
+                        'data_date': store.data_date.strftime('%Y-%m-%d'),
+                        'store_name': store.store_name,
+                        'value': getattr(store, config['display_field'], None)
+                    })
+            
+            return success_response({
+                'anomaly_type': anomaly_type,
+                'anomaly_name': config['name'],
+                'field_name': config['display_name'],
+                'date': target_date.strftime('%Y-%m-%d'),
+                'total_count': len(anomaly_stores),
+                'data': anomaly_stores
+            })
+        
+        # ========== 处理申请退款异常（来自订单数据） ==========
+        elif anomaly_type == 'refund_orders':
+            # 查询该日期的所有退款订单（只查询在营门店，使用食亨门店名称）
+            orders = []
+            if active_store_names_shiheng:  # 只有在有食亨门店名称时才查询
+                orders = ElemeOrderData.query.filter(
+                    func.date(ElemeOrderData.order_time) == target_date,
+                    ElemeOrderData.store_name.in_(active_store_names_shiheng),
+                    ElemeOrderData.refund_reason.isnot(None),
+                    ElemeOrderData.refund_reason != ''
+                ).all()
+            
+            anomaly_orders = []
+            for order in orders:
+                anomaly_orders.append({
+                    'id': order.id,
+                    'order_id': order.order_id,
+                    'store_name': order.store_name,
+                    'order_time': order.order_time,
+                    'order_status': order.order_status,
+                    'product_info': order.product_info,
+                    'order_note': order.order_note,
+                    'refund_reason': order.refund_reason,
+                    'estimated_income': float(order.estimated_income) if order.estimated_income else 0
+                })
+            
+            return success_response({
+                'anomaly_type': anomaly_type,
+                'anomaly_name': '申请退款',
+                'date': target_date.strftime('%Y-%m-%d'),
+                'total_count': len(anomaly_orders),
+                'data': anomaly_orders
+            })
+        
+        # ========== 处理顾客差评异常（来自评价数据，只查询在营门店） ==========
+        elif anomaly_type == 'bad_reviews':
+            # 查询该日期的所有差评
+            reviews = ElemeReviewData.query.filter(
+                ElemeReviewData.data_date == target_date,
+                ElemeReviewData.store_name.in_(active_store_names_eleme),
+                ElemeReviewData.overall_score.isnot(None),
+                ElemeReviewData.overall_score < 5.0
+            ).all()
+            
+            anomaly_reviews = []
+            for review in reviews:
+                anomaly_reviews.append({
+                    'id': review.id,
+                    'data_date': review.data_date.strftime('%Y-%m-%d'),
+                    'store_name': review.store_name,
+                    'order_id': review.order_id,
+                    'review_time': review.review_time.strftime('%Y-%m-%d %H:%M:%S') if review.review_time else '',
+                    'overall_score': float(review.overall_score) if review.overall_score else 0,
+                    'review_content': review.review_content,
+                    'is_appeal_success': review.is_appeal_success
+                })
+            
+            return success_response({
+                'anomaly_type': anomaly_type,
+                'anomaly_name': '顾客差评',
+                'date': target_date.strftime('%Y-%m-%d'),
+                'total_count': len(anomaly_reviews),
+                'data': anomaly_reviews
+            })
+        
+        # ========== 处理粉丝群未创建异常（来自粉丝群数据，只查询在营门店） ==========
+        elif anomaly_type == 'fans_not_created':
+            # 查询该日期的所有粉丝群未创建门店
+            fans_data = ElemeFansData.query.filter(
+                ElemeFansData.data_date == target_date,
+                ElemeFansData.store_name.in_(active_store_names_eleme),
+                ElemeFansData.group_type == '未创建'
+            ).all()
+            
+            anomaly_fans = []
+            for data in fans_data:
+                anomaly_fans.append({
+                    'id': data.id,
+                    'data_date': data.data_date.strftime('%Y-%m-%d'),
+                    'store_name': data.store_name,
+                    'reach_threshold': data.reach_threshold,
+                    'group_type': data.group_type
+                })
+            
+            return success_response({
+                'anomaly_type': anomaly_type,
+                'anomaly_name': '粉丝群未创建',
+                'date': target_date.strftime('%Y-%m-%d'),
+                'total_count': len(anomaly_fans),
+                'data': anomaly_fans
+            })
+        
+        # ========== 处理低店铺分异常（来自商家成长数据，只查询在营门店） ==========
+        elif anomaly_type == 'low_growth_score':
+            # 查询该日期的所有低店铺分门店
+            growth_data = ElemeGrowthData.query.filter(
+                ElemeGrowthData.data_date == target_date,
+                ElemeGrowthData.store_name.in_(active_store_names_eleme),
+                ElemeGrowthData.store_score.isnot(None),
+                ElemeGrowthData.store_score < 100
+            ).all()
+            
+            anomaly_growth = []
+            for data in growth_data:
+                item = {
+                    'id': data.id,
+                    'data_date': data.data_date.strftime('%Y-%m-%d'),
+                    'store_name': data.store_name,
+                    'store_score': float(data.store_score) if data.store_score else 0,
+                }
+                
+                # 条件显示各个得分项（只显示不等于100的）
+                score_fields = [
+                    ('peak_hours_7d_score', '高峰时长得分'),
+                    ('business_hours_7d_score', '营业时长得分'),
+                    ('store_decoration_score', '店装丰富度得分'),
+                    ('min_delivery_price_score', '最低起送价得分'),
+                    ('service_features_score', '服务功能得分'),
+                    ('promotion_richness_score', '活动丰富度得分'),
+                    ('negative_reply_rate_7d_score', '差评回复率得分'),
+                    ('merchant_rating_score', '商家评分得分'),
+                    ('online_reply_rate_7d_score', '在线回复率得分'),
+                    ('quality_product_rate_score', '优质商品率得分'),
+                    ('menu_richness_score', '菜单丰富度得分'),
+                    ('merchant_cancel_rate_score', '商责取消率得分'),
+                    ('meal_report_rate_7d_score', '出餐上报率得分')
+                ]
+                
+                for field_name, display_name in score_fields:
+                    field_value = getattr(data, field_name, None)
+                    if field_value is not None:
+                        score = float(field_value)
+                        if score != 100:
+                            item[field_name] = score
+                            item[f'{field_name}_name'] = display_name
+                
+                anomaly_growth.append(item)
+            
+            return success_response({
+                'anomaly_type': anomaly_type,
+                'anomaly_name': '低店铺分',
+                'date': target_date.strftime('%Y-%m-%d'),
+                'total_count': len(anomaly_growth),
+                'data': anomaly_growth
+            })
+        
+        else:
+            return error_response(f'无效的异常类型: {anomaly_type}', 400)
+        
+    except Exception as e:
+        current_app.logger.error(f'获取异常详情失败: {str(e)}')
+        import traceback
+        current_app.logger.error(traceback.format_exc())
+        return error_response(f'获取异常详情失败: {str(e)}', 500)
 

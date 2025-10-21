@@ -119,9 +119,9 @@ STORE_FIELD_MAPPING = {
     '近30天差评人工回复率': 'bad_reply_rate_30d',
 }
 
-# ==================== 订单数据字段映射 ====================
+# ==================== 订单数据字段映射（食亨） ====================
 # 字段映射：Excel列名 -> 数据库字段名（来自食亨收银系统）
-ORDER_FIELD_MAPPING = {
+ORDER_SHIHENG_FIELD_MAPPING = {
     # 基础信息
     '门店名称': 'store_name',
     '门店编号': 'store_id',
@@ -150,6 +150,16 @@ ORDER_FIELD_MAPPING = {
     '配送费': 'delivery_fee',
     '优惠名称': 'discount_name',
     '餐盒费': 'package_fee',
+}
+
+# ==================== 订单数据字段映射（饿了么） ====================
+# 字段映射：Excel列名 -> 数据库字段名（直接从饿了么后台导出）
+# 需要4列：日期、门店名称、订单单号、商品信息
+ORDER_ELEME_FIELD_MAPPING = {
+    '日期': 'data_date',
+    '门店名称': 'store_name',
+    '订单单号': 'order_id',
+    '商品信息': 'product_info',
 }
 
 # ==================== 商品数据字段映射 ====================
@@ -402,9 +412,12 @@ class ExcelParser:
         """
         try:
             # 根据数据类型选择字段映射
-            if data_type == 'order':
-                field_mapping = ORDER_FIELD_MAPPING
-                required_columns = ['门店名称', '订单号']  # 订单数据必填
+            if data_type == 'order_shiheng':
+                field_mapping = ORDER_SHIHENG_FIELD_MAPPING
+                required_columns = ['门店名称', '订单号']  # 订单数据（食亨）必填
+            elif data_type == 'order_eleme':
+                field_mapping = ORDER_ELEME_FIELD_MAPPING
+                required_columns = ['日期', '门店名称', '订单单号']  # 订单数据（饿了么）必填
             elif data_type == 'product':
                 field_mapping = PRODUCT_FIELD_MAPPING
                 required_columns = ['日期', '门店名称', '商品名称']  # 商品数据必填
@@ -613,12 +626,20 @@ class ExcelParser:
             tuple: (is_valid, error_message)
         """
         # 根据数据类型检查必填字段
-        if data_type == 'order':
-            # 订单数据必填字段
+        if data_type == 'order_shiheng':
+            # 订单数据（食亨）必填字段
             if not data.get('store_name'):
                 return False, "缺少门店名称"
             if not data.get('order_id'):
                 return False, "缺少订单号"
+        elif data_type == 'order_eleme':
+            # 订单数据（饿了么）必填字段
+            if not data.get('data_date'):
+                return False, "缺少日期字段"
+            if not data.get('store_name'):
+                return False, "缺少门店名称"
+            if not data.get('order_id'):
+                return False, "缺少订单单号"
         elif data_type == 'product':
             # 商品数据必填字段
             if not data.get('data_date'):

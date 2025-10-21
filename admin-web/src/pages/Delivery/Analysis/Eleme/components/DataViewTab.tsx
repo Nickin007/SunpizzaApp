@@ -10,7 +10,8 @@ const { RangePicker } = DatePicker;
 // 数据类型枚举
 const DATA_TYPES = {
   STORE: 'store',
-  ORDER: 'order',
+  ORDER_SHIHENG: 'order_shiheng',
+  ORDER_ELEME: 'order_eleme',
   PRODUCT: 'product',
   REVIEW: 'review',
   GROWTH: 'growth',
@@ -20,7 +21,8 @@ const DATA_TYPES = {
 // 数据类型显示名称
 const DATA_TYPE_NAMES: Record<string, string> = {
   [DATA_TYPES.STORE]: '门店数据',
-  [DATA_TYPES.ORDER]: '订单数据',
+  [DATA_TYPES.ORDER_SHIHENG]: '订单数据（食亨）',
+  [DATA_TYPES.ORDER_ELEME]: '订单数据（饿了么）',
   [DATA_TYPES.PRODUCT]: '商品数据',
   [DATA_TYPES.REVIEW]: '评价数据',
   [DATA_TYPES.GROWTH]: '商家成长数据',
@@ -867,6 +869,39 @@ const DataViewTab: React.FC = () => {
       width: 120,
       align: 'right',
       render: (val: number) => val?.toFixed(2) || '0.00',
+    },
+  ];
+
+  // 饿了么订单数据列定义（4列：日期、门店名称、订单单号、商品信息）
+  const orderElemeColumns: ColumnsType<any> = [
+    {
+      title: '日期',
+      dataIndex: 'data_date',
+      key: 'data_date',
+      width: 120,
+      fixed: 'left',
+    },
+    {
+      title: '门店名称',
+      dataIndex: 'store_name',
+      key: 'store_name',
+      width: 200,
+      fixed: 'left',
+      render: (val: string) => val || '-',
+    },
+    {
+      title: '订单单号',
+      dataIndex: 'order_id',
+      key: 'order_id',
+      width: 200,
+    },
+    {
+      title: '商品信息',
+      dataIndex: 'product_info',
+      key: 'product_info',
+      width: 400,
+      ellipsis: true,
+      render: (val: string) => val || '-',
     },
   ];
 
@@ -2042,8 +2077,10 @@ const DataViewTab: React.FC = () => {
     switch (activeTab) {
       case DATA_TYPES.STORE:
         return storeColumns;
-      case DATA_TYPES.ORDER:
+      case DATA_TYPES.ORDER_SHIHENG:
         return orderColumns;
+      case DATA_TYPES.ORDER_ELEME:
+        return orderElemeColumns;
       case DATA_TYPES.PRODUCT:
         return productColumns;
       case DATA_TYPES.REVIEW:
@@ -2076,9 +2113,22 @@ const DataViewTab: React.FC = () => {
           current: resData.page || page,
           total: resData.total || 0,
         });
-      } else if (activeTab === DATA_TYPES.ORDER) {
-        // 订单数据API
+      } else if (activeTab === DATA_TYPES.ORDER_SHIHENG) {
+        // 订单数据（食亨）API
         const response = await elemeApi.getOrderData({
+          page,
+          per_page: pagination.pageSize,
+        });
+        const resData = (response.data as any).data || response.data;
+        setDataList(resData.data || []);
+        setPagination({
+          ...pagination,
+          current: resData.page || page,
+          total: resData.total || 0,
+        });
+      } else if (activeTab === DATA_TYPES.ORDER_ELEME) {
+        // 订单数据（饿了么）API
+        const response = await elemeApi.getOrderElemeData({
           page,
           per_page: pagination.pageSize,
         });
@@ -2183,8 +2233,13 @@ const DataViewTab: React.FC = () => {
       children: null,
     },
     {
-      key: DATA_TYPES.ORDER,
-      label: '📋 订单数据',
+      key: DATA_TYPES.ORDER_SHIHENG,
+      label: '📋 订单数据（食亨）',
+      children: null,
+    },
+    {
+      key: DATA_TYPES.ORDER_ELEME,
+      label: '📋 订单数据（饿了么）',
       children: null,
     },
     {
@@ -2229,7 +2284,7 @@ const DataViewTab: React.FC = () => {
           >
             刷新
           </Button>
-          {(activeTab === DATA_TYPES.STORE || activeTab === DATA_TYPES.ORDER || activeTab === DATA_TYPES.PRODUCT || activeTab === DATA_TYPES.REVIEW || activeTab === DATA_TYPES.GROWTH || activeTab === DATA_TYPES.FANS) && (
+          {(activeTab === DATA_TYPES.STORE || activeTab === DATA_TYPES.ORDER_SHIHENG || activeTab === DATA_TYPES.ORDER_ELEME || activeTab === DATA_TYPES.PRODUCT || activeTab === DATA_TYPES.REVIEW || activeTab === DATA_TYPES.GROWTH || activeTab === DATA_TYPES.FANS) && (
             <span style={{ color: '#8c8c8c', fontSize: 14 }}>
               共 {pagination.total} 条数据
             </span>
@@ -2246,7 +2301,8 @@ const DataViewTab: React.FC = () => {
         onChange={handleTableChange}
         scroll={{ 
           x: activeTab === DATA_TYPES.STORE ? 11000 : 
-             activeTab === DATA_TYPES.ORDER ? 2800 : 
+             activeTab === DATA_TYPES.ORDER_SHIHENG ? 2800 : 
+             activeTab === DATA_TYPES.ORDER_ELEME ? 1000 : 
              activeTab === DATA_TYPES.PRODUCT ? 3300 : 
              activeTab === DATA_TYPES.REVIEW ? 3100 : 
              activeTab === DATA_TYPES.GROWTH ? 8000 : 
