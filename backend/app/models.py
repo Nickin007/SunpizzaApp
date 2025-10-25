@@ -1435,6 +1435,7 @@ class ElemeActiveStore(db.Model):
     store_name = db.Column(db.String(200), nullable=False, unique=True, index=True, comment='门店名称（饿了么）')
     store_name_shiheng = db.Column(db.String(200), comment='门店名称（食亨）')
     is_active = db.Column(db.Boolean, default=True, comment='是否在营')
+    cost_analysis_enabled = db.Column(db.Boolean, default=False, comment='是否启用成本分析')
     created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
     
@@ -1445,6 +1446,57 @@ class ElemeActiveStore(db.Model):
             'store_name': self.store_name,
             'store_name_shiheng': self.store_name_shiheng,
             'is_active': self.is_active,
+            'cost_analysis_enabled': self.cost_analysis_enabled,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class SourceCostLibrary(db.Model):
+    """源商品成本库"""
+    __tablename__ = 'source_cost_library'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    source_product_name = db.Column(db.String(200), nullable=False, index=True, comment='源商品名称')
+    source_product_sku = db.Column(db.String(100), nullable=False, unique=True, index=True, comment='源商品SKU')
+    category = db.Column(db.String(100), comment='类别')
+    cost = db.Column(db.Numeric(10, 2), nullable=False, comment='成本')
+    is_deleted = db.Column(db.Boolean, default=False, comment='是否删除')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'source_product_name': self.source_product_name,
+            'source_product_sku': self.source_product_sku,
+            'category': self.category,
+            'cost': float(self.cost) if self.cost else 0,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ProductMapping(db.Model):
+    """映射商品库"""
+    __tablename__ = 'product_mapping'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    parsed_product_name = db.Column(db.String(200), nullable=False, unique=True, index=True, comment='拆解单品名称')
+    source_product_name = db.Column(db.String(200), nullable=False, comment='映射源商品名称')
+    source_product_sku = db.Column(db.String(100), nullable=False, comment='映射源商品SKU')
+    is_deleted = db.Column(db.Boolean, default=False, comment='是否删除')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'parsed_product_name': self.parsed_product_name,
+            'source_product_name': self.source_product_name,
+            'source_product_sku': self.source_product_sku,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

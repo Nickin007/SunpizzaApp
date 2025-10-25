@@ -49,7 +49,7 @@ const DeliveryLayout: React.FC = () => {
         {
           key: '/delivery/eleme/cost-mapping',
           icon: <DollarOutlined />,
-          label: '成本映射',
+          label: '成本分析',
         },
         {
           key: '/delivery/eleme/upload',
@@ -76,7 +76,7 @@ const DeliveryLayout: React.FC = () => {
         {
           key: '/delivery/meituan/cost-mapping',
           icon: <DollarOutlined />,
-          label: '成本映射',
+          label: '成本分析',
         },
         {
           key: '/delivery/meituan/upload',

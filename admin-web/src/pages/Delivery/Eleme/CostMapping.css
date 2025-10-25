@@ -1,9 +1,10 @@
-.eleme-cost-mapping {
+.eleme-cost-analysis {
   padding: 24px;
   background: #f5f5f5;
+  min-height: calc(100vh - 64px);
 }
 
-.cost-mapping-card {
+.cost-analysis-card {
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -27,6 +28,29 @@
   font-size: 14px;
 }
 
+.cost-analysis-tabs .ant-tabs-nav {
+  margin-bottom: 24px;
+}
+
+.cost-analysis-tabs .ant-tabs-tab {
+  font-size: 15px;
+  padding: 12px 20px;
+}
+
+.cost-analysis-tabs .ant-tabs-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cost-analysis-tabs .ant-tabs-tab-active {
+  font-weight: 600;
+}
+
+.cost-analysis-tabs .anticon {
+  font-size: 16px;
+}
+
 .filter-bar {
   margin-bottom: 24px;
   padding: 16px;
@@ -46,26 +70,48 @@
   font-size: 16px;
 }
 
-.analysis {
-  line-height: 1.8;
+/* Tab content styles */
+.tab-content {
+  padding: 16px 0;
 }
 
-.analysis p {
-  margin-top: 16px;
-  margin-bottom: 8px;
+.tab-section {
+  margin-bottom: 24px;
+}
+
+.tab-section-title {
+  font-size: 16px;
+  font-weight: 600;
   color: #262626;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #1890ff;
 }
 
-.analysis p:first-child {
-  margin-top: 0;
+.info-card {
+  background: #fafafa;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
 }
 
-.analysis ul {
-  margin-left: 20px;
-  color: #595959;
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #e8e8e8;
 }
 
-.analysis li {
-  margin-bottom: 4px;
+.info-row:last-child {
+  border-bottom: none;
 }
 
+.info-label {
+  color: #8c8c8c;
+  font-weight: 500;
+}
+
+.info-value {
+  color: #262626;
+  font-weight: 600;
+}
