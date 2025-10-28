@@ -2,6 +2,9 @@
 export { default as CostDashboardTab } from './CostDashboardTab';
 export { default as CostCalendarTab } from './CostCalendarTab';
 export { default as AppliedStoresTab } from './AppliedStoresTab';
+export { default as OrderIntegrationTab } from './OrderIntegrationTab';
+export { default as ProductMappingProcessTab } from './ProductMappingProcessTab';
+export { default as CostMappingProcessTab } from './CostMappingProcessTab';
 export { default as SourceCostLibraryTab } from './SourceCostLibraryTab';
 export { default as OrderParseDataTab } from './OrderParseDataTab';
 

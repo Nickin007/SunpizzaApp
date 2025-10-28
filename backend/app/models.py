@@ -1458,8 +1458,6 @@ class SourceCostLibrary(db.Model):
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     source_product_name = db.Column(db.String(200), nullable=False, index=True, comment='源商品名称')
-    source_product_sku = db.Column(db.String(100), nullable=False, unique=True, index=True, comment='源商品SKU')
-    category = db.Column(db.String(100), comment='类别')
     cost = db.Column(db.Numeric(10, 2), nullable=False, comment='成本')
     is_deleted = db.Column(db.Boolean, default=False, comment='是否删除')
     created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
@@ -1470,8 +1468,6 @@ class SourceCostLibrary(db.Model):
         return {
             'id': self.id,
             'source_product_name': self.source_product_name,
-            'source_product_sku': self.source_product_sku,
-            'category': self.category,
             'cost': float(self.cost) if self.cost else 0,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
@@ -1485,7 +1481,6 @@ class ProductMapping(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     parsed_product_name = db.Column(db.String(200), nullable=False, unique=True, index=True, comment='拆解单品名称')
     source_product_name = db.Column(db.String(200), nullable=False, comment='映射源商品名称')
-    source_product_sku = db.Column(db.String(100), nullable=False, comment='映射源商品SKU')
     is_deleted = db.Column(db.Boolean, default=False, comment='是否删除')
     created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
@@ -1496,8 +1491,193 @@ class ProductMapping(db.Model):
             'id': self.id,
             'parsed_product_name': self.parsed_product_name,
             'source_product_name': self.source_product_name,
-            'source_product_sku': self.source_product_sku,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ElemeIntegratedOrder(db.Model):
+    """饿了么订单整合数据库（已匹配订单）"""
+    __tablename__ = 'eleme_integrated_orders'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    order_date = db.Column(db.Date, nullable=False, index=True, comment='日期（来自饿了么）')
+    order_id = db.Column(db.String(100), nullable=False, index=True, comment='订单号（来自食亨）')
+    store_name = db.Column(db.String(200), nullable=False, index=True, comment='门店名称（来自食亨）')
+    order_time = db.Column(db.DateTime, comment='下单时间（来自食亨）')
+    expected_income = db.Column(db.Numeric(10, 2), comment='预计收入（元）（来自食亨）')
+    product_info = db.Column(db.Text, comment='商品信息（来自饿了么）')
+    is_deleted = db.Column(db.Boolean, default=False, comment='是否删除')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'order_date': self.order_date.isoformat() if self.order_date else None,
+            'order_id': self.order_id,
+            'store_name': self.store_name,
+            'order_time': self.order_time.isoformat() if self.order_time else None,
+            'expected_income': float(self.expected_income) if self.expected_income else None,
+            'product_info': self.product_info,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ElemeUnmatchedOrder(db.Model):
+    """饿了么未匹配订单"""
+    __tablename__ = 'eleme_unmatched_orders'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    source = db.Column(db.String(20), nullable=False, index=True, comment='来源：eleme或shiheng')
+    order_id = db.Column(db.String(100), nullable=False, index=True, comment='订单号')
+    store_name = db.Column(db.String(200), nullable=False, index=True, comment='门店名称')
+    order_date = db.Column(db.Date, comment='日期（来自饿了么）')
+    order_time = db.Column(db.DateTime, comment='下单时间（来自食亨）')
+    expected_income = db.Column(db.Numeric(10, 2), comment='预计收入（元）（仅食亨）')
+    product_info = db.Column(db.Text, comment='商品信息（仅饿了么）')
+    is_deleted = db.Column(db.Boolean, default=False, comment='是否删除')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'source': self.source,
+            'order_id': self.order_id,
+            'store_name': self.store_name,
+            'order_date': self.order_date.isoformat() if self.order_date else None,
+            'order_time': self.order_time.isoformat() if self.order_time else None,
+            'expected_income': float(self.expected_income) if self.expected_income else None,
+            'product_info': self.product_info,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class ElemeProductMapping(db.Model):
+    """饿了么单品映射数据库（已映射订单）"""
+    __tablename__ = 'eleme_product_mapping'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    order_date = db.Column(db.Date, nullable=False, index=True, comment='日期')
+    order_id = db.Column(db.String(100), nullable=False, index=True, comment='订单号')
+    store_name = db.Column(db.String(200), nullable=False, index=True, comment='门店名称')
+    order_time = db.Column(db.DateTime, comment='下单时间')
+    expected_income = db.Column(db.Numeric(10, 2), comment='预计收入（元）')
+    product_info = db.Column(db.Text, comment='商品信息（原始）')
+    parsed_products = db.Column(db.Text, comment='解析单品（逗号分隔）')
+    is_deleted = db.Column(db.Boolean, default=False, comment='是否删除')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'order_date': self.order_date.isoformat() if self.order_date else None,
+            'order_id': self.order_id,
+            'store_name': self.store_name,
+            'order_time': self.order_time.isoformat() if self.order_time else None,
+            'expected_income': float(self.expected_income) if self.expected_income else None,
+            'product_info': self.product_info,
+            'parsed_products': self.parsed_products,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ElemeProductMappingUnmatched(db.Model):
+    """饿了么单品映射未匹配订单"""
+    __tablename__ = 'eleme_product_mapping_unmatched'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    order_date = db.Column(db.Date, nullable=False, index=True, comment='日期')
+    order_id = db.Column(db.String(100), nullable=False, index=True, comment='订单号')
+    store_name = db.Column(db.String(200), nullable=False, index=True, comment='门店名称')
+    order_time = db.Column(db.DateTime, comment='下单时间')
+    expected_income = db.Column(db.Numeric(10, 2), comment='预计收入（元）')
+    product_info = db.Column(db.Text, comment='商品信息（原始）')
+    parsed_products = db.Column(db.Text, comment='解析单品（逗号分隔）')
+    is_deleted = db.Column(db.Boolean, default=False, comment='是否删除')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'order_date': self.order_date.isoformat() if self.order_date else None,
+            'order_id': self.order_id,
+            'store_name': self.store_name,
+            'order_time': self.order_time.isoformat() if self.order_time else None,
+            'expected_income': float(self.expected_income) if self.expected_income else None,
+            'product_info': self.product_info,
+            'parsed_products': self.parsed_products,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class ElemeCostMapping(db.Model):
+    """饿了么成本映射数据库（已映射成本订单）"""
+    __tablename__ = 'eleme_cost_mapping'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    order_date = db.Column(db.Date, nullable=False, index=True, comment='日期')
+    order_id = db.Column(db.String(100), nullable=False, index=True, comment='订单号')
+    store_name = db.Column(db.String(200), nullable=False, index=True, comment='门店名称')
+    order_time = db.Column(db.DateTime, comment='下单时间')
+    expected_income = db.Column(db.Numeric(10, 2), comment='预计收入（元）')
+    order_cost = db.Column(db.Numeric(10, 2), comment='订单成本（元）')
+    product_info = db.Column(db.Text, comment='商品信息（原始）')
+    parsed_products = db.Column(db.Text, comment='解析单品（逗号分隔）')
+    is_deleted = db.Column(db.Boolean, default=False, comment='是否删除')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'order_date': self.order_date.isoformat() if self.order_date else None,
+            'order_id': self.order_id,
+            'store_name': self.store_name,
+            'order_time': self.order_time.isoformat() if self.order_time else None,
+            'expected_income': float(self.expected_income) if self.expected_income else None,
+            'order_cost': float(self.order_cost) if self.order_cost else None,
+            'product_info': self.product_info,
+            'parsed_products': self.parsed_products,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ElemeCostMappingUnmatched(db.Model):
+    """饿了么成本映射未匹配订单"""
+    __tablename__ = 'eleme_cost_mapping_unmatched'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    order_date = db.Column(db.Date, nullable=False, index=True, comment='日期')
+    order_id = db.Column(db.String(100), nullable=False, index=True, comment='订单号')
+    store_name = db.Column(db.String(200), nullable=False, index=True, comment='门店名称')
+    order_time = db.Column(db.DateTime, comment='下单时间')
+    expected_income = db.Column(db.Numeric(10, 2), comment='预计收入（元）')
+    product_info = db.Column(db.Text, comment='商品信息（原始）')
+    parsed_products = db.Column(db.Text, comment='解析单品（逗号分隔）')
+    is_deleted = db.Column(db.Boolean, default=False, comment='是否删除')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'order_date': self.order_date.isoformat() if self.order_date else None,
+            'order_id': self.order_id,
+            'store_name': self.store_name,
+            'order_time': self.order_time.isoformat() if self.order_time else None,
+            'expected_income': float(self.expected_income) if self.expected_income else None,
+            'product_info': self.product_info,
+            'parsed_products': self.parsed_products,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 

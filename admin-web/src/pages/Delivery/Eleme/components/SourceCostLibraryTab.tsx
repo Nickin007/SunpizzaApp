@@ -15,16 +15,13 @@ const SourceCostLibraryTab: React.FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchText, setSearchText] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [categories, setCategories] = useState<string[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<SourceCostItem | null>(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
     loadData();
-    loadCategories();
-  }, [page, pageSize, categoryFilter]);
+  }, [page, pageSize]);
 
   const loadData = async () => {
     setLoading(true);
@@ -37,28 +34,17 @@ const SourceCostLibraryTab: React.FC = () => {
       if (searchText) {
         params.search = searchText;
       }
-      
-      if (categoryFilter) {
-        params.category = categoryFilter;
-      }
 
       const response = await costAnalysisApi.getSourceCostLibrary(params);
-      setDataSource(response.data.items);
-      setTotal(response.data.total);
+      // 注意：后端返回的是 response.data.data（嵌套两层data）
+      const resData = (response.data as any).data || response.data;
+      setDataSource(resData.items || []);
+      setTotal(resData.total || 0);
     } catch (error: any) {
       console.error('加载源商品成本库失败', error);
       message.error('加载数据失败');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadCategories = async () => {
-    try {
-      const response = await costAnalysisApi.getSourceCostCategories();
-      setCategories(response.data.categories);
-    } catch (error) {
-      console.error('加载类别列表失败', error);
     }
   };
 
@@ -77,8 +63,6 @@ const SourceCostLibraryTab: React.FC = () => {
     setEditingItem(record);
     form.setFieldsValue({
       source_product_name: record.source_product_name,
-      source_product_sku: record.source_product_sku,
-      category: record.category,
       cost: record.cost,
     });
     setModalVisible(true);
@@ -89,7 +73,6 @@ const SourceCostLibraryTab: React.FC = () => {
       await costAnalysisApi.deleteSourceCost(record.id);
       message.success('删除成功');
       loadData();
-      loadCategories(); // 重新加载类别列表
     } catch (error: any) {
       message.error(error.response?.data?.error || '删除失败');
     }
@@ -111,7 +94,6 @@ const SourceCostLibraryTab: React.FC = () => {
       
       setModalVisible(false);
       loadData();
-      loadCategories(); // 重新加载类别列表
     } catch (error: any) {
       if (error.response) {
         message.error(error.response.data?.error || '操作失败');
@@ -137,19 +119,6 @@ const SourceCostLibraryTab: React.FC = () => {
       dataIndex: 'source_product_name',
       key: 'source_product_name',
       width: 200,
-    },
-    {
-      title: '源商品SKU',
-      dataIndex: 'source_product_sku',
-      key: 'source_product_sku',
-      width: 180,
-    },
-    {
-      title: '类别',
-      dataIndex: 'category',
-      key: 'category',
-      width: 120,
-      render: (category) => category || '-',
     },
     {
       title: '成本',
@@ -207,19 +176,8 @@ const SourceCostLibraryTab: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 className="tab-section-title" style={{ marginBottom: 0 }}>源商品成本库</h3>
           <Space>
-            <Select
-              placeholder="筛选类别"
-              allowClear
-              style={{ width: 150 }}
-              value={categoryFilter || undefined}
-              onChange={(value) => {
-                setCategoryFilter(value || '');
-                setPage(1);
-              }}
-              options={(categories || []).map(cat => ({ label: cat, value: cat }))}
-            />
             <Input.Search
-              placeholder="搜索源商品或SKU"
+              placeholder="搜索源商品"
               allowClear
               style={{ width: 250 }}
               value={searchText}
@@ -282,26 +240,6 @@ const SourceCostLibraryTab: React.FC = () => {
             rules={[{ required: true, message: '请输入源商品名称' }]}
           >
             <Input placeholder="例如：榴莲王披萨-7寸" />
-          </Form.Item>
-          <Form.Item
-            label="源商品SKU"
-            name="source_product_sku"
-            rules={[{ required: true, message: '请输入源商品SKU' }]}
-          >
-            <Input placeholder="例如：LLWPZ-7" />
-          </Form.Item>
-          <Form.Item
-            label="类别"
-            name="category"
-          >
-            <Select
-              placeholder="请选择或输入类别"
-              allowClear
-              showSearch
-              mode="tags"
-              maxCount={1}
-              options={(categories || []).map(cat => ({ label: cat, value: cat }))}
-            />
           </Form.Item>
           <Form.Item
             label="成本"

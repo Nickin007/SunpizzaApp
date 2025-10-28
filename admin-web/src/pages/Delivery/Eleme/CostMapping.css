@@ -1,12 +1,12 @@
 .eleme-cost-analysis {
   padding: 24px;
-  background: #f5f5f5;
+  background: #f0f2f5;
   min-height: calc(100vh - 64px);
 }
 
 .cost-analysis-card {
-  border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
 }
 
 .page-header {
@@ -28,27 +28,12 @@
   font-size: 14px;
 }
 
+.cost-analysis-tabs {
+  margin-top: 0;
+}
+
 .cost-analysis-tabs .ant-tabs-nav {
-  margin-bottom: 24px;
-}
-
-.cost-analysis-tabs .ant-tabs-tab {
-  font-size: 15px;
-  padding: 12px 20px;
-}
-
-.cost-analysis-tabs .ant-tabs-tab-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cost-analysis-tabs .ant-tabs-tab-active {
-  font-weight: 600;
-}
-
-.cost-analysis-tabs .anticon {
-  font-size: 16px;
+  margin-bottom: 16px;
 }
 
 .filter-bar {
@@ -114,4 +99,13 @@
 .info-value {
   color: #262626;
   font-weight: 600;
+}
+
+/* Calendar styles for integration */
+.ant-picker-calendar {
+  border-radius: 8px;
+}
+
+.ant-picker-calendar-header {
+  padding: 16px 0;
 }

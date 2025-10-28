@@ -40,8 +40,10 @@ const OrderParseDataTab: React.FC = () => {
       }
 
       const response = await costAnalysisApi.getProductMapping(params);
-      setDataSource(response.data.items);
-      setTotal(response.data.total);
+        // 注意：后端返回的是 response.data.data（嵌套两层data）
+      const resData = (response.data as any).data || response.data;
+      setDataSource(resData.items || []);
+      setTotal(resData.total || 0);
     } catch (error: any) {
       console.error('加载映射商品库失败', error);
       message.error('加载数据失败');
@@ -54,7 +56,8 @@ const OrderParseDataTab: React.FC = () => {
     try {
       // 获取所有源商品（不分页，用于自动完成）
       const response = await costAnalysisApi.getSourceCostLibrary({ per_page: 1000 });
-      setSourceProducts(response.data.items);
+      const resData = (response.data as any).data || response.data;
+      setSourceProducts(resData.items || []);
     } catch (error) {
       console.error('加载源商品列表失败', error);
     }
@@ -76,7 +79,6 @@ const OrderParseDataTab: React.FC = () => {
     form.setFieldsValue({
       parsed_product_name: record.parsed_product_name,
       source_product_name: record.source_product_name,
-      source_product_sku: record.source_product_sku,
     });
     setModalVisible(true);
   };
@@ -119,14 +121,9 @@ const OrderParseDataTab: React.FC = () => {
     form.resetFields();
   };
 
-  // 当选择源商品时，自动填充SKU
+  // 当选择源商品时（预留）
   const handleSourceProductSelect = (value: string) => {
-    const selectedProduct = sourceProducts.find(p => p.source_product_name === value);
-    if (selectedProduct) {
-      form.setFieldsValue({
-        source_product_sku: selectedProduct.source_product_sku,
-      });
-    }
+    // 可用于未来扩展
   };
 
   const columns: ColumnsType<ProductMappingItem> = [
@@ -148,12 +145,6 @@ const OrderParseDataTab: React.FC = () => {
       dataIndex: 'source_product_name',
       key: 'source_product_name',
       width: 200,
-    },
-    {
-      title: '映射源商品SKU',
-      dataIndex: 'source_product_sku',
-      key: 'source_product_sku',
-      width: 180,
     },
     {
       title: '创建时间',
@@ -279,21 +270,13 @@ const OrderParseDataTab: React.FC = () => {
               placeholder="请选择或输入源商品名称"
               options={(sourceProducts || []).map(p => ({ 
                 value: p.source_product_name,
-                label: `${p.source_product_name} (${p.source_product_sku})`,
+                label: p.source_product_name,
               }))}
               onSelect={handleSourceProductSelect}
               filterOption={(inputValue, option) =>
                 option?.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
               }
             />
-          </Form.Item>
-          <Form.Item
-            label="映射源商品SKU"
-            name="source_product_sku"
-            rules={[{ required: true, message: '请输入映射源商品SKU' }]}
-            extra="选择源商品后会自动填充"
-          >
-            <Input placeholder="例如：LLWPZ-7" />
           </Form.Item>
         </Form>
       </Modal>

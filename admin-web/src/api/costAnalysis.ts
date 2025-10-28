@@ -35,8 +35,6 @@ export interface StoreSummary {
 export interface SourceCostItem {
   id: number;
   source_product_name: string;
-  source_product_sku: string;
-  category?: string;
   cost: number;
   created_at: string;
   updated_at: string;
@@ -62,7 +60,6 @@ export interface ProductMappingItem {
   id: number;
   parsed_product_name: string;
   source_product_name: string;
-  source_product_sku: string;
   created_at: string;
   updated_at: string;
 }
@@ -130,8 +127,6 @@ const costAnalysisApi = {
   // 创建源商品成本
   createSourceCost: (data: {
     source_product_name: string;
-    source_product_sku: string;
-    category?: string;
     cost: number;
   }) => {
     return http.post('/cost-analysis/source-cost-library', data);
@@ -140,8 +135,6 @@ const costAnalysisApi = {
   // 更新源商品成本
   updateSourceCost: (id: number, data: {
     source_product_name?: string;
-    source_product_sku?: string;
-    category?: string;
     cost?: number;
   }) => {
     return http.put(`/cost-analysis/source-cost-library/${id}`, data);
@@ -168,7 +161,6 @@ const costAnalysisApi = {
   createProductMapping: (data: {
     parsed_product_name: string;
     source_product_name: string;
-    source_product_sku: string;
   }) => {
     return http.post('/cost-analysis/product-mapping', data);
   },
@@ -177,7 +169,6 @@ const costAnalysisApi = {
   updateProductMapping: (id: number, data: {
     parsed_product_name?: string;
     source_product_name?: string;
-    source_product_sku?: string;
   }) => {
     return http.put(`/cost-analysis/product-mapping/${id}`, data);
   },
@@ -185,6 +176,354 @@ const costAnalysisApi = {
   // 删除商品映射
   deleteProductMapping: (id: number) => {
     return http.delete(`/cost-analysis/product-mapping/${id}`);
+  },
+
+  // ==================== 订单整合 API ====================
+
+  // 执行订单整合
+  integrateOrders: (date?: string) => {
+    const data = date ? { date } : {};
+    return http.post<{
+      matched_count: number;
+      unmatched_eleme_count: number;
+      unmatched_shiheng_count: number;
+      total_shiheng: number;
+      total_eleme: number;
+    }>('/cost-analysis/integrate-orders', data);
+  },
+
+  // 获取已整合订单列表
+  getIntegratedOrders: (params?: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    start_date?: string;
+    end_date?: string;
+  }) => {
+    return http.get<{
+      items: Array<{
+        id: number;
+        order_date: string;
+        order_id: string;
+        store_name: string;
+        order_time: string;
+        expected_income: number;
+        product_info: string;
+      }>;
+      total: number;
+      page: number;
+      per_page: number;
+      pages: number;
+    }>('/cost-analysis/integrated-orders', { params });
+  },
+
+  // 获取未匹配订单列表
+  getUnmatchedOrders: (params?: {
+    page?: number;
+    per_page?: number;
+    source?: string;
+    search?: string;
+    start_date?: string;
+    end_date?: string;
+  }) => {
+    return http.get<{
+      items: Array<{
+        id: number;
+        source: 'eleme' | 'shiheng';
+        order_id: string;
+        store_name: string;
+        order_date?: string;
+        order_time?: string;
+        expected_income?: number;
+        product_info?: string;
+      }>;
+      total: number;
+      page: number;
+      per_page: number;
+      pages: number;
+      eleme_count: number;
+      shiheng_count: number;
+    }>('/cost-analysis/unmatched-orders', { params });
+  },
+
+  // 手动匹配订单
+  manualMatchOrder: (data: {
+    unmatched_order_id: number;
+    expected_income?: number;
+    order_time?: string;
+    product_info?: string;
+  }) => {
+    return http.post<any>('/cost-analysis/manual-match-order', data);
+  },
+
+  // 获取订单整合状态（用于日历面板）
+  getIntegrationStatus: () => {
+    return http.get<{
+      dates: string[];
+      count: number;
+    }>('/cost-analysis/integration-status');
+  },
+
+  // ==================== 单品映射 API ====================
+
+  // 获取单品映射状态（用于日历面板）
+  getMappingStatus: () => {
+    return http.get<{
+      dates: string[];
+      count: number;
+    }>('/cost-analysis/mapping-status');
+  },
+
+  // 执行单品映射
+  mapProducts: (date: string) => {
+    return http.post<{
+      message: string;
+      date: string;
+      mapped_count: number;
+      unmatched_count: number;
+    }>('/cost-analysis/map-products', { date });
+  },
+
+  // 获取已映射的单品订单列表
+  getMappedProducts: (params?: {
+    page?: number;
+    per_page?: number;
+    start_date?: string;
+    end_date?: string;
+  }) => {
+    return http.get<{
+      items: Array<{
+        id: number;
+        order_date: string;
+        order_id: string;
+        store_name: string;
+        order_time: string;
+        expected_income: number;
+        product_info: string;
+        parsed_products: string;
+      }>;
+      total: number;
+      page: number;
+      per_page: number;
+      pages: number;
+    }>('/cost-analysis/mapped-products', { params });
+  },
+
+  // 获取单品映射未匹配的订单列表
+  getUnmatchedMappingOrders: (params?: {
+    page?: number;
+    per_page?: number;
+    start_date?: string;
+    end_date?: string;
+  }) => {
+    return http.get<{
+      items: Array<{
+        id: number;
+        order_date: string;
+        order_id: string;
+        store_name: string;
+        order_time: string;
+        expected_income: number;
+        product_info: string;
+        parsed_products: string;
+      }>;
+      total: number;
+      page: number;
+      per_page: number;
+      pages: number;
+    }>('/cost-analysis/unmatched-mapping-orders', { params });
+  },
+
+  // ==================== 成本映射 API ====================
+
+  // 获取成本映射状态（用于日历面板）
+  getCostMappingStatus: () => {
+    return http.get<{
+      dates: string[];
+      count: number;
+    }>('/cost-analysis/cost-mapping-status');
+  },
+
+  // 执行成本映射
+  mapCosts: (date: string) => {
+    return http.post<{
+      message: string;
+      date: string;
+      mapped_count: number;
+      unmatched_count: number;
+    }>('/cost-analysis/map-costs', { date });
+  },
+
+  // 获取已映射成本的订单列表
+  getCostMappedOrders: (params?: {
+    page?: number;
+    per_page?: number;
+    start_date?: string;
+    end_date?: string;
+  }) => {
+    return http.get<{
+      items: Array<{
+        id: number;
+        order_date: string;
+        order_id: string;
+        store_name: string;
+        order_time: string;
+        expected_income: number;
+        order_cost: number;
+        product_info: string;
+        parsed_products: string;
+      }>;
+      total: number;
+      page: number;
+      per_page: number;
+      pages: number;
+    }>('/cost-analysis/cost-mapped-orders', { params });
+  },
+
+  // 获取成本映射未匹配的订单列表
+  getUnmatchedCostMappingOrders: (params?: {
+    page?: number;
+    per_page?: number;
+    start_date?: string;
+    end_date?: string;
+  }) => {
+    return http.get<{
+      items: Array<{
+        id: number;
+        order_date: string;
+        order_id: string;
+        store_name: string;
+        order_time: string;
+        expected_income: number;
+        product_info: string;
+        parsed_products: string;
+      }>;
+      total: number;
+      page: number;
+      per_page: number;
+      pages: number;
+    }>('/cost-analysis/unmatched-cost-mapping-orders', { params });
+  },
+
+  // 手动匹配成本映射订单
+  manualMatchCostMapping: (data: {
+    unmatched_order_id: number;
+    order_cost: number;
+  }) => {
+    return http.post<any>('/cost-analysis/manual-match-cost-mapping', data);
+  },
+
+  // 手动匹配单品映射订单
+  manualMatchProductMapping: (data: {
+    unmatched_order_id: number;
+    parsed_products: string;
+  }) => {
+    return http.post<any>('/cost-analysis/manual-match-product-mapping', data);
+  },
+
+  // ==================== 成本看板 API ====================
+
+  // 获取门店成本统计数据
+  getDashboardStoreStats: (date?: string) => {
+    return http.get<{
+      date: string;
+      stores: Array<{
+        store_name: string;
+        total_revenue: number;
+        total_cost: number;
+        profit_margin: number;
+        order_count: number;
+      }>;
+      summary: {
+        total_revenue: number;
+        total_cost: number;
+        avg_profit_margin: number;
+        total_orders: number;
+        store_count: number;
+      };
+    }>('/cost-analysis/dashboard/store-stats', {
+      params: date ? { date } : undefined
+    });
+  },
+
+  // 获取单店毛利率趋势
+  getDashboardStoreTrend: (storeName: string, days?: number) => {
+    return http.get<{
+      store_name: string;
+      start_date: string;
+      end_date: string;
+      trend: Array<{
+        date: string;
+        total_revenue: number;
+        total_cost: number;
+        profit_margin: number;
+        order_count: number;
+      }>;
+    }>('/cost-analysis/dashboard/store-trend', {
+      params: { store_name: storeName, days }
+    });
+  },
+
+  // 批量删除订单整合数据
+  deleteIntegratedOrders: (date: string) => {
+    return http.post<{
+      deleted_count: number;
+    }>('/cost-analysis/delete-integrated-orders', { date });
+  },
+
+  // 批量删除单品映射数据
+  deleteProductMappings: (date: string) => {
+    return http.post<{
+      deleted_count: number;
+    }>('/cost-analysis/delete-product-mappings', { date });
+  },
+
+  // 批量删除成本映射数据
+  deleteCostMappings: (date: string) => {
+    return http.post<{
+      deleted_count: number;
+    }>('/cost-analysis/delete-cost-mappings', { date });
+  },
+
+  // ==================== 编辑相关API ====================
+  
+  // 更新订单整合数据
+  updateIntegratedOrder: (id: number, data: {
+    order_date?: string;
+    order_id?: string;
+    store_name?: string;
+    order_time?: string;
+    expected_income?: number;
+    product_info?: string;
+  }) => {
+    return http.put<{ order: any }>(`/cost-analysis/integrated-orders/${id}`, data);
+  },
+
+  // 更新单品映射数据（订单记录）
+  updateProductMappingRecord: (id: number, data: {
+    order_date?: string;
+    order_id?: string;
+    store_name?: string;
+    order_time?: string;
+    expected_income?: number;
+    product_info?: string;
+    parsed_products?: string;
+  }) => {
+    return http.put<{ mapping: any }>(`/cost-analysis/product-mappings/${id}`, data);
+  },
+
+  // 更新成本映射数据
+  updateCostMapping: (id: number, data: {
+    order_date?: string;
+    order_id?: string;
+    store_name?: string;
+    order_time?: string;
+    expected_income?: number;
+    order_cost?: number;
+    product_info?: string;
+    parsed_products?: string;
+  }) => {
+    return http.put<{ cost_mapping: any }>(`/cost-analysis/cost-mappings/${id}`, data);
   },
 };
 
