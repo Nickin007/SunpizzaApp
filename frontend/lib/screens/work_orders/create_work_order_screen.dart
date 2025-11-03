@@ -200,7 +200,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
+            colorScheme: const ColorScheme.light(
               primary: AppColors.primary,
             ),
           ),
@@ -303,7 +303,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
           SnackBar(
             content: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white),
+                const Icon(Icons.check_circle, color: Colors.white),
                 SizedBox(width: 12.w),
                 Text(isEditMode ? '工单更新成功！' : '工单创建成功！'),
               ],
@@ -510,25 +510,25 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
       style: TextStyle(fontSize: 15.sp),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: AppColors.textHint),
+        hintStyle: const TextStyle(color: AppColors.textHint),
         filled: true,
         fillColor: Colors.white,
         contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.r),
-          borderSide: BorderSide(color: AppColors.divider),
+          borderSide: const BorderSide(color: AppColors.divider),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.r),
-          borderSide: BorderSide(color: AppColors.divider),
+          borderSide: const BorderSide(color: AppColors.divider),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.r),
-          borderSide: BorderSide(color: AppColors.primary, width: 2),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.r),
-          borderSide: BorderSide(color: AppColors.error),
+          borderSide: const BorderSide(color: AppColors.error),
         ),
       ),
     );
@@ -729,11 +729,11 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
             ),
             SizedBox(height: 20.h),
             ..._shops.map((shop) => ListTile(
-              leading: Icon(Icons.store, color: AppColors.primary),
+              leading: const Icon(Icons.store, color: AppColors.primary),
               title: Text(shop['name'] ?? '未命名门店'),
               subtitle: Text(shop['address'] ?? ''),
               trailing: _selectedShop?['id'] == shop['id']
-                  ? Icon(Icons.check_circle, color: AppColors.primary)
+                  ? const Icon(Icons.check_circle, color: AppColors.primary)
                   : null,
               onTap: () {
                 setState(() {
@@ -741,7 +741,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                 });
                 Navigator.pop(context);
               },
-            )).toList(),
+            )),
           ],
         ),
       ),
@@ -784,7 +784,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                     child: SizedBox(
                       width: 20.w,
                       height: 20.w,
-                      child: CircularProgressIndicator(
+                      child: const CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                       ),

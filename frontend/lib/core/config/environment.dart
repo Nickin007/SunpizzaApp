@@ -1,5 +1,6 @@
 /// 环境配置
 /// 用于区分开发环境和生产环境的 API 地址
+library;
 
 import 'package:flutter/foundation.dart';
 

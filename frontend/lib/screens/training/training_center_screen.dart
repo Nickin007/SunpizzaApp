@@ -25,8 +25,8 @@ class _TrainingCenterScreenState extends State<TrainingCenterScreen>
     {'name': '运营类', 'type': 'operation'},
   ];
   
-  Map<String, List<Map<String, dynamic>>> _coursesData = {};
-  Map<String, bool> _isLoading = {};
+  final Map<String, List<Map<String, dynamic>>> _coursesData = {};
+  final Map<String, bool> _isLoading = {};
 
   @override
   void initState() {

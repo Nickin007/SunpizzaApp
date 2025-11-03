@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, Table, Tag, Space, Button, message, DatePicker, Select } from 'antd';
-import { ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Tabs, Table, Tag, Space, Button, message, DatePicker, Select, Input, Form, Card } from 'antd';
+import { ReloadOutlined, DeleteOutlined, SearchOutlined, ClearOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import type { Dayjs } from 'dayjs';
 import elemeApi from '../../../../../api/eleme';
 import dayjs from 'dayjs';
 
@@ -41,6 +42,12 @@ const DataViewTab: React.FC = () => {
     pageSize: 50,
     total: 0,
   });
+
+  // 查询条件
+  const [form] = Form.useForm();
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const [storeName, setStoreName] = useState<string>('');
+  const [storeList, setStoreList] = useState<string[]>([]);
 
   // 门店数据列定义（完整的90+个字段）
   const storeColumns: ColumnsType<any> = [
@@ -2094,18 +2101,54 @@ const DataViewTab: React.FC = () => {
     }
   };
 
+  // 加载门店列表（用于下拉筛选）
+  const loadStoreList = async () => {
+    try {
+      const response = await elemeApi.getActiveStores({});
+      const resData = (response.data as any).data || response.data;
+      const stores = (resData.stores || []) as Array<{ store_name: string }>;
+      // 提取门店名称列表（去重）
+      const names = [...new Set(stores.map((s) => s.store_name))].filter((name): name is string => typeof name === 'string');
+      setStoreList(names);
+    } catch (error) {
+      console.error('加载门店列表失败:', error);
+    }
+  };
+
+  // 构建查询参数
+  const buildQueryParams = () => {
+    const params: any = {};
+    
+    // 日期范围
+    if (dateRange && dateRange.length === 2) {
+      params.start_date = dateRange[0].format('YYYY-MM-DD');
+      params.end_date = dateRange[1].format('YYYY-MM-DD');
+    }
+    
+    // 门店名称
+    if (storeName) {
+      params.store_name = storeName;
+    }
+    
+    return params;
+  };
+
   // 加载数据
   const loadData = async (page = 1) => {
     try {
       setLoading(true);
       
+      // 构建查询参数
+      const queryParams = {
+        page,
+        per_page: pagination.pageSize,
+        ...buildQueryParams(),
+      };
+      
       // 根据数据类型调用不同的API
       if (activeTab === DATA_TYPES.STORE) {
         // 门店数据API
-        const response = await elemeApi.getStoreData({
-          page,
-          per_page: pagination.pageSize,
-        });
+        const response = await elemeApi.getStoreData(queryParams);
         const resData = (response.data as any).data || response.data;
         setDataList(resData.data || []);
         setPagination({
@@ -2115,10 +2158,7 @@ const DataViewTab: React.FC = () => {
         });
       } else if (activeTab === DATA_TYPES.ORDER_SHIHENG) {
         // 订单数据（食亨）API
-        const response = await elemeApi.getOrderData({
-          page,
-          per_page: pagination.pageSize,
-        });
+        const response = await elemeApi.getOrderData(queryParams);
         const resData = (response.data as any).data || response.data;
         setDataList(resData.data || []);
         setPagination({
@@ -2128,10 +2168,7 @@ const DataViewTab: React.FC = () => {
         });
       } else if (activeTab === DATA_TYPES.ORDER_ELEME) {
         // 订单数据（饿了么）API
-        const response = await elemeApi.getOrderElemeData({
-          page,
-          per_page: pagination.pageSize,
-        });
+        const response = await elemeApi.getOrderElemeData(queryParams);
         const resData = (response.data as any).data || response.data;
         setDataList(resData.data || []);
         setPagination({
@@ -2141,10 +2178,7 @@ const DataViewTab: React.FC = () => {
         });
       } else if (activeTab === DATA_TYPES.PRODUCT) {
         // 商品数据API
-        const response = await elemeApi.getProductData({
-          page,
-          per_page: pagination.pageSize,
-        });
+        const response = await elemeApi.getProductData(queryParams);
         const resData = (response.data as any).data || response.data;
         setDataList(resData.data || []);
         setPagination({
@@ -2154,10 +2188,7 @@ const DataViewTab: React.FC = () => {
         });
       } else if (activeTab === DATA_TYPES.REVIEW) {
         // 评价数据API
-        const response = await elemeApi.getReviewData({
-          page,
-          per_page: pagination.pageSize,
-        });
+        const response = await elemeApi.getReviewData(queryParams);
         const resData = (response.data as any).data || response.data;
         setDataList(resData.data || []);
         setPagination({
@@ -2167,10 +2198,7 @@ const DataViewTab: React.FC = () => {
         });
       } else if (activeTab === DATA_TYPES.GROWTH) {
         // 商家成长数据API
-        const response = await elemeApi.getGrowthData({
-          page,
-          per_page: pagination.pageSize,
-        });
+        const response = await elemeApi.getGrowthData(queryParams);
         const resData = (response.data as any).data || response.data;
         setDataList(resData.data || []);
         setPagination({
@@ -2180,10 +2208,7 @@ const DataViewTab: React.FC = () => {
         });
       } else if (activeTab === DATA_TYPES.FANS) {
         // 粉丝群数据API
-        const response = await elemeApi.getFansData({
-          page,
-          per_page: pagination.pageSize,
-        });
+        const response = await elemeApi.getFansData(queryParams);
         const resData = (response.data as any).data || response.data;
         setDataList(resData.data || []);
         setPagination({
@@ -2205,6 +2230,11 @@ const DataViewTab: React.FC = () => {
     }
   };
 
+  // 初始化加载门店列表
+  useEffect(() => {
+    loadStoreList();
+  }, []);
+
   // 切换Tab时重新加载数据
   useEffect(() => {
     loadData(1);
@@ -2213,6 +2243,25 @@ const DataViewTab: React.FC = () => {
   // Tab切换
   const handleTabChange = (key: string) => {
     setActiveTab(key);
+  };
+
+  // 查询
+  const handleSearch = () => {
+    // 重置到第一页并查询
+    setPagination({ ...pagination, current: 1 });
+    loadData(1);
+  };
+
+  // 重置查询条件
+  const handleReset = () => {
+    form.resetFields();
+    setDateRange(null);
+    setStoreName('');
+    // 重置后自动查询
+    setTimeout(() => {
+      setPagination({ ...pagination, current: 1 });
+      loadData(1);
+    }, 0);
   };
 
   // 刷新数据
@@ -2274,16 +2323,63 @@ const DataViewTab: React.FC = () => {
         tabBarStyle={{ marginBottom: 16 }}
       />
 
-      {/* 工具栏 */}
+      {/* 查询表单 */}
+      <Card size="small" style={{ marginBottom: 16 }}>
+        <Form form={form} layout="inline">
+          <Form.Item label="日期范围" name="dateRange">
+            <RangePicker
+              value={dateRange}
+              onChange={(dates) => setDateRange(dates as [Dayjs, Dayjs] | null)}
+              format="YYYY-MM-DD"
+              style={{ width: 260 }}
+              placeholder={['开始日期', '结束日期']}
+            />
+          </Form.Item>
+          <Form.Item label="门店名称" name="storeName">
+            <Select
+              value={storeName || undefined}
+              onChange={setStoreName}
+              placeholder="请选择门店"
+              allowClear
+              showSearch
+              style={{ width: 200 }}
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={storeList.map((name) => ({ label: name, value: name }))}
+            />
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={handleSearch}
+                loading={loading}
+              >
+                查询
+              </Button>
+              <Button
+                icon={<ClearOutlined />}
+                onClick={handleReset}
+              >
+                重置
+              </Button>
+              <Button 
+                icon={<ReloadOutlined />} 
+                onClick={handleRefresh}
+                loading={loading}
+              >
+                刷新
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Card>
+
+      {/* 统计信息 */}
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space>
-          <Button 
-            icon={<ReloadOutlined />} 
-            onClick={handleRefresh}
-            loading={loading}
-          >
-            刷新
-          </Button>
           {(activeTab === DATA_TYPES.STORE || activeTab === DATA_TYPES.ORDER_SHIHENG || activeTab === DATA_TYPES.ORDER_ELEME || activeTab === DATA_TYPES.PRODUCT || activeTab === DATA_TYPES.REVIEW || activeTab === DATA_TYPES.GROWTH || activeTab === DATA_TYPES.FANS) && (
             <span style={{ color: '#8c8c8c', fontSize: 14 }}>
               共 {pagination.total} 条数据

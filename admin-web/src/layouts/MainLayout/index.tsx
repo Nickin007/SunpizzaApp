@@ -12,6 +12,7 @@ import {
   BookOutlined,
   AppstoreOutlined,
   RocketOutlined,
+  CalculatorOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -33,6 +34,11 @@ const MainLayout: React.FC = () => {
         key: '/admin/dashboard',
         icon: <DashboardOutlined />,
         label: '仪表板',
+      },
+      {
+        key: '/admin/investment-calculator',
+        icon: <CalculatorOutlined />,
+        label: '投资计算器',
       },
       {
         key: 'store-training',

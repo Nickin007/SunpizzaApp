@@ -120,7 +120,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
           SnackBar(
             content: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white),
+                const Icon(Icons.check_circle, color: Colors.white),
                 SizedBox(width: 12.w),
                 Text('工单状态已更新为"$statusName"'),
               ],

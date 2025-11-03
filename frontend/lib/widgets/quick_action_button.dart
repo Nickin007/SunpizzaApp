@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../core/constants/app_colors.dart';
 
 /// 快捷操作按钮组件
 class QuickActionButton extends StatelessWidget {

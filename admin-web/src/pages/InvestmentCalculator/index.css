@@ -1,0 +1,133 @@
+/* 主容器：占据完整视口，flex 布局 */
+.investment-calculator-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* 左侧：输入表单区 */
+.investment-calculator-left {
+  width: 450px;
+  min-width: 450px;
+  max-width: 450px;
+  height: 100vh;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+/* 左侧头部 */
+.investment-calculator-header {
+  padding: 24px 16px 0 16px;
+  flex-shrink: 0;
+}
+
+/* 左侧表单区域（可滚动） */
+.investment-calculator-form {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 16px 24px 16px;
+}
+
+/* 右侧：结果展示区 */
+.investment-calculator-right {
+  flex: 1;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #f0f2f5;
+}
+
+/* 自定义滚动条样式 */
+.investment-calculator-form::-webkit-scrollbar,
+.investment-calculator-right::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.investment-calculator-form::-webkit-scrollbar-thumb,
+.investment-calculator-right::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.investment-calculator-form::-webkit-scrollbar-thumb:hover,
+.investment-calculator-right::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.investment-calculator-form::-webkit-scrollbar-track,
+.investment-calculator-right::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* 响应式布局 */
+@media (max-width: 1200px) {
+  .investment-calculator-left {
+    width: 380px;
+    min-width: 380px;
+    max-width: 380px;
+  }
+}
+
+@media (max-width: 992px) {
+  .investment-calculator-container {
+    flex-direction: column;
+  }
+  
+  .investment-calculator-left {
+    width: 100vw;
+    min-width: 100vw;
+    max-width: 100vw;
+    height: 50vh;
+    border-right: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .investment-calculator-right {
+    height: 50vh;
+  }
+}
+
+@media (max-width: 768px) {
+  .investment-calculator-left {
+    height: 40vh;
+  }
+  
+  .investment-calculator-right {
+    height: 60vh;
+  }
+}
+
+/* 打印样式优化 */
+@media print {
+  .investment-calculator-container {
+    position: static;
+    height: auto;
+  }
+  
+  .investment-calculator-left {
+    display: none;
+  }
+  
+  .investment-calculator-right {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  
+  .ant-card {
+    page-break-inside: avoid;
+  }
+}
+
+

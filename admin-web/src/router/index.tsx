@@ -8,6 +8,7 @@ import Shops from '../pages/Shops';
 import WorkOrders from '../pages/WorkOrders';
 import Dict from '../pages/Dict';
 import Training from '../pages/Training';
+import InvestmentCalculator from '../pages/InvestmentCalculator';
 import DeliveryWelcome from '../pages/Delivery/Welcome';
 // 饿了么页面（新架构）
 import ElemeDataBoard from '../pages/Delivery/Eleme/DataBoard';
@@ -88,6 +89,11 @@ const router = createBrowserRouter([
       },
     ],
   },
+  // 投资计算器独立路由（全屏，无导航栏）
+  {
+    path: '/admin/investment-calculator',
+    element: <PrivateRoute><InvestmentCalculator /></PrivateRoute>,
+  },
   // 外卖运营路由（delivery_operation）
   {
     path: '/delivery',
@@ -136,6 +142,16 @@ const router = createBrowserRouter([
         element: <MeituanDataUpload />,
       },
     ],
+  },
+  // 重定向旧路径
+  {
+    path: '/dashboard',
+    element: <Navigate to="/admin/dashboard" replace />,
+  },
+  // 404 处理
+  {
+    path: '*',
+    element: <Navigate to="/" replace />,
   },
 ]);
 

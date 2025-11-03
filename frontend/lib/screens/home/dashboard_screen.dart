@@ -127,7 +127,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             SliverToBoxAdapter(
               child: Container(
                 padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 30.h),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
                       AppColors.primaryDark,
@@ -405,7 +405,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Center(
                         child: Padding(
                           padding: EdgeInsets.all(20.h),
-                          child: CircularProgressIndicator(
+                          child: const CircularProgressIndicator(
                             color: AppColors.primary,
                           ),
                         ),
