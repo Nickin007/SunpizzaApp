@@ -6,7 +6,7 @@ import type { ApiResponse } from '../types';
 // 创建 axios 实例
 const request: AxiosInstance = axios.create({
   baseURL: 'http://118.89.73.199:5000/api', // 后端 API 地址
-  timeout: 30000,
+  timeout: 600000, // 10分钟超时（用于分区县POI查询等长时间操作）
   headers: {
     'Content-Type': 'application/json',
   },

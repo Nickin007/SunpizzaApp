@@ -13,8 +13,8 @@ worker_class = "sync"
 # 连接数
 worker_connections = 1000
 
-# 超时时间（秒）
-timeout = 30
+# 超时时间（秒）- 10分钟，用于POI分区县查询等长时间操作
+timeout = 600
 
 # 保持连接时间
 keepalive = 2

@@ -29,6 +29,10 @@ def token_required(f):
     """JWT token验证装饰器"""
     @wraps(f)
     def decorated(*args, **kwargs):
+        # CORS 预检请求直接放行
+        if request.method == 'OPTIONS':
+            return '', 200
+        
         token = None
         
         # 从请求头获取token

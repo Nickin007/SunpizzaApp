@@ -1,24 +1,13 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import Login from '../pages/Login';
-import MainLayout from '../layouts/MainLayout';
 import DeliveryLayout from '../layouts/DeliveryLayout';
-import Dashboard from '../pages/Dashboard';
-import Users from '../pages/Users';
-import Shops from '../pages/Shops';
-import WorkOrders from '../pages/WorkOrders';
-import Dict from '../pages/Dict';
-import Training from '../pages/Training';
-import InvestmentCalculator from '../pages/InvestmentCalculator';
 import DeliveryWelcome from '../pages/Delivery/Welcome';
-// 饿了么页面（新架构）
-import ElemeDataBoard from '../pages/Delivery/Eleme/DataBoard';
+// 饿了么页面
 import ElemeDiagnosis from '../pages/Delivery/Eleme/Diagnosis';
-import ElemeCostMapping from '../pages/Delivery/Eleme/CostMapping';
-import ElemeDataUpload from '../pages/Delivery/Eleme/DataUpload';
-// 美团外卖页面（新架构）
+import ElemeSiteSelection from '../pages/Delivery/Eleme/SiteSelectionV2';
+// 美团外卖页面
 import MeituanDataBoard from '../pages/Delivery/Meituan/DataBoard';
 import MeituanDiagnosis from '../pages/Delivery/Meituan/Diagnosis';
-import MeituanCostMapping from '../pages/Delivery/Meituan/CostMapping';
 import MeituanDataUpload from '../pages/Delivery/Meituan/DataUpload';
 import { useAuthStore } from '../store/authStore';
 
@@ -28,23 +17,6 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
-// 角色路由守卫 - 根据角色重定向
-const RoleBasedRedirect = () => {
-  const user = useAuthStore(state => state.user);
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  // 外卖运营角色跳转到外卖运营系统
-  if (user.role === 'delivery_operation') {
-    return <Navigate to="/delivery/welcome" replace />;
-  }
-  
-  // 其他角色（admin, regional_manager, shop_manager）跳转到管理后台
-  return <Navigate to="/admin/dashboard" replace />;
-};
-
 const router = createBrowserRouter([
   {
     path: '/login',
@@ -52,49 +24,9 @@ const router = createBrowserRouter([
   },
   {
     path: '/',
-    element: <PrivateRoute><RoleBasedRedirect /></PrivateRoute>,
+    element: <Navigate to="/login" replace />,
   },
-  // 管理后台路由（admin, regional_manager, shop_manager）
-  {
-    path: '/admin',
-    element: <PrivateRoute><MainLayout /></PrivateRoute>,
-    children: [
-      {
-        index: true,
-        element: <Navigate to="/admin/dashboard" replace />,
-      },
-      {
-        path: 'dashboard',
-        element: <Dashboard />,
-      },
-      {
-        path: 'users',
-        element: <Users />,
-      },
-      {
-        path: 'shops',
-        element: <Shops />,
-      },
-      {
-        path: 'work-orders',
-        element: <WorkOrders />,
-      },
-      {
-        path: 'dict',
-        element: <Dict />,
-      },
-      {
-        path: 'training',
-        element: <Training />,
-      },
-    ],
-  },
-  // 投资计算器独立路由（全屏，无导航栏）
-  {
-    path: '/admin/investment-calculator',
-    element: <PrivateRoute><InvestmentCalculator /></PrivateRoute>,
-  },
-  // 外卖运营路由（delivery_operation）
+  // 外卖运营路由
   {
     path: '/delivery',
     element: <PrivateRoute><DeliveryLayout /></PrivateRoute>,
@@ -107,24 +39,17 @@ const router = createBrowserRouter([
         path: 'welcome',
         element: <DeliveryWelcome />,
       },
-      // 饿了么路由（新架构）
+      // 选址工具（独立模块）
       {
-        path: 'eleme/databoard',
-        element: <ElemeDataBoard />,
+        path: 'site-selection',
+        element: <ElemeSiteSelection />,
       },
+      // 饿了么路由
       {
         path: 'eleme/diagnosis',
         element: <ElemeDiagnosis />,
       },
-      {
-        path: 'eleme/cost-mapping',
-        element: <ElemeCostMapping />,
-      },
-      {
-        path: 'eleme/upload',
-        element: <ElemeDataUpload />,
-      },
-      // 美团外卖路由（新架构）
+      // 美团外卖路由
       {
         path: 'meituan/databoard',
         element: <MeituanDataBoard />,
@@ -134,26 +59,16 @@ const router = createBrowserRouter([
         element: <MeituanDiagnosis />,
       },
       {
-        path: 'meituan/cost-mapping',
-        element: <MeituanCostMapping />,
-      },
-      {
         path: 'meituan/upload',
         element: <MeituanDataUpload />,
       },
     ],
   },
-  // 重定向旧路径
-  {
-    path: '/dashboard',
-    element: <Navigate to="/admin/dashboard" replace />,
-  },
-  // 404 处理
+  // 404 处理 - 重定向到登录页
   {
     path: '*',
-    element: <Navigate to="/" replace />,
+    element: <Navigate to="/login" replace />,
   },
 ]);
 
 export default router;
-

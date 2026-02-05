@@ -1,0 +1,205 @@
+.site-selection {
+  padding: 24px;
+  background: #f5f5f5;
+  min-height: 100vh;
+}
+
+.site-selection-container {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.page-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.page-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1890ff;
+}
+
+.page-description {
+  margin: 8px 0 0 0;
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+.content-wrapper {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 250px);
+}
+
+.search-panel {
+  width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+}
+
+.map-panel {
+  flex: 1;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.map-container {
+  width: 100%;
+  height: 100%;
+  min-height: 600px;
+  background: #f0f2f5;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* 确保地图标记可见 */
+.map-container .amap-marker {
+  z-index: 999 !important;
+}
+
+.map-container .amap-marker-label {
+  z-index: 1000 !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  padding: 2px 6px !important;
+  font-size: 12px !important;
+}
+
+/* 自定义滚动条 */
+.search-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.search-panel::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.search-panel::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.search-panel::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* 全屏模式 */
+.map-panel:fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #fff;
+  z-index: 9999;
+}
+
+.map-panel:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #fff;
+  z-index: 9999;
+}
+
+.map-panel:-moz-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #fff;
+  z-index: 9999;
+}
+
+.map-panel:-ms-fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #fff;
+  z-index: 9999;
+}
+
+/* 绘图工具面板 */
+.drawing-tools-panel {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  background-color: #fff;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  animation: slideInLeft 0.3s ease;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.drawing-tools-panel .ant-btn {
+  transition: all 0.3s ease;
+}
+
+.drawing-tools-panel .ant-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.drawing-tools-panel .ant-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+}
+
+.drawing-tools-panel .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+/* 高德地图绘图覆盖物样式优化 */
+.amap-marker-label {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid #1890ff !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* 测距工具样式 */
+.amap-ui-ranging-tool {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 响应式 */
+@media (max-width: 1200px) {
+  .content-wrapper {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .search-panel {
+    width: 100%;
+    max-height: 500px;
+  }
+
+  .map-panel {
+    height: 600px;
+  }
+  
+  .drawing-tools-panel {
+    min-width: 160px;
+    padding: 8px;
+  }
+}
+

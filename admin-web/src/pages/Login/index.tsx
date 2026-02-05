@@ -24,13 +24,8 @@ const Login: React.FC = () => {
       setAuth(token, user);
       message.success('登录成功！');
       
-      // 根据角色跳转到不同的系统
-      if (user.role === 'delivery_operation') {
-        navigate('/delivery/welcome');
-      } else {
-        // admin, regional_manager, shop_manager 跳转到管理后台
-        navigate('/admin/dashboard');
-      }
+      // 所有用户都跳转到外卖运营系统
+      navigate('/delivery/welcome');
     } catch (error: any) {
       console.error('❌ 登录失败：', error);
       console.error('错误详情:', error.response);
@@ -50,9 +45,9 @@ const Login: React.FC = () => {
               <img src={logoImage} alt="圣比萨 SUN PIZZA" />
             </div>
             <h1 className="brand-title">圣比萨</h1>
-            <h3 className="brand-subtitle">管理后台系统</h3>
+            <h3 className="brand-subtitle">外卖运营系统</h3>
             <p className="brand-description">
-              统一管理门店、员工、工单，让运营更高效
+              饿了么、美团数据分析与门店运营管理
             </p>
             <div className="features">
               <div className="feature-item">

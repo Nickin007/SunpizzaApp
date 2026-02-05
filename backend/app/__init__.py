@@ -30,15 +30,9 @@ def create_app(config_class=Config):
          }})
     
     # 注册蓝图
-    from app.api import users, shops, work_orders, training, routine_tasks, upload, eleme, cost_analysis
-    app.register_blueprint(users.bp)
-    app.register_blueprint(shops.bp)
-    app.register_blueprint(work_orders.bp)
-    app.register_blueprint(training.bp)
-    app.register_blueprint(routine_tasks.bp)
-    app.register_blueprint(upload.bp)
-    app.register_blueprint(eleme.bp)
-    app.register_blueprint(cost_analysis.bp)
+    from app.api import users, poi
+    app.register_blueprint(users.bp)  # 保留用户认证API（登录）
+    app.register_blueprint(poi.bp)  # POI选址工具API
     
     # 配置静态文件访问（用于访问上传的视频、图片等）
     @app.route('/uploads/<path:filename>')
@@ -47,4 +41,7 @@ def create_app(config_class=Config):
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
     
     return app
+
+# 创建应用实例供 gunicorn 使用
+app = create_app()
 

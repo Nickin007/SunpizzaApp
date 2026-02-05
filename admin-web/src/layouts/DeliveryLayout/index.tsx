@@ -9,8 +9,9 @@ import {
   BarChartOutlined,
   LineChartOutlined,
   FileSearchOutlined,
-  DollarOutlined,
   CloudUploadOutlined,
+  EnvironmentOutlined,
+  CompassOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -32,29 +33,19 @@ const DeliveryLayout: React.FC = () => {
       label: '首页',
     },
     {
+      key: '/delivery/site-selection',
+      icon: <EnvironmentOutlined />,
+      label: '选址工具',
+    },
+    {
       key: 'eleme',
-      icon: <BarChartOutlined />,
+      icon: <CompassOutlined />,
       label: '饿了么',
       children: [
-        {
-          key: '/delivery/eleme/databoard',
-          icon: <LineChartOutlined />,
-          label: '数据看板',
-        },
         {
           key: '/delivery/eleme/diagnosis',
           icon: <FileSearchOutlined />,
           label: '门店诊断',
-        },
-        {
-          key: '/delivery/eleme/cost-mapping',
-          icon: <DollarOutlined />,
-          label: '成本分析',
-        },
-        {
-          key: '/delivery/eleme/upload',
-          icon: <CloudUploadOutlined />,
-          label: '数据上传',
         },
       ],
     },
@@ -72,11 +63,6 @@ const DeliveryLayout: React.FC = () => {
           key: '/delivery/meituan/diagnosis',
           icon: <FileSearchOutlined />,
           label: '门店诊断',
-        },
-        {
-          key: '/delivery/meituan/cost-mapping',
-          icon: <DollarOutlined />,
-          label: '成本分析',
         },
         {
           key: '/delivery/meituan/upload',

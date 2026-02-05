@@ -1,6 +1,9 @@
+"""
+订单解析工具
+用于将订单商品信息拆分成单个单品
+"""
 import re
-import pandas as pd
-import os
+
 
 def parse_order_items(order_text):
     """
@@ -26,6 +29,7 @@ def parse_order_items(order_text):
             items.extend(parse_single_part(part))
     
     return items
+
 
 def split_order_by_pattern(order_text):
     """
@@ -63,6 +67,7 @@ def split_order_by_pattern(order_text):
         parts.append(order_text[start_pos:])
     
     return parts
+
 
 def parse_combo_part(combo_text):
     """
@@ -245,6 +250,7 @@ def parse_combo_part(combo_text):
     
     return items
 
+
 def parse_single_part(single_text):
     """
     解析单点部分
@@ -265,6 +271,7 @@ def parse_single_part(single_text):
             items.append(f"{item_name}_{quantity}")
     
     return items
+
 
 def is_beverage(combo_name):
     """
@@ -307,143 +314,18 @@ def is_beverage(combo_name):
     
     return None
 
-def process_excel_file(input_file_path):
-    """
-    处理Excel文件，解析订单信息
-    """
-    try:
-        # 读取Excel文件
-        df = pd.read_excel(input_file_path)
-        
-        # 检查文件结构
-        if df.empty:
-            print("Excel文件为空！")
-            return
-        
-        # 检查必要的列是否存在
-        required_columns = ['日期', '门店名称', '商品信息']
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        
-        if missing_columns:
-            print(f"Excel文件中缺少以下列: {', '.join(missing_columns)}")
-            print(f"现有列: {', '.join(df.columns)}")
-            return
-        
-        print(f"检测到所需列: {', '.join(required_columns)}")
-        
-        # 解析每个订单
-        results = []
-        order_counter = 1
-        
-        for index, row in df.iterrows():
-            order_text = str(row['商品信息'])
-            date = row['日期']
-            store_name = row['门店名称']
-            
-            if order_text and order_text != 'nan':
-                items = parse_order_items(order_text)
-                
-                # 为每个单品添加编号
-                for i, item in enumerate(items, 1):
-                    results.append({
-                        '序号': f"订单{order_counter}",
-                        '日期': date,
-                        '门店名称': store_name,
-                        '解析单品': f"{i}. {item}",
-                        '原订单': order_text
-                    })
-                
-                order_counter += 1
-        
-        # 创建结果DataFrame
-        result_df = pd.DataFrame(results)
-        
-        # 保存结果
-        output_file = os.path.join(os.path.dirname(__file__), '解析结果.xlsx')
-        result_df.to_excel(output_file, index=False)
-        
-        print(f"解析完成！共处理 {order_counter-1} 个订单")
-        print(f"结果已保存至: {output_file}")
-        
-        # 显示前几个结果作为示例
-        print("\n解析结果格式示例:")
-        sample_df = result_df.head(10)
-        for _, row in sample_df.iterrows():
-            print(f"{row['序号']:10} {row['解析单品']:30} {row['日期']} {row['门店名称']} {row['原订单'][:50]}")
-        
-    except Exception as e:
-        print(f"处理文件时出错: {e}")
 
-def main():
-    """
-    主函数：获取用户输入并处理Excel文件
-    """
-    print("=" * 80)
-    print("订单解析工具 - 完整版")
-    print("=" * 80)
-    print("说明：")
-    print("- 解析结果将包含日期、门店名称和完整订单信息")
-    print("- 每个单品都有编号")
-    print("- 使用 _x*y 模式精准分割订单")
-    print("- 双拼披萨会从套餐名中提取尺寸并标注为半份")
-    print("- 饮料单品使用精确匹配或前缀匹配")
-    print("- 不过滤任何字段，所有单品都会被解析")
-    print("=" * 80)
-    
-    while True:
-        file_path = input("\n请输入Excel文件路径（输入'quit'退出）: ").strip().strip('"')
-        
-        if file_path.lower() == 'quit':
-            print("程序退出")
-            break
-        
-        if not os.path.exists(file_path):
-            print("文件不存在，请检查路径是否正确")
-            continue
-        
-        if not file_path.lower().endswith(('.xlsx', '.xls')):
-            print("请提供Excel文件（.xlsx 或 .xls 格式）")
-            continue
-        
-        try:
-            process_excel_file(file_path)
-            break
-        except Exception as e:
-            print(f"处理文件时出错: {e}")
-            print("请检查文件格式是否正确")
-
-# 测试函数
-def test_parser():
-    """
-    测试解析功能
-    """
-    test_cases = [
-        "花果山披萨-7英寸(手拍)_1*25.9+奶酪芝士卷边（7英寸）_1*4.9+芒果汁[温度:冷]_1*7.0",  # 饮料单品
-        "柠檬茶[温度:常温]_1*5.0+可乐听装[温度:冷]_1*6.0",  # 多个饮料单品
-        "【肥宅快乐水】小可乐[温度:冷]_1*5.0+可口可乐 1听[温度:冷]_1*6.0",  # 特殊饮料名称
-        "【随心拼】12英寸披萨（口味自选）[双拼1:缤纷水果,双拼2:缤纷水果]_1*105.0",  # 双拼披萨
-        "新奥尔良烤鸡肉披萨-7英寸(手拍)_1*58.0+金丝鸡排_1*10.88",  # 全是单点
-        "️【任选】爆款意面4选1+小吃5选1+饮品[意面:黑椒牛肉意面,小吃:地道肠1根,饮品:小可乐]_1*61.0",  # 全是套餐
-        "【任选】披萨随心配[加选小吃一:不另加_1,加选小吃二:不另加._1,必选小吃:地道肠_1,披萨:碳烤鸡肉培根披萨_7英寸(手拍)_1,饮品:雀巢牛奶_1]_1*31.9+蛋挞一个（原味）_1*3.9+点击右上角❤️收藏得小吃[3选1:上校鸡块2个]_1*2.0",  # 套餐与单点组合
-        "【任选】披萨8选1+小吃5选1+饮品·[披萨:日系照烧鸡披萨7英寸,小吃:薯饼3个,饮品:芒果汁]_1*58.0+️【任选】爆款意面4选1+小吃5选1+饮品[意面:招牌肉酱意面,小吃:盐酥鸡米花小份,饮品:芒果汁]_1*61.0",  # 多个套餐
-        "任选披萨6选1+小吃6选1+饮料[7寸披萨6选1:水果披萨7寸,美味小吃6选1:上校鸡块4个,饮料选1:芒果汁,饮料温度:常温]_1*40.0",  # 包含之前被过滤的字段
-        "测试套餐+包含加号[内容:测试+内容_1]_1*10.0+单品_1*5.0"  # 测试套餐内包含加号的情况
+# 测试代码
+if __name__ == '__main__':
+    # 测试用例
+    test_orders = [
+        "金牌披萨小食组合[必选:夏威夷风情披萨9英寸_1,小食2选1:新奥尔良烤翅_1,饮品:可乐听装_1]_1*48.9",
+        "【肥宅快乐水】小可乐[规格:可乐]_2*1.0",
+        "9英寸随心❤️拼[双拼1:培根芝士9英寸,双拼2:夏威夷风情9英寸]_1*39.9",
     ]
     
-    print("测试解析功能:")
-    print("-" * 50)
-    
-    for i, test_case in enumerate(test_cases, 1):
-        print(f"\n测试用例 {i}:")
-        print(f"原订单: {test_case}")
-        items = parse_order_items(test_case)
-        print("解析结果:")
-        for j, item in enumerate(items, 1):
-            print(f"  {j}. {item}")
-
-if __name__ == "__main__":
-    # 运行测试
-    # test_parser()
-    
-    # 运行主程序
-    main()
+    for order in test_orders:
+        print(f"原始订单: {order}")
+        items = parse_order_items(order)
+        print(f"解析结果: {items}")
+        print("-" * 50)

@@ -20,3 +20,11 @@ node_modules/
 .env
 .env.local
 
+# 敏感信息 - 令牌和密钥文件
+*Token.txt
+*.key
+*.secret
+*.pem
+*_Token.txt
+*_token.txt
+SunpizzaApp_Token.txt
