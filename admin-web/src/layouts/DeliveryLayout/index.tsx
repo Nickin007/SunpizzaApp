@@ -7,9 +7,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   BarChartOutlined,
-  LineChartOutlined,
-  FileSearchOutlined,
-  CloudUploadOutlined,
+  DollarOutlined,
   EnvironmentOutlined,
   CompassOutlined,
 } from '@ant-design/icons';
@@ -43,9 +41,9 @@ const DeliveryLayout: React.FC = () => {
       label: '饿了么',
       children: [
         {
-          key: '/delivery/eleme/diagnosis',
-          icon: <FileSearchOutlined />,
-          label: '门店诊断',
+          key: '/delivery/eleme/cost-analysis',
+          icon: <DollarOutlined />,
+          label: '成本分析',
         },
       ],
     },
@@ -55,19 +53,9 @@ const DeliveryLayout: React.FC = () => {
       label: '美团外卖',
       children: [
         {
-          key: '/delivery/meituan/databoard',
-          icon: <LineChartOutlined />,
-          label: '数据看板',
-        },
-        {
-          key: '/delivery/meituan/diagnosis',
-          icon: <FileSearchOutlined />,
-          label: '门店诊断',
-        },
-        {
-          key: '/delivery/meituan/upload',
-          icon: <CloudUploadOutlined />,
-          label: '数据上传',
+          key: '/delivery/meituan/cost-analysis',
+          icon: <DollarOutlined />,
+          label: '成本分析',
         },
       ],
     },
@@ -151,4 +139,3 @@ const DeliveryLayout: React.FC = () => {
 };
 
 export default DeliveryLayout;
-

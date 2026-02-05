@@ -1,0 +1,215 @@
+.cost-analysis {
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  background: #f0f2f5;
+}
+
+.cost-analysis-container {
+  min-height: 600px;
+}
+
+.page-header {
+  margin-bottom: 24px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 16px;
+}
+
+.page-header h2 {
+  font-size: 24px;
+  color: #1890ff;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* 分析Tab样式 */
+.analysis-tab {
+  padding: 16px 0;
+}
+
+.upload-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.upload-tip {
+  color: #999;
+  font-size: 14px;
+}
+
+.loading-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 100px 0;
+}
+
+.summary-section {
+  margin-bottom: 24px;
+  padding: 24px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.unmapped-products {
+  margin-top: 8px;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.store-select-section {
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.store-select-section > span {
+  font-weight: 500;
+  color: #333;
+}
+
+.result-section {
+  margin-top: 24px;
+}
+
+.result-section .ant-card-head {
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+.result-section .ant-card-head-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 门店Tab样式 */
+.stores-tab,
+.recipes-tab,
+.ingredients-tab,
+.mappings-tab {
+  padding: 16px 0;
+}
+
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.store-count,
+.recipe-count,
+.ingredient-count,
+.mapping-count {
+  color: #666;
+  font-size: 14px;
+}
+
+/* 表格样式优化 */
+.cost-analysis .ant-table-thead > tr > th {
+  background: #fafafa;
+  font-weight: 500;
+}
+
+.cost-analysis .ant-table-tbody > tr:hover > td {
+  background: #e6f7ff;
+}
+
+/* Modal样式 */
+.cost-analysis .ant-modal-body {
+  padding: 24px;
+}
+
+.cost-analysis .ant-form-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Tab样式 */
+.cost-analysis .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+.cost-analysis .ant-tabs-tab {
+  padding: 12px 16px;
+  font-size: 15px;
+}
+
+.cost-analysis .ant-tabs-tab-active {
+  font-weight: 500;
+}
+
+/* 解析配置子Tab样式 */
+.config-sub-tabs {
+  margin-top: 16px;
+}
+
+.config-sub-tabs .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.config-sub-tabs .ant-tabs-tab {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+/* 解析算法选择样式 */
+.parser-select {
+  display: flex;
+  align-items: center;
+}
+
+/* 统计卡片样式 */
+.cost-analysis .ant-statistic-title {
+  font-size: 14px;
+  color: #666;
+}
+
+.cost-analysis .ant-statistic-content {
+  font-size: 24px;
+}
+
+/* Alert样式 */
+.cost-analysis .ant-alert {
+  border-radius: 8px;
+}
+
+/* 响应式布局 */
+@media (max-width: 1200px) {
+  .result-section .ant-col {
+    width: 100%;
+    margin-bottom: 16px;
+  }
+}
+
+/* 小屏幕适配 */
+@media (max-width: 768px) {
+  .cost-analysis {
+    padding: 16px;
+  }
+
+  .upload-section {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tab-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .store-select-section {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .summary-section .ant-col {
+    margin-bottom: 16px;
+  }
+}

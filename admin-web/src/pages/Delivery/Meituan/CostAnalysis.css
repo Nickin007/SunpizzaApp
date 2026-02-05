@@ -1,0 +1,24 @@
+.cost-analysis {
+  padding: 24px;
+}
+
+.cost-analysis-container {
+  min-height: calc(100vh - 180px);
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #ff9800;
+}
+
+.page-description {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+}

@@ -3,12 +3,10 @@ import Login from '../pages/Login';
 import DeliveryLayout from '../layouts/DeliveryLayout';
 import DeliveryWelcome from '../pages/Delivery/Welcome';
 // 饿了么页面
-import ElemeDiagnosis from '../pages/Delivery/Eleme/Diagnosis';
 import ElemeSiteSelection from '../pages/Delivery/Eleme/SiteSelectionV2';
+import ElemeCostAnalysis from '../pages/Delivery/Eleme/CostAnalysis';
 // 美团外卖页面
-import MeituanDataBoard from '../pages/Delivery/Meituan/DataBoard';
-import MeituanDiagnosis from '../pages/Delivery/Meituan/Diagnosis';
-import MeituanDataUpload from '../pages/Delivery/Meituan/DataUpload';
+import MeituanCostAnalysis from '../pages/Delivery/Meituan/CostAnalysis';
 import { useAuthStore } from '../store/authStore';
 
 // 路由守卫组件 - 检查是否登录
@@ -46,21 +44,13 @@ const router = createBrowserRouter([
       },
       // 饿了么路由
       {
-        path: 'eleme/diagnosis',
-        element: <ElemeDiagnosis />,
+        path: 'eleme/cost-analysis',
+        element: <ElemeCostAnalysis />,
       },
       // 美团外卖路由
       {
-        path: 'meituan/databoard',
-        element: <MeituanDataBoard />,
-      },
-      {
-        path: 'meituan/diagnosis',
-        element: <MeituanDiagnosis />,
-      },
-      {
-        path: 'meituan/upload',
-        element: <MeituanDataUpload />,
+        path: 'meituan/cost-analysis',
+        element: <MeituanCostAnalysis />,
       },
     ],
   },

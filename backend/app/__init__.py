@@ -30,9 +30,10 @@ def create_app(config_class=Config):
          }})
     
     # 注册蓝图
-    from app.api import users, poi
+    from app.api import users, poi, cost_analysis
     app.register_blueprint(users.bp)  # 保留用户认证API（登录）
     app.register_blueprint(poi.bp)  # POI选址工具API
+    app.register_blueprint(cost_analysis.bp)  # 成本分析API
     
     # 配置静态文件访问（用于访问上传的视频、图片等）
     @app.route('/uploads/<path:filename>')

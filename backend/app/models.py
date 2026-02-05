@@ -77,3 +77,91 @@ class POIStore(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+class AnalyzableStore(db.Model):
+    """可分析门店表（成本分析）"""
+    __tablename__ = 'analyzable_stores'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    store_name = db.Column(db.String(200), unique=True, nullable=False, comment='门店名称')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'store_name': self.store_name,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class ProductRecipeCard(db.Model):
+    """单品原料卡表（成本分析）"""
+    __tablename__ = 'product_recipe_cards'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    product_name = db.Column(db.String(200), nullable=False, index=True, comment='单品名称')
+    ingredient_name = db.Column(db.String(100), nullable=False, comment='原料名称')
+    ingredient_unit = db.Column(db.String(50), nullable=False, comment='原料计量单位')
+    quantity = db.Column(db.Numeric(10, 4), nullable=False, comment='用量')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'product_name': self.product_name,
+            'ingredient_name': self.ingredient_name,
+            'ingredient_unit': self.ingredient_unit,
+            'quantity': float(self.quantity) if self.quantity else 0,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class IngredientCost(db.Model):
+    """原料成本表（成本分析）"""
+    __tablename__ = 'ingredient_costs'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    ingredient_name = db.Column(db.String(100), unique=True, nullable=False, comment='原料名称')
+    unit = db.Column(db.String(50), nullable=False, comment='计量单位')
+    unit_cost = db.Column(db.Numeric(10, 4), nullable=False, comment='单位成本')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'ingredient_name': self.ingredient_name,
+            'unit': self.unit,
+            'unit_cost': float(self.unit_cost) if self.unit_cost else 0,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ProductNameMapping(db.Model):
+    """源商品名称映射表（成本分析）
+    用于将解析出的各种单品名称变体统一映射到标准的源商品名称
+    """
+    __tablename__ = 'product_name_mappings'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    parsed_name = db.Column(db.String(200), unique=True, nullable=False, index=True, comment='解析出的单品名称')
+    source_name = db.Column(db.String(200), nullable=False, index=True, comment='源商品名称（标准名称）')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'parsed_name': self.parsed_name,
+            'source_name': self.source_name,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
