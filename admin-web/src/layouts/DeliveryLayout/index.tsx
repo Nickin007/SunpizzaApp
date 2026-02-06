@@ -10,6 +10,7 @@ import {
   DollarOutlined,
   EnvironmentOutlined,
   CompassOutlined,
+  FileExcelOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -44,6 +45,11 @@ const DeliveryLayout: React.FC = () => {
           key: '/delivery/eleme/cost-analysis',
           icon: <DollarOutlined />,
           label: '成本分析',
+        },
+        {
+          key: '/delivery/eleme/excel-toolkit',
+          icon: <FileExcelOutlined />,
+          label: '数据分析库',
         },
       ],
     },

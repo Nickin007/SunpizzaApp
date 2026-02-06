@@ -5,6 +5,7 @@ import DeliveryWelcome from '../pages/Delivery/Welcome';
 // 饿了么页面
 import ElemeSiteSelection from '../pages/Delivery/Eleme/SiteSelectionV2';
 import ElemeCostAnalysis from '../pages/Delivery/Eleme/CostAnalysis';
+import ElemeExcelToolkit from '../pages/Delivery/Eleme/ExcelToolkit';
 // 美团外卖页面
 import MeituanCostAnalysis from '../pages/Delivery/Meituan/CostAnalysis';
 import { useAuthStore } from '../store/authStore';
@@ -46,6 +47,10 @@ const router = createBrowserRouter([
       {
         path: 'eleme/cost-analysis',
         element: <ElemeCostAnalysis />,
+      },
+      {
+        path: 'eleme/excel-toolkit',
+        element: <ElemeExcelToolkit />,
       },
       // 美团外卖路由
       {

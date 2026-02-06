@@ -1,0 +1,147 @@
+.excel-toolkit {
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  background: #f0f2f5;
+}
+
+.excel-toolkit-container {
+  min-height: 600px;
+}
+
+.page-header {
+  margin-bottom: 24px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 16px;
+}
+
+.page-header h2 {
+  font-size: 24px;
+  color: #52c41a;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.excel-toolkit .ant-tabs-tab {
+  padding: 12px 16px;
+  font-size: 15px;
+}
+
+.excel-toolkit .ant-tabs-tab-active {
+  font-weight: 500;
+}
+
+/* Stage container */
+.stage-container {
+  padding: 16px 0;
+}
+
+/* Upload stage */
+.upload-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.upload-area {
+  text-align: center;
+}
+
+.upload-hint {
+  margin-top: 16px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* Preview table wrapper */
+.preview-table-wrapper {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.preview-table-wrapper .ant-table-thead > tr > th {
+  background: #fafafa;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.preview-table-wrapper .ant-table-tbody > tr > td {
+  white-space: nowrap;
+}
+
+/* Tutorial section */
+.tutorial-section {
+  margin-bottom: 24px;
+}
+
+.tutorial-header {
+  font-size: 15px;
+  font-weight: 500;
+  color: #1890ff;
+}
+
+.tutorial-content {
+  padding: 8px 16px;
+  line-height: 1.8;
+}
+
+.tutorial-content .ant-typography h5 {
+  color: #333;
+  margin-top: 8px;
+}
+
+.tutorial-steps {
+  margin: 16px 0;
+}
+
+.tutorial-steps .ant-steps-item-description {
+  max-width: 100% !important;
+}
+
+.step-detail {
+  padding: 8px 0;
+  color: #555;
+}
+
+.step-detail .ant-typography {
+  margin-bottom: 8px;
+  color: #555;
+}
+
+.column-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.column-tags .ant-tag {
+  margin: 0;
+  font-size: 13px;
+}
+
+.tutorial-list {
+  padding-left: 20px;
+  margin: 8px 0;
+  line-height: 2;
+}
+
+.tutorial-list li {
+  color: #555;
+}
+
+/* Collapse ghost style override */
+.tutorial-section .ant-collapse-ghost > .ant-collapse-item > .ant-collapse-header {
+  padding: 12px 16px;
+  background: #f6f9ff;
+  border-radius: 8px;
+  border: 1px solid #e6f0ff;
+}
+
+.tutorial-section .ant-collapse-ghost > .ant-collapse-item-active > .ant-collapse-header {
+  background: #edf4ff;
+  border-color: #d1e3ff;
+}
