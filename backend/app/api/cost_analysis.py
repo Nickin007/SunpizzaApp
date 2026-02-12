@@ -84,11 +84,11 @@ def import_config():
                     if mode == 'replace':
                         db.session.add(AnalyzableStore(store_name=name))
                         stats['stores']['added'] += 1
-        else:
+                    else:
                         existing = AnalyzableStore.query.filter_by(store_name=name).first()
                         if existing:
                             stats['stores']['skipped'] += 1
-            else:
+                        else:
                             db.session.add(AnalyzableStore(store_name=name))
                             stats['stores']['added'] += 1
                 processed_sheets.append(store_sheet)
@@ -156,8 +156,8 @@ def import_config():
 
                         if not ing_name or not ing_unit:
                             col_idx += 3
-                continue
-            
+                            continue
+
                         try:
                             quantity = Decimal(str(ing_qty_val)) if pd.notna(ing_qty_val) else Decimal('0')
                         except Exception:
@@ -211,8 +211,8 @@ def import_config():
                     ing_name = str(row[col_name]).strip() if pd.notna(row[col_name]) else ''
                     unit = str(row[col_unit]).strip() if pd.notna(row[col_unit]) else ''
                     if not ing_name or not unit:
-                continue
-            
+                        continue
+
                     try:
                         unit_cost = Decimal(str(row[col_cost])) if pd.notna(row[col_cost]) else Decimal('0')
                     except Exception:
@@ -225,13 +225,13 @@ def import_config():
                             unit_cost=unit_cost
                         ))
                         stats['ingredients']['added'] += 1
-            else:
+                    else:
                         existing = IngredientCost.query.filter_by(ingredient_name=ing_name).first()
                         if existing:
                             existing.unit = unit
                             existing.unit_cost = unit_cost
                             stats['ingredients']['updated'] += 1
-        else:
+                        else:
                             db.session.add(IngredientCost(
                                 ingredient_name=ing_name,
                                 unit=unit,
@@ -367,10 +367,10 @@ def batch_add_stores():
                 continue
             
             existing = AnalyzableStore.query.filter_by(store_name=name).first()
-        if existing:
+            if existing:
                 skipped += 1
                 continue
-            
+
             store = AnalyzableStore(store_name=name)
             db.session.add(store)
             added += 1
@@ -1042,7 +1042,7 @@ def analyze_orders():
         # 读取文件
         if filename_lower.endswith('.csv'):
             df = pd.read_csv(file)
-                else:
+        else:
             df = pd.read_excel(file, engine='openpyxl')
         
         # 获取列名
@@ -1135,7 +1135,7 @@ def analyze_orders():
                         product_name = parts[0]
                         try:
                             qty = int(parts[1])
-        except ValueError:
+                        except ValueError:
                             qty = 1
                     else:
                         product_name = item

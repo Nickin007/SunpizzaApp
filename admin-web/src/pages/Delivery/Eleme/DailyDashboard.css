@@ -1,0 +1,375 @@
+/* ==================== 一图看清当日运营 - 浅色现代企业风格 ==================== */
+
+.daily-dashboard {
+  background: #f5f7fa;
+  padding: 0;
+}
+
+/* ---- 仪表盘可截图区域 ---- */
+.dashboard-capture-area {
+  background: #f5f7fa;
+  padding: 24px;
+  border-radius: 12px;
+}
+
+/* ---- PNG 导出时的标题栏 ---- */
+.dashboard-export-header {
+  background: linear-gradient(135deg, #e8f4fd 0%, #f5f7fa 100%);
+  border-radius: 12px 12px 0 0;
+  padding: 20px 28px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #d6e8f7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dashboard-export-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.dashboard-export-header .header-meta {
+  font-size: 14px;
+  color: #666;
+}
+
+/* ---- 汇总卡片区 ---- */
+.summary-cards-section {
+  margin-bottom: 24px;
+}
+
+.summary-cards-section .section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 16px;
+  padding-left: 12px;
+  border-left: 4px solid #1890ff;
+}
+
+.summary-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-left: 4px solid #1890ff;
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+  height: 100%;
+}
+
+.summary-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.summary-card.green { border-left-color: #52c41a; }
+.summary-card.orange { border-left-color: #fa8c16; }
+.summary-card.purple { border-left-color: #722ed1; }
+.summary-card.red { border-left-color: #f5222d; }
+.summary-card.cyan { border-left-color: #13c2c2; }
+
+.summary-card .ant-statistic-title {
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+.summary-card .ant-statistic-content {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+/* ---- 图表卡片 ---- */
+.chart-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.chart-card .ant-card-head {
+  background: #fafbfd;
+  border-bottom: 1px solid #f0f0f0;
+  font-weight: 600;
+}
+
+.chart-card .ant-card-body {
+  padding: 16px;
+}
+
+/* ---- 热力图表格 ---- */
+.heatmap-section {
+  margin-bottom: 24px;
+}
+
+.heatmap-section .section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 16px;
+  padding-left: 12px;
+  border-left: 4px solid #fa8c16;
+}
+
+.heatmap-table-wrapper {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.heatmap-table-wrapper .ant-table-thead > tr > th {
+  background: #fafbfd !important;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+  text-align: center;
+  padding: 10px 8px;
+}
+
+.heatmap-table-wrapper .ant-table-tbody > tr > td {
+  text-align: center;
+  font-size: 13px;
+  padding: 8px 6px;
+  transition: all 0.2s;
+}
+
+.heatmap-table-wrapper .ant-table-tbody > tr:hover > td {
+  background: #e6f7ff !important;
+}
+
+.heatmap-table-wrapper .ant-table-tbody > tr.selected-row > td {
+  background: #bae7ff !important;
+  font-weight: 600;
+}
+
+.heatmap-cell {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  min-width: 48px;
+}
+
+.store-name-cell {
+  font-weight: 600;
+  color: #1890ff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.store-name-cell:hover {
+  text-decoration: underline;
+}
+
+/* ---- 单店详情面板 ---- */
+.store-detail-section {
+  margin-bottom: 24px;
+}
+
+.store-detail-section .section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 16px;
+  padding-left: 12px;
+  border-left: 4px solid #722ed1;
+}
+
+.store-detail-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  padding: 24px;
+}
+
+.radar-chart-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ---- 指标分组卡片 ---- */
+.metric-group {
+  margin-bottom: 20px;
+}
+
+.metric-group-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.metric-group-title.promo-eff { background: #fff1f0; color: #cf1322; }
+.metric-group-title.conversion { background: #fff7e6; color: #d46b08; }
+.metric-group-title.benchmark { background: #e6f7ff; color: #096dd9; }
+.metric-group-title.user-struct { background: #f6ffed; color: #389e0d; }
+.metric-group-title.ops-health { background: #f5f5f5; color: #595959; }
+.metric-group-title.basic-data { background: #f9f0ff; color: #531dab; }
+
+.metric-item {
+  background: #fafbfd;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid #f0f0f0;
+  transition: border-color 0.2s;
+}
+
+.metric-item:hover {
+  border-color: #d9d9d9;
+}
+
+.metric-item .metric-code {
+  font-weight: 700;
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 4px;
+}
+
+.metric-item .metric-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.metric-item .metric-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 2px;
+}
+
+.metric-item.highlight-good .metric-value { color: #52c41a; }
+.metric-item.highlight-bad .metric-value { color: #f5222d; }
+.metric-item.highlight-warn .metric-value { color: #fa8c16; }
+
+/* UC1 vs CT1 对比高亮 */
+.uc1-ct1-compare {
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.uc1-ct1-compare.over-threshold {
+  background: #fff1f0;
+  border-color: #ffa39e;
+}
+
+/* ---- 说明书区域 ---- */
+.dashboard-manual-section {
+  margin-top: 32px;
+}
+
+.dashboard-manual-card {
+  background: #f9fbff;
+  border: 1px solid #e6f0ff;
+  border-radius: 12px;
+}
+
+.dashboard-manual-card .ant-card-head {
+  background: #edf4ff;
+  border-bottom: 1px solid #d1e3ff;
+  border-radius: 12px 12px 0 0;
+}
+
+.manual-group-section {
+  margin-bottom: 24px;
+}
+
+.manual-group-section h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #e6f0ff;
+}
+
+.indicator-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.indicator-table th,
+.indicator-table td {
+  border: 1px solid #e8e8e8;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.indicator-table th {
+  background: #fafafa;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.indicator-table td:first-child {
+  text-align: center;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.indicator-table tr:hover td {
+  background: #f0f7ff;
+}
+
+/* ---- 导出按钮区域 ---- */
+.export-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+/* ---- PNG 导出时的底部水印 ---- */
+.dashboard-export-footer {
+  text-align: center;
+  padding: 16px 0 8px;
+  font-size: 12px;
+  color: #bfbfbf;
+  border-top: 1px solid #f0f0f0;
+  margin-top: 24px;
+}
+
+/* ---- 日期选择器区域 ---- */
+.date-selector-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding: 12px 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.date-selector-bar .date-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+/* ---- 散点图象限标签 ---- */
+.quadrant-label {
+  font-size: 11px;
+  color: #999;
+  font-style: italic;
+}
+
+/* ---- 响应式调整 ---- */
+@media (max-width: 1200px) {
+  .summary-card .ant-statistic-content {
+    font-size: 20px;
+  }
+}
