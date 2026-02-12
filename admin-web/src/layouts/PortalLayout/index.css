@@ -1,0 +1,255 @@
+/* ========== PortalLayout 通用主题布局 ========== */
+/* 所有颜色通过 CSS 变量 --portal-* 注入，由组件 props 动态设置 */
+
+/* --- 侧边栏 --- */
+.portal-sider {
+  background: linear-gradient(
+    180deg,
+    var(--portal-sider-from) 0%,
+    var(--portal-sider-to) 100%
+  ) !important;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.06);
+  border-right: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.portal-sider .ant-layout-sider-trigger {
+  background: var(--portal-primary) !important;
+  color: var(--portal-sider-from) !important;
+}
+
+/* --- Logo --- */
+.portal-logo-box {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  margin: 16px;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 2px 8px var(--portal-logo-shadow);
+  transition: all 0.3s;
+}
+
+.portal-logo-box:hover {
+  box-shadow: 0 4px 12px var(--portal-logo-shadow);
+  transform: translateY(-2px);
+}
+
+.portal-logo-large {
+  width: 100%;
+  height: auto;
+  max-height: 60px;
+  object-fit: contain;
+  transition: all 0.3s;
+}
+
+.portal-logo-small {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  transition: all 0.3s;
+}
+
+/* --- 菜单 --- */
+.portal-menu {
+  background: transparent !important;
+  border-right: none !important;
+  font-weight: 500;
+}
+
+/* 菜单项默认 */
+.portal-menu .ant-menu-item {
+  color: #333 !important;
+  margin: 4px 12px !important;
+  border-radius: 8px !important;
+  height: 48px !important;
+  line-height: 48px !important;
+  padding-left: 24px !important;
+  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) !important;
+}
+
+/* 子菜单标题 */
+.portal-menu .ant-menu-submenu-title {
+  color: #333 !important;
+  margin: 4px 12px !important;
+  border-radius: 8px !important;
+  height: 48px !important;
+  line-height: 48px !important;
+  padding-left: 24px !important;
+  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) !important;
+}
+
+/* hover */
+.portal-menu .ant-menu-item:hover,
+.portal-menu .ant-menu-submenu-title:hover {
+  background: linear-gradient(
+    135deg,
+    var(--portal-hover-from) 0%,
+    var(--portal-hover-to) 100%
+  ) !important;
+  color: var(--portal-primary) !important;
+  transform: translateX(4px);
+}
+
+/* 选中 */
+.portal-menu .ant-menu-item-selected {
+  background: linear-gradient(
+    135deg,
+    var(--portal-selected-from) 0%,
+    var(--portal-selected-to) 100%
+  ) !important;
+  color: white !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.portal-menu .ant-menu-item-selected:hover {
+  background: linear-gradient(
+    135deg,
+    var(--portal-selected-to) 0%,
+    var(--portal-primary-dark) 100%
+  ) !important;
+  transform: translateX(4px);
+}
+
+/* 菜单图标 */
+.portal-menu .ant-menu-item .anticon {
+  font-size: 18px;
+  margin-right: 12px;
+  transition: all 0.3s;
+}
+
+.portal-menu .ant-menu-item-selected .anticon {
+  color: white !important;
+}
+
+.portal-menu .ant-menu-item:hover .anticon {
+  color: var(--portal-primary) !important;
+  transform: scale(1.1);
+}
+
+.portal-menu .ant-menu-item-selected:hover .anticon {
+  color: white !important;
+}
+
+/* --- Header --- */
+.portal-header {
+  background: white;
+  padding: 0 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  height: 64px;
+  line-height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 20px 0 40px;
+  border-radius: 12px;
+}
+
+.portal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.portal-trigger {
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.portal-trigger:hover {
+  color: var(--portal-primary);
+  background-color: var(--portal-hover-from);
+}
+
+.portal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.portal-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.portal-user-info:hover {
+  background-color: #f5f5f5;
+}
+
+.portal-username {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+/* --- 右侧内容区域 --- */
+.portal-content-layout {
+  margin-right: 100px !important;
+  background: #f5f5f5 !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.portal-page-content {
+  margin: 32px 20px 32px 40px;
+  padding: 0;
+  min-height: calc(100vh - 128px);
+  max-width: none !important;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.portal-page-content > * {
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* --- 响应式 --- */
+@media (max-width: 768px) {
+  .portal-header {
+    padding: 0 16px;
+    margin: 0 16px 0 20px;
+  }
+
+  .portal-page-content {
+    margin: 16px 16px 16px 20px;
+  }
+
+  .portal-username {
+    display: none;
+  }
+
+  .portal-logo-box {
+    height: 60px;
+    margin: 12px;
+    padding: 8px;
+  }
+
+  .portal-logo-large {
+    max-height: 40px;
+  }
+
+  .portal-menu .ant-menu-item {
+    height: 42px !important;
+    line-height: 42px !important;
+    margin: 3px 8px !important;
+  }
+
+  .portal-content-layout {
+    margin-right: 0 !important;
+  }
+}
