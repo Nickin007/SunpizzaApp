@@ -103,9 +103,25 @@ export interface ProductNameMapping {
   updated_at: string;
 }
 
+export interface UnmappedOrderItem {
+  name: string;
+  qty: number;
+  is_unmapped: boolean;
+}
+
+export interface UnmappedDetail {
+  store_name: string;
+  order_text: string;
+  total_parsed: number;
+  all_items: UnmappedOrderItem[];
+}
+
 export interface UnmappedProduct {
   parsed_name: string;
   count: number;
+  stores: string[];
+  store_count: number;
+  details: UnmappedDetail[];
 }
 
 export interface ParserInfo {
@@ -113,6 +129,38 @@ export interface ParserInfo {
   filename: string;
   description: string;
 }
+
+// ==================== 一站式导入配置 API ====================
+
+export interface ImportConfigStats {
+  stores: { added: number; skipped: number; updated: number };
+  mappings: { added: number; skipped: number; updated: number };
+  recipes: { added: number; skipped: number; updated: number };
+  ingredients: { added: number; skipped: number; updated: number };
+}
+
+export interface ImportConfigResult {
+  mode: string;
+  mode_label: string;
+  processed_sheets: string[];
+  all_sheets: string[];
+  stats: ImportConfigStats;
+}
+
+export const importConfig = (file: File, mode: 'upsert' | 'replace') => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('mode', mode);
+  return request.post<{ code: number; data: ImportConfigResult; message?: string }>(
+    '/cost-analysis/import-config',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+};
 
 // ==================== 解析算法 API ====================
 
@@ -279,7 +327,7 @@ export const getUnmappedProducts = (file: File) => {
   formData.append('file', file);
   return request.post<{
     code: number;
-    data: { unmapped: UnmappedProduct[]; total_products: number; unmapped_count: number };
+    data: { unmapped: UnmappedProduct[]; total_products: number; mapped_count: number; unmapped_count: number };
     message?: string;
   }>('/cost-analysis/mappings/unmapped', formData, {
     headers: {

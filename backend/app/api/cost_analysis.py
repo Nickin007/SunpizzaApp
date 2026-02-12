@@ -17,6 +17,247 @@ import os
 import importlib.util
 
 
+# ==================== 一站式导入配置 API ====================
+
+@bp.route('/import-config', methods=['POST'])
+def import_config():
+    """一站式导入配置：上传xlsx文件，一次性导入四项配置数据"""
+    try:
+        if 'file' not in request.files:
+            return error_response('请上传Excel文件')
+
+        file = request.files['file']
+        if file.filename == '':
+            return error_response('文件名不能为空')
+
+        filename_lower = file.filename.lower() if file.filename else ''
+        if not filename_lower.endswith('.xlsx'):
+            return error_response('仅支持 .xlsx 格式文件')
+
+        mode = request.form.get('mode', 'upsert')  # upsert 或 replace
+        if mode not in ('upsert', 'replace'):
+            return error_response('无效的导入模式，请选择 upsert 或 replace')
+
+        # 读取所有sheet
+        xls = pd.ExcelFile(file, engine='openpyxl')
+        sheet_names = xls.sheet_names
+
+        stats = {
+            'stores': {'added': 0, 'skipped': 0, 'updated': 0},
+            'mappings': {'added': 0, 'skipped': 0, 'updated': 0},
+            'recipes': {'added': 0, 'skipped': 0, 'updated': 0},
+            'ingredients': {'added': 0, 'skipped': 0, 'updated': 0},
+        }
+        processed_sheets = []
+
+        # ---------- replace模式：先清空四张表 ----------
+        if mode == 'replace':
+            AnalyzableStore.query.delete()
+            ProductNameMapping.query.delete()
+            ProductRecipeCard.query.delete()
+            IngredientCost.query.delete()
+            db.session.flush()
+
+        # ---------- Sheet 1: 可分析门店 ----------
+        store_sheet = None
+        for sn in sheet_names:
+            if '门店' in sn:
+                store_sheet = sn
+                break
+
+        if store_sheet:
+            df_stores = pd.read_excel(xls, sheet_name=store_sheet)
+            # 找到包含"门店"的列
+            store_col = None
+            for col in df_stores.columns:
+                if '门店' in str(col):
+                    store_col = col
+                    break
+            if store_col is None and len(df_stores.columns) >= 1:
+                store_col = df_stores.columns[0]
+
+            if store_col is not None:
+                for _, row in df_stores.iterrows():
+                    name = str(row[store_col]).strip() if pd.notna(row[store_col]) else ''
+                    if not name:
+                        continue
+                    if mode == 'replace':
+                        db.session.add(AnalyzableStore(store_name=name))
+                        stats['stores']['added'] += 1
+        else:
+                        existing = AnalyzableStore.query.filter_by(store_name=name).first()
+                        if existing:
+                            stats['stores']['skipped'] += 1
+            else:
+                            db.session.add(AnalyzableStore(store_name=name))
+                            stats['stores']['added'] += 1
+                processed_sheets.append(store_sheet)
+
+        # ---------- Sheet 2: 单品-源商品映射 ----------
+        mapping_sheet = None
+        for sn in sheet_names:
+            if '映射' in sn or '单品' in sn:
+                mapping_sheet = sn
+                break
+
+        if mapping_sheet:
+            df_mappings = pd.read_excel(xls, sheet_name=mapping_sheet)
+            # 前两列: 解析单品名称, 映射源商品名称
+            if len(df_mappings.columns) >= 2:
+                col_parsed = df_mappings.columns[0]
+                col_source = df_mappings.columns[1]
+
+                for _, row in df_mappings.iterrows():
+                    parsed_name = str(row[col_parsed]).strip() if pd.notna(row[col_parsed]) else ''
+                    source_name = str(row[col_source]).strip() if pd.notna(row[col_source]) else ''
+                    if not parsed_name or not source_name:
+                        continue
+                    if mode == 'replace':
+                        db.session.add(ProductNameMapping(parsed_name=parsed_name, source_name=source_name))
+                        stats['mappings']['added'] += 1
+                    else:
+                        existing = ProductNameMapping.query.filter_by(parsed_name=parsed_name).first()
+                        if existing:
+                            existing.source_name = source_name
+                            stats['mappings']['updated'] += 1
+                        else:
+                            db.session.add(ProductNameMapping(parsed_name=parsed_name, source_name=source_name))
+                            stats['mappings']['added'] += 1
+                processed_sheets.append(mapping_sheet)
+
+        # ---------- Sheet 3: 源商品原料卡 ----------
+        recipe_sheet = None
+        for sn in sheet_names:
+            if '原料卡' in sn:
+                recipe_sheet = sn
+                break
+
+        if recipe_sheet:
+            df_recipes = pd.read_excel(xls, sheet_name=recipe_sheet)
+            # 第1列: 映射源商品名称; 后续每3列一组: 原料名称, 用量, 计量单位
+            if len(df_recipes.columns) >= 4:
+                product_col = df_recipes.columns[0]
+
+                for _, row in df_recipes.iterrows():
+                    product_name = str(row[product_col]).strip() if pd.notna(row[product_col]) else ''
+                    if not product_name:
+                        continue
+
+                    # 每3列一组提取原料
+                    col_idx = 1
+                    cols = list(df_recipes.columns)
+                    while col_idx + 2 < len(cols):
+                        ing_name_val = row.iloc[col_idx] if col_idx < len(row) else None
+                        ing_qty_val = row.iloc[col_idx + 1] if col_idx + 1 < len(row) else None
+                        ing_unit_val = row.iloc[col_idx + 2] if col_idx + 2 < len(row) else None
+
+                        ing_name = str(ing_name_val).strip() if pd.notna(ing_name_val) and str(ing_name_val).strip() else ''
+                        ing_unit = str(ing_unit_val).strip() if pd.notna(ing_unit_val) and str(ing_unit_val).strip() else ''
+
+                        if not ing_name or not ing_unit:
+                            col_idx += 3
+                continue
+            
+                        try:
+                            quantity = Decimal(str(ing_qty_val)) if pd.notna(ing_qty_val) else Decimal('0')
+                        except Exception:
+                            quantity = Decimal('0')
+
+                        if mode == 'replace':
+                            db.session.add(ProductRecipeCard(
+                                product_name=product_name,
+                                ingredient_name=ing_name,
+                                ingredient_unit=ing_unit,
+                                quantity=quantity
+                            ))
+                            stats['recipes']['added'] += 1
+                        else:
+                            existing = ProductRecipeCard.query.filter_by(
+                                product_name=product_name,
+                                ingredient_name=ing_name
+            ).first()
+                            if existing:
+                                existing.ingredient_unit = ing_unit
+                                existing.quantity = quantity
+                                stats['recipes']['updated'] += 1
+                            else:
+                                db.session.add(ProductRecipeCard(
+                                    product_name=product_name,
+                                    ingredient_name=ing_name,
+                                    ingredient_unit=ing_unit,
+                                    quantity=quantity
+                                ))
+                                stats['recipes']['added'] += 1
+
+                        col_idx += 3
+                processed_sheets.append(recipe_sheet)
+
+        # ---------- Sheet 4: 原料成本数据库 ----------
+        cost_sheet = None
+        for sn in sheet_names:
+            if '成本' in sn:
+                cost_sheet = sn
+                break
+
+        if cost_sheet:
+            df_costs = pd.read_excel(xls, sheet_name=cost_sheet)
+            # 三列: 原料名称, 原料计量单位, 原料单位成本
+            if len(df_costs.columns) >= 3:
+                col_name = df_costs.columns[0]
+                col_unit = df_costs.columns[1]
+                col_cost = df_costs.columns[2]
+
+                for _, row in df_costs.iterrows():
+                    ing_name = str(row[col_name]).strip() if pd.notna(row[col_name]) else ''
+                    unit = str(row[col_unit]).strip() if pd.notna(row[col_unit]) else ''
+                    if not ing_name or not unit:
+                continue
+            
+                    try:
+                        unit_cost = Decimal(str(row[col_cost])) if pd.notna(row[col_cost]) else Decimal('0')
+                    except Exception:
+                        unit_cost = Decimal('0')
+
+                    if mode == 'replace':
+                        db.session.add(IngredientCost(
+                            ingredient_name=ing_name,
+                            unit=unit,
+                            unit_cost=unit_cost
+                        ))
+                        stats['ingredients']['added'] += 1
+            else:
+                        existing = IngredientCost.query.filter_by(ingredient_name=ing_name).first()
+                        if existing:
+                            existing.unit = unit
+                            existing.unit_cost = unit_cost
+                            stats['ingredients']['updated'] += 1
+        else:
+                            db.session.add(IngredientCost(
+                                ingredient_name=ing_name,
+                                unit=unit,
+                                unit_cost=unit_cost
+                            ))
+                            stats['ingredients']['added'] += 1
+                processed_sheets.append(cost_sheet)
+
+        db.session.commit()
+
+        mode_label = '完全替换' if mode == 'replace' else '智能合并'
+        return success_response({
+            'mode': mode,
+            'mode_label': mode_label,
+            'processed_sheets': processed_sheets,
+            'all_sheets': sheet_names,
+            'stats': stats
+        }, message=f'导入成功（{mode_label}模式）')
+            
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return error_response(f'导入失败: {str(e)}')
+
+
 # ==================== 解析算法 API ====================
 
 @bp.route('/parsers', methods=['GET'])
@@ -126,7 +367,7 @@ def batch_add_stores():
                 continue
             
             existing = AnalyzableStore.query.filter_by(store_name=name).first()
-            if existing:
+        if existing:
                 skipped += 1
                 continue
             
@@ -588,11 +829,15 @@ def get_unmapped_products():
         if file.filename == '':
             return error_response('文件名不能为空')
         
-        if not file.filename.endswith('.xlsx'):
-            return error_response('请上传.xlsx格式的Excel文件')
+        filename_lower = file.filename.lower() if file.filename else ''
+        if not (filename_lower.endswith('.xlsx') or filename_lower.endswith('.csv')):
+            return error_response('请上传 .xlsx 或 .csv 格式的文件')
         
-        # 读取Excel文件
-        df = pd.read_excel(file, engine='openpyxl')
+        # 读取文件
+        if filename_lower.endswith('.csv'):
+            df = pd.read_csv(file)
+        else:
+            df = pd.read_excel(file, engine='openpyxl')
         
         # 获取列名
         columns = list(df.columns)
@@ -629,43 +874,80 @@ def get_unmapped_products():
         existing_mappings = ProductNameMapping.query.all()
         mapped_names = {m.parsed_name for m in existing_mappings}
         
-        # 解析所有单品
-        all_products = {}  # {product_name: count}
-        
-        for _, row in df_filtered.iterrows():
+        # ============================================================
+        # 第一轮：逐订单解析，收集每个未映射单品的详细来源信息
+        # ============================================================
+        # 汇总结构: {product_name: {count, stores: set(), details: list()}}
+        all_products = {}
+        # 每个订单的完整解析记录（用于详情展示，限量存储）
+        MAX_DETAILS_PER_PRODUCT = 10  # 每个未映射单品最多保留10条订单详情
+
+        for row_idx, row in df_filtered.iterrows():
             product_info = str(row[product_col]) if pd.notna(row[product_col]) else ''
+            current_store = str(row[store_col]) if pd.notna(row[store_col]) else ''
             if not product_info:
                 continue
-            
-            items = parse_order_items(product_info)
-            
-            for item in items:
+
+            # 解析整条订单
+            raw_items = parse_order_items(product_info)
+
+            # 把 raw_items 拆成 (name, qty) 列表
+            parsed_list = []
+            for item in raw_items:
                 if '_' in item:
                     parts = item.rsplit('_', 1)
-                    product_name = parts[0]
+                    pname = parts[0]
                     try:
-                        qty = int(parts[1])
+                        pqty = int(parts[1])
                     except ValueError:
-                        qty = 1
+                        pqty = 1
                 else:
-                    product_name = item
-                    qty = 1
-                
-                if product_name not in all_products:
-                    all_products[product_name] = 0
-                all_products[product_name] += qty
-        
+                    pname = item
+                    pqty = 1
+                parsed_list.append({'name': pname, 'qty': pqty, 'mapped': pname in mapped_names})
+
+            # 记录该订单里哪些是未映射的
+            unmapped_names_in_order = [p['name'] for p in parsed_list if not p['mapped']]
+
+            for p in parsed_list:
+                pname = p['name']
+                pqty = p['qty']
+
+                if pname not in all_products:
+                    all_products[pname] = {'count': 0, 'stores': set(), 'details': []}
+                all_products[pname]['count'] += pqty
+                if current_store:
+                    all_products[pname]['stores'].add(current_store)
+
+                # 对未映射的单品，保存订单级详情
+                if pname not in mapped_names and len(all_products[pname]['details']) < MAX_DETAILS_PER_PRODUCT:
+                    all_products[pname]['details'].append({
+                        'store_name': current_store,
+                        'order_text': product_info[:300],
+                        'total_parsed': len(parsed_list),
+                        'all_items': [
+                            {'name': pp['name'], 'qty': pp['qty'], 'is_unmapped': not pp['mapped']}
+                            for pp in parsed_list
+                        ],
+                    })
+
         # 筛选未映射的单品
-        unmapped = [
-            {'parsed_name': name, 'count': count}
-            for name, count in sorted(all_products.items(), key=lambda x: x[1], reverse=True)
-            if name not in mapped_names
-        ]
+        unmapped = []
+        for name, info in sorted(all_products.items(), key=lambda x: x[1]['count'], reverse=True):
+            if name not in mapped_names:
+                unmapped.append({
+                    'parsed_name': name,
+                    'count': info['count'],
+                    'stores': sorted(info['stores']),
+                    'store_count': len(info['stores']),
+                    'details': info['details'],
+                })
         
         return success_response({
             'unmapped': unmapped,
             'total_products': len(all_products),
-            'unmapped_count': len(unmapped)
+            'mapped_count': len(all_products) - len(unmapped),
+            'unmapped_count': len(unmapped),
         })
     except Exception as e:
         import traceback
@@ -686,11 +968,15 @@ def preview_orders():
         if file.filename == '':
             return error_response('文件名不能为空')
         
-        if not file.filename.endswith('.xlsx'):
-            return error_response('请上传.xlsx格式的Excel文件')
+        filename_lower = file.filename.lower() if file.filename else ''
+        if not (filename_lower.endswith('.xlsx') or filename_lower.endswith('.csv')):
+            return error_response('请上传 .xlsx 或 .csv 格式的文件')
         
-        # 读取Excel文件
-        df = pd.read_excel(file, engine='openpyxl')
+        # 读取文件
+        if filename_lower.endswith('.csv'):
+            df = pd.read_csv(file)
+        else:
+            df = pd.read_excel(file, engine='openpyxl')
         
         # 获取列名
         columns = list(df.columns)
@@ -749,11 +1035,15 @@ def analyze_orders():
         if file.filename == '':
             return error_response('文件名不能为空')
         
-        if not file.filename.endswith('.xlsx'):
-            return error_response('请上传.xlsx格式的Excel文件')
+        filename_lower = file.filename.lower() if file.filename else ''
+        if not (filename_lower.endswith('.xlsx') or filename_lower.endswith('.csv')):
+            return error_response('请上传 .xlsx 或 .csv 格式的文件')
         
-        # 读取Excel文件
-        df = pd.read_excel(file, engine='openpyxl')
+        # 读取文件
+        if filename_lower.endswith('.csv'):
+            df = pd.read_csv(file)
+                else:
+            df = pd.read_excel(file, engine='openpyxl')
         
         # 获取列名
         columns = list(df.columns)
@@ -845,7 +1135,7 @@ def analyze_orders():
                         product_name = parts[0]
                         try:
                             qty = int(parts[1])
-                        except ValueError:
+        except ValueError:
                             qty = 1
                     else:
                         product_name = item

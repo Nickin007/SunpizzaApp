@@ -20,6 +20,11 @@ import {
   Alert,
   Spin,
   Empty,
+  Collapse,
+  Typography,
+  Steps,
+  Divider,
+  Progress,
 } from 'antd';
 import {
   DollarOutlined,
@@ -34,6 +39,15 @@ import {
   SwapOutlined,
   SettingOutlined,
   DatabaseOutlined,
+  QuestionCircleOutlined,
+  InfoCircleOutlined,
+  FileExcelOutlined,
+  FilterOutlined,
+  SplitCellsOutlined,
+  LinkOutlined,
+  CalculatorOutlined,
+  FileSearchOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import type { UploadFile } from 'antd/es/upload/interface';
 import type { ColumnsType } from 'antd/es/table';
@@ -44,14 +58,19 @@ import type {
   IngredientCost,
   ProductNameMapping,
   UnmappedProduct,
+  UnmappedDetail,
   ParserInfo,
   PreviewResult,
   MatrixAnalysisResult,
+  ImportConfigResult,
 } from '../../../api/costAnalysis';
 import './CostAnalysis.css';
 
 const { TabPane } = Tabs;
 const { TextArea } = Input;
+const { Panel } = Collapse;
+const { Text, Paragraph, Title } = Typography;
+const { Step } = Steps;
 
 const ElemeCostAnalysis: React.FC = () => {
   const [activeTab, setActiveTab] = useState('analysis');
@@ -115,6 +134,19 @@ const ElemeCostAnalysis: React.FC = () => {
   const [unmappedLoading, setUnmappedLoading] = useState(false);
   const [mappingFileList, setMappingFileList] = useState<UploadFile[]>([]);
   const [selectedMappingKeys, setSelectedMappingKeys] = useState<React.Key[]>([]);
+  const [unmappedDetailVisible, setUnmappedDetailVisible] = useState(false);
+  const [unmappedDetailProduct, setUnmappedDetailProduct] = useState<UnmappedProduct | null>(null);
+  const [unmappedStats, setUnmappedStats] = useState<{ total: number; mapped: number; unmapped: number } | null>(null);
+
+  // 一站式导入状态
+  const [importMode, setImportMode] = useState<'upsert' | 'replace'>('upsert');
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<ImportConfigResult | null>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+
+  // 订单解析进度状态
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const analysisTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 加载解析算法
   useEffect(() => {
@@ -139,6 +171,35 @@ const ElemeCostAnalysis: React.FC = () => {
   }, [activeTab, configSubTab]);
 
   // ==================== 解析算法功能 ====================
+
+  // ==================== 一站式导入功能 ====================
+
+  const handleImportConfig = async () => {
+    if (!importFile) {
+      message.error('请先选择配置文件');
+      return;
+    }
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const response = await costAnalysisApi.importConfig(importFile, importMode);
+      if (response.data.code === 200) {
+        setImportResult(response.data.data);
+        message.success(response.data.message || '导入成功');
+        // 刷新所有配置数据
+        loadStores();
+        loadMappings();
+        loadRecipes();
+        loadIngredients();
+      } else {
+        message.error(response.data.message || '导入失败');
+      }
+    } catch (error: any) {
+      message.error(error.response?.data?.message || '导入失败');
+    } finally {
+      setImportLoading(false);
+    }
+  };
 
   const loadParsers = async () => {
     try {
@@ -818,7 +879,12 @@ const ElemeCostAnalysis: React.FC = () => {
       const response = await costAnalysisApi.getUnmappedProducts(file);
       if (response.data.code === 200) {
         setUnmappedProducts(response.data.data.unmapped);
-        message.success(`找到 ${response.data.data.unmapped_count} 个未映射的单品`);
+        setUnmappedStats({
+          total: response.data.data.total_products,
+          mapped: response.data.data.mapped_count,
+          unmapped: response.data.data.unmapped_count,
+        });
+        message.success(`找到 ${response.data.data.unmapped_count} 个未映射的单品（共 ${response.data.data.total_products} 种单品）`);
       } else {
         message.error(response.data.message || '获取未映射单品失败');
       }
@@ -896,29 +962,50 @@ const ElemeCostAnalysis: React.FC = () => {
 
   const unmappedColumns: ColumnsType<UnmappedProduct> = [
     {
-      title: '排名',
+      title: '#',
       key: 'rank',
-      width: 80,
+      width: 50,
       render: (_: unknown, __: UnmappedProduct, index: number) => index + 1,
     },
     {
       title: '解析单品名称',
       dataIndex: 'parsed_name',
       key: 'parsed_name',
+      ellipsis: true,
     },
     {
       title: '出现次数',
       dataIndex: 'count',
       key: 'count',
-      width: 100,
+      width: 90,
       sorter: (a, b) => a.count - b.count,
+      render: (count: number) => <Tag color="red">{count}</Tag>,
+    },
+    {
+      title: '涉及门店数',
+      dataIndex: 'store_count',
+      key: 'store_count',
+      width: 100,
+      sorter: (a, b) => a.store_count - b.store_count,
+      render: (cnt: number) => <Tag color="blue">{cnt} 家</Tag>,
     },
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 240,
       render: (_: unknown, record: UnmappedProduct) => (
         <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => {
+              setUnmappedDetailProduct(record);
+              setUnmappedDetailVisible(true);
+            }}
+          >
+            溯源详情
+          </Button>
           <Button
             type="link"
             size="small"
@@ -970,9 +1057,26 @@ const ElemeCostAnalysis: React.FC = () => {
     setAnalysisLoading(true);
     setPreviewModalVisible(false);
     setAnalysisResult(null);
+    setAnalysisProgress(0);
+
+    // 启动模拟进度条（逐步增长到90%，实际完成时跳到100%）
+    let progress = 0;
+    analysisTimerRef.current = setInterval(() => {
+      progress += Math.random() * 8 + 2; // 每次增2~10%
+      if (progress > 90) progress = 90;
+      setAnalysisProgress(Math.round(progress));
+    }, 500);
 
     try {
       const response = await costAnalysisApi.analyzeOrders(uploadedFile);
+
+      // 清除定时器，跳到95%
+      if (analysisTimerRef.current) {
+        clearInterval(analysisTimerRef.current);
+        analysisTimerRef.current = null;
+      }
+      setAnalysisProgress(95);
+
       if (response.data.code === 200) {
         const result = response.data.data;
         setAnalysisResult(result);
@@ -982,6 +1086,7 @@ const ElemeCostAnalysis: React.FC = () => {
         await downloadSourceProductExcel(result);
         await downloadIngredientExcel(result);
 
+        setAnalysisProgress(100);
         message.success('两个Excel文件已生成并下载');
       } else {
         message.error(response.data.message || '解析失败');
@@ -990,6 +1095,10 @@ const ElemeCostAnalysis: React.FC = () => {
       const err = error as { response?: { data?: { message?: string } } };
       message.error(err.response?.data?.message || '解析失败');
     } finally {
+      if (analysisTimerRef.current) {
+        clearInterval(analysisTimerRef.current);
+        analysisTimerRef.current = null;
+      }
       setAnalysisLoading(false);
     }
   };
@@ -1104,7 +1213,7 @@ const ElemeCostAnalysis: React.FC = () => {
                     />
                   </div>
                   <Upload
-                    accept=".xlsx"
+                    accept=".xlsx,.csv"
                     fileList={fileList}
                     beforeUpload={(file) => {
                       handleUploadPreview(file);
@@ -1123,13 +1232,32 @@ const ElemeCostAnalysis: React.FC = () => {
                     </Button>
                   </Upload>
                 </Space>
-                <span className="upload-tip">支持 .xlsx 格式，文件需包含"门店名称"和"商品信息"列</span>
+                <span className="upload-tip">支持 .xlsx / .csv 格式，文件需包含"门店名称"和"商品信息"列</span>
               </div>
 
               {analysisLoading && (
-                <div className="loading-section">
-                  <Spin size="large" tip="正在解析订单数据并生成报表..." />
-                </div>
+                <Card style={{ marginTop: 20, marginBottom: 20, borderRadius: 12, textAlign: 'center' }}>
+                  <Spin size="large" />
+                  <div style={{ marginTop: 16, marginBottom: 8 }}>
+                    <Text strong style={{ fontSize: 16 }}>正在解析订单数据并生成报表...</Text>
+                  </div>
+                  <div style={{ maxWidth: 500, margin: '0 auto' }}>
+                    <Progress
+                      percent={analysisProgress}
+                      status="active"
+                      strokeColor={{
+                        '0%': '#108ee9',
+                        '100%': '#87d068',
+                      }}
+                    />
+                  </div>
+                  <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+                    {analysisProgress < 30 && '读取订单文件并过滤门店...'}
+                    {analysisProgress >= 30 && analysisProgress < 60 && '解析商品信息并映射源商品...'}
+                    {analysisProgress >= 60 && analysisProgress < 90 && '计算原料消耗并生成矩阵...'}
+                    {analysisProgress >= 90 && '生成Excel文件中...'}
+                  </Text>
+                </Card>
               )}
 
               {analysisResult && (
@@ -1232,8 +1360,355 @@ const ElemeCostAnalysis: React.FC = () => {
               )}
 
               {!analysisLoading && !analysisResult && (
-                <Empty description="请上传订单Excel文件进行解析" style={{ marginTop: 100 }} />
+                <Empty description="请上传订单Excel文件进行解析" style={{ marginTop: 60, marginBottom: 40 }} />
               )}
+
+              {/* 成本分析功能使用说明书 */}
+              <div className="tutorial-section" style={{ marginTop: 32 }}>
+                <Card
+                  className="tutorial-card"
+                  title={
+                    <span className="tutorial-header">
+                      <InfoCircleOutlined style={{ marginRight: 8 }} />
+                      成本分析功能 - 完整使用说明书
+                    </span>
+                  }
+                >
+                  <div className="tutorial-content">
+                      <Title level={5}>一、功能概述</Title>
+                      <Paragraph>
+                        成本分析模块是一套完整的<Text strong>外卖订单成本核算系统</Text>。
+                        它能够将饿了么后台导出的原始订单数据，经过<Text strong>门店过滤、商品解析、名称映射、原料换算、成本计算</Text>五个步骤，
+                        最终生成每个门店的源商品销量报表和原料消耗/成本报表。
+                      </Paragraph>
+                      <Paragraph>
+                        整个系统由两大部分组成：
+                      </Paragraph>
+                      <ul className="tutorial-list">
+                        <li><Text strong>订单解析</Text>（当前页面）：上传订单Excel，选择解析算法，执行解析并下载结果</li>
+                        <li><Text strong>解析配置</Text>（第二个Tab）：维护解析所需的四个配置数据库</li>
+                      </ul>
+
+                      <Divider dashed />
+
+                      <Title level={5}>二、核心概念说明</Title>
+
+                      <Paragraph>
+                        <Text strong>2.1 数据处理流程</Text>
+                      </Paragraph>
+                      <Paragraph>
+                        系统的数据处理遵循以下流程（每一步都依赖上一步的结果）：
+                      </Paragraph>
+                      <Steps direction="vertical" size="small" current={-1} className="tutorial-steps">
+                        <Step
+                          title="第1步：上传订单Excel并过滤门店"
+                          icon={<FilterOutlined />}
+                          description={
+                            <div className="step-detail">
+                              <Paragraph>
+                                从饿了么后台导出的订单Excel中，通常包含你所有门店的订单数据。
+                                系统会根据<Text strong>「可分析门店数据库」</Text>中配置的门店名称，
+                                自动筛选出这些门店的订单，过滤掉不需要分析的门店。
+                              </Paragraph>
+                              <Paragraph>
+                                <Text type="secondary">
+                                  例如：Excel中有60家门店的数据，但「可分析门店数据库」中只配置了18家门店，
+                                  那么系统只会处理这18家门店的订单。
+                                </Text>
+                              </Paragraph>
+                            </div>
+                          }
+                        />
+                        <Step
+                          title="第2步：解析商品信息为单品"
+                          icon={<SplitCellsOutlined />}
+                          description={
+                            <div className="step-detail">
+                              <Paragraph>
+                                饿了么订单中的「商品信息」列包含复杂的商品描述字符串（如套餐、组合商品等）。
+                                系统使用你选择的<Text strong>解析算法</Text>（.py文件），
+                                将每条订单的商品信息拆解为一个个独立的<Text strong>「单品」</Text>及其数量。
+                              </Paragraph>
+                              <Paragraph>
+                                <Text type="secondary">
+                                  例如：「9英寸经典夏威夷披萨_1*29.9+可乐_2*6.0」会被拆解为：
+                                  9英寸经典夏威夷披萨 x1、可乐 x2。
+                                  系统还能处理「爆品团商品」等特殊格式。
+                                </Text>
+                              </Paragraph>
+                            </div>
+                          }
+                        />
+                        <Step
+                          title="第3步：将单品映射为源商品"
+                          icon={<LinkOutlined />}
+                          description={
+                            <div className="step-detail">
+                              <Paragraph>
+                                拆解出来的单品名称可能有多种不同的写法（如「9英寸经典夏威夷」「9寸夏威夷披萨」），
+                                但它们本质上是同一个产品。<Text strong>「源商品映射数据库」</Text>就是用来将这些不同名称
+                                统一映射到一个<Text strong>「源商品」</Text>名称。
+                              </Paragraph>
+                              <Paragraph>
+                                <Text type="secondary">
+                                  例如：「9英寸经典夏威夷」「9寸夏威夷」「夏威夷披萨9英寸」都映射到源商品「9寸经典夏威夷披萨」。
+                                  如果某个单品没有配置映射，解析结果中会以橙色标签警告提示。
+                                </Text>
+                              </Paragraph>
+                            </div>
+                          }
+                        />
+                        <Step
+                          title="第4步：根据原料卡计算原料消耗"
+                          icon={<ExperimentOutlined />}
+                          description={
+                            <div className="step-detail">
+                              <Paragraph>
+                                每个源商品在<Text strong>「源商品原料卡」</Text>中配置了其制作所需的各项原料及用量。
+                                系统会根据每个门店卖出的源商品数量，乘以原料卡中的用量，
+                                计算出每个门店每种原料的总消耗量。
+                              </Paragraph>
+                              <Paragraph>
+                                <Text type="secondary">
+                                  例如：源商品「9寸经典夏威夷披萨」的原料卡配置了：面团200g、芝士80g、菠萝50g、火腿40g。
+                                  如果某门店卖了10个，那么面团消耗 = 200g x 10 = 2000g。
+                                  如果某个源商品没有配置原料卡，解析结果中会以蓝色标签警告提示。
+                                </Text>
+                              </Paragraph>
+                            </div>
+                          }
+                        />
+                        <Step
+                          title="第5步：计算原料成本"
+                          icon={<CalculatorOutlined />}
+                          description={
+                            <div className="step-detail">
+                              <Paragraph>
+                                <Text strong>「原料成本数据库」</Text>中配置了每种原料的单位成本。
+                                系统将每种原料的消耗量乘以单位成本，得到每个门店每种原料的消耗成本，
+                                以及每个源商品的单位成本。
+                              </Paragraph>
+                              <Paragraph>
+                                <Text type="secondary">
+                                  例如：面团单价 0.008元/g，某门店面团消耗 2000g，则面团成本 = 0.008 x 2000 = 16元。
+                                </Text>
+                              </Paragraph>
+                            </div>
+                          }
+                        />
+                      </Steps>
+
+                      <Divider dashed />
+
+                      <Title level={5}>三、解析配置 - 四个数据库详解</Title>
+
+                      <Paragraph>
+                        在进行订单解析之前，你需要在「解析配置」Tab中维护以下四个数据库。
+                        这些数据会<Text strong>持久化存储在服务器</Text>中，配置一次后可反复使用。
+                      </Paragraph>
+
+                      <Paragraph>
+                        <Text strong>3.1 可分析门店数据库</Text>
+                        <Tag color="blue" style={{ marginLeft: 8 }}>必配</Tag>
+                      </Paragraph>
+                      <ul className="tutorial-list">
+                        <li><Text strong>作用</Text>：定义哪些门店参与成本分析。只有在此数据库中的门店，其订单才会被处理</li>
+                        <li><Text strong>字段</Text>：门店名称（必须与Excel中的「门店名称」列<Text type="danger">完全一致</Text>）</li>
+                        <li><Text strong>操作</Text>：支持单个添加、批量添加（每行一个门店名称）、单个删除、批量删除</li>
+                        <li><Text type="secondary">提示：门店名称一定要和饿了么后台的门店名称完全匹配，包括标点符号和括号类型（中文/英文括号）</Text></li>
+                      </ul>
+
+                      <Paragraph>
+                        <Text strong>3.2 源商品映射数据库</Text>
+                        <Tag color="blue" style={{ marginLeft: 8 }}>必配</Tag>
+                      </Paragraph>
+                      <ul className="tutorial-list">
+                        <li><Text strong>作用</Text>：将解析出来的各种单品名称统一映射到标准的「源商品」名称</li>
+                        <li><Text strong>字段</Text>：单品名称（原始名称） → 源商品名称（标准名称）</li>
+                        <li><Text strong>操作</Text>：支持单个添加、批量添加（每行格式：单品名称,源商品名称）、单个删除、批量删除</li>
+                        <li><Text type="secondary">提示：可以先上传一次订单Excel进行试解析，系统会在结果中用橙色标签列出所有「未映射的单品」，根据这些提示来添加映射关系</Text></li>
+                      </ul>
+
+                      <Paragraph>
+                        <Text strong>3.3 源商品原料卡</Text>
+                        <Tag color="green" style={{ marginLeft: 8 }}>按需配置</Tag>
+                      </Paragraph>
+                      <ul className="tutorial-list">
+                        <li><Text strong>作用</Text>：定义每个源商品的制作原料清单，包括每种原料的名称、用量和计量单位</li>
+                        <li><Text strong>字段</Text>：源商品名称、原料名称、原料用量、原料计量单位</li>
+                        <li><Text strong>操作</Text>：
+                          <ul>
+                            <li>单个添加：逐条添加原料记录</li>
+                            <li>批量添加：格式为「源商品名称,原料1名称,原料1用量,原料1单位,原料2名称,原料2用量,原料2单位,...」。字段数必须满足 3n+1（1个商品名 + n组原料，每组3个字段）</li>
+                            <li>支持单个删除和批量删除</li>
+                          </ul>
+                        </li>
+                        <li><Text type="secondary">提示：如果不配置某个源商品的原料卡，该商品在「原料数据」报表中不会体现，但仍会出现在「源商品数据」报表中。系统会以蓝色标签提示未配置原料卡的源商品</Text></li>
+                      </ul>
+
+                      <Paragraph>
+                        <Text strong>3.4 原料成本数据库</Text>
+                        <Tag color="green" style={{ marginLeft: 8 }}>按需配置</Tag>
+                      </Paragraph>
+                      <ul className="tutorial-list">
+                        <li><Text strong>作用</Text>：定义每种原料的单位成本，用于计算原料消耗的金额</li>
+                        <li><Text strong>字段</Text>：原料名称、原料计量单位、原料单位成本</li>
+                        <li><Text strong>操作</Text>：支持单个添加、批量添加（每行格式：原料名称,计量单位,单位成本）、单个删除、批量删除</li>
+                        <li><Text type="secondary">提示：原料名称和计量单位需要与「源商品原料卡」中的保持一致</Text></li>
+                      </ul>
+
+                      <Divider dashed />
+
+                      <Title level={5}>四、操作步骤（快速上手）</Title>
+
+                      <Paragraph>
+                        <Text strong>首次使用时</Text>，按以下顺序配置（后续只需要在新增商品时更新即可）：
+                      </Paragraph>
+                      <Steps direction="vertical" size="small" current={-1} className="tutorial-steps">
+                        <Step
+                          title="步骤1：配置可分析门店"
+                          icon={<ShopOutlined />}
+                          description={
+                            <div className="step-detail">
+                              <Paragraph>
+                                进入「解析配置」→「可分析门店数据库」，将你需要做成本分析的门店名称逐个或批量添加。
+                                门店名称必须与饿了么后台导出的Excel中的名称<Text type="danger">完全一致</Text>。
+                              </Paragraph>
+                            </div>
+                          }
+                        />
+                        <Step
+                          title="步骤2：试运行一次订单解析"
+                          icon={<FileSearchOutlined />}
+                          description={
+                            <div className="step-detail">
+                              <Paragraph>
+                                回到「订单解析」页面，选择解析算法，上传一份订单Excel，点击确认解析。
+                                查看结果中橙色和蓝色的警告标签，这些标签会告诉你哪些单品还没有配置映射、哪些源商品还没有配置原料卡。
+                              </Paragraph>
+                            </div>
+                          }
+                        />
+                        <Step
+                          title="步骤3：配置源商品映射"
+                          icon={<SwapOutlined />}
+                          description={
+                            <div className="step-detail">
+                              <Paragraph>
+                                根据步骤2的橙色警告，进入「解析配置」→「源商品映射数据库」，
+                                将所有未映射的单品名称映射到对应的源商品名称。同一个源商品可能对应多个不同的单品名称。
+                              </Paragraph>
+                            </div>
+                          }
+                        />
+                        <Step
+                          title="步骤4：配置源商品原料卡"
+                          icon={<AccountBookOutlined />}
+                          description={
+                            <div className="step-detail">
+                              <Paragraph>
+                                进入「解析配置」→「源商品原料卡」，为每个源商品配置其制作所需的原料清单。
+                                可以使用批量添加功能，格式为：源商品名称,原料1名称,原料1用量,原料1单位,...
+                              </Paragraph>
+                            </div>
+                          }
+                        />
+                        <Step
+                          title="步骤5：配置原料成本"
+                          icon={<DollarOutlined />}
+                          description={
+                            <div className="step-detail">
+                              <Paragraph>
+                                进入「解析配置」→「原料成本数据库」，为每种原料设置单位成本。
+                                可以使用批量添加功能，格式为：原料名称,计量单位,单位成本。
+                              </Paragraph>
+                            </div>
+                          }
+                        />
+                        <Step
+                          title="步骤6：正式解析并下载报表"
+                          icon={<DownloadOutlined />}
+                          description={
+                            <div className="step-detail">
+                              <Paragraph>
+                                回到「订单解析」页面，重新上传订单Excel并确认解析。
+                                解析完成后，点击「下载源商品数据」和「下载原料数据」获取报表。
+                              </Paragraph>
+                            </div>
+                          }
+                        />
+                      </Steps>
+
+                      <Divider dashed />
+
+                      <Title level={5}>五、输出报表说明</Title>
+
+                      <Paragraph>
+                        解析完成后可以下载两个Excel报表，共包含四个子表：
+                      </Paragraph>
+
+                      <Paragraph>
+                        <Text strong>5.1 源商品数据.xlsx</Text>
+                      </Paragraph>
+                      <ul className="tutorial-list">
+                        <li>
+                          <Tag color="purple">Sheet1: 源商品销量</Tag> — 矩阵表格，行为各源商品名称，列为各门店名称。
+                          单元格数值表示该门店在上传周期内卖出了多少份该源商品
+                        </li>
+                        <li>
+                          <Tag color="purple">Sheet2: 源商品成本</Tag> — 同样的矩阵结构。
+                          单元格数值表示该门店在该源商品上消耗的原料总成本（元）。
+                          计算方式：源商品数量 x 该源商品所有原料的（单位用量 x 原料单位成本）之和
+                        </li>
+                      </ul>
+
+                      <Paragraph>
+                        <Text strong>5.2 原料数据.xlsx</Text>
+                      </Paragraph>
+                      <ul className="tutorial-list">
+                        <li>
+                          <Tag color="cyan">Sheet1: 原料消耗量</Tag> — 矩阵表格，行为各原料名称，列为各门店名称。
+                          单元格数值表示该门店在上传周期内消耗了多少该原料（按原料卡中的计量单位）
+                        </li>
+                        <li>
+                          <Tag color="cyan">Sheet2: 原料成本</Tag> — 同样的矩阵结构。
+                          单元格数值表示该门店在该原料上的成本花费（元）。
+                          计算方式：原料消耗量 x 原料单位成本
+                        </li>
+                      </ul>
+
+                      <Divider dashed />
+
+                      <Title level={5}>六、常见问题与注意事项</Title>
+                      <ul className="tutorial-list">
+                        <li>
+                          <Text strong>Q: 上传的Excel文件有什么要求？</Text><br />
+                          <Text type="secondary">A: 必须是饿了么后台导出的 .xlsx 或 .csv 格式订单文件，至少包含「门店名称」和「商品信息」两列。</Text>
+                        </li>
+                        <li>
+                          <Text strong>Q: 为什么解析后出现很多橙色/蓝色警告标签？</Text><br />
+                          <Text type="secondary">A: 橙色标签表示有单品尚未配置「源商品映射」，蓝色标签表示有源商品尚未配置「原料卡」。这属于正常现象，根据提示逐步完善配置数据库即可。随着配置越来越完整，警告会越来越少。</Text>
+                        </li>
+                        <li>
+                          <Text strong>Q: 修改了配置数据库后需要重新上传Excel吗？</Text><br />
+                          <Text type="secondary">A: 是的。每次修改了映射、原料卡或原料成本后，需要重新上传Excel文件进行解析，才能看到更新后的结果。配置数据库的修改是即时生效的。</Text>
+                        </li>
+                        <li>
+                          <Text strong>Q: 解析算法可以自定义吗？</Text><br />
+                          <Text type="secondary">A: 可以。解析算法是后端 backend/app/utils/ 目录下包含 parse_order_items 函数的 .py 文件。新增一个符合规范的 .py 文件后，前端下拉菜单会自动显示新的算法选项。</Text>
+                        </li>
+                        <li>
+                          <Text strong>Q: 数据会一直保存吗？</Text><br />
+                          <Text type="secondary">A: 四个配置数据库（可分析门店、源商品映射、源商品原料卡、原料成本）的数据持久存储在服务器数据库中，不会丢失。但上传的订单Excel文件和解析结果不会存储，刷新页面后需要重新上传。</Text>
+                        </li>
+                        <li>
+                          <Text strong>Q: 支持批量操作吗？</Text><br />
+                          <Text type="secondary">A: 四个配置数据库均支持批量添加和批量删除。批量添加时在文本框中按指定格式粘贴多行数据；批量删除时先勾选表格行再点击「批量删除」按钮。</Text>
+                        </li>
+                      </ul>
+                    </div>
+                </Card>
+              </div>
             </div>
           </TabPane>
 
@@ -1247,6 +1722,132 @@ const ElemeCostAnalysis: React.FC = () => {
             }
             key="config"
           >
+            {/* 一站式导入配置卡片 */}
+            <Card
+              style={{
+                marginBottom: 20,
+                borderRadius: 12,
+                border: '1px solid #fa8c16',
+                background: 'linear-gradient(135deg, #fff7e6 0%, #fff2e8 100%)',
+              }}
+            >
+              <Row gutter={24} align="middle">
+                <Col flex="auto">
+                  <Title level={5} style={{ margin: 0, color: '#d46b08' }}>
+                    <FileExcelOutlined style={{ marginRight: 8 }} />
+                    一站式导入配置
+                  </Title>
+                  <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
+                    上传 .xlsx 配置文件，一次性导入全部四项配置（可分析门店、源商品映射、源商品原料卡、原料成本）
+                  </Text>
+                </Col>
+                <Col>
+                  <Space size="middle">
+                    <Select
+                      value={importMode}
+                      onChange={(v) => setImportMode(v)}
+                      style={{ width: 200 }}
+                      options={[
+                        { value: 'upsert', label: '智能合并（保留旧数据）' },
+                        { value: 'replace', label: '完全替换（清空后导入）' },
+                      ]}
+                    />
+                    <Upload
+                      accept=".xlsx"
+                      showUploadList={false}
+                      beforeUpload={(file) => {
+                        setImportFile(file);
+                        setImportResult(null);
+                        return false;
+                      }}
+                    >
+                      <Button icon={<UploadOutlined />}>
+                        选择配置文件
+                      </Button>
+                    </Upload>
+                    <Button
+                      type="primary"
+                      onClick={handleImportConfig}
+                      loading={importLoading}
+                      disabled={!importFile}
+                      style={{ background: '#fa8c16', borderColor: '#fa8c16' }}
+                    >
+                      {importLoading ? '导入中...' : '确认导入'}
+                    </Button>
+                  </Space>
+                </Col>
+              </Row>
+              {importFile && !importResult && !importLoading && (
+                <div style={{ marginTop: 12 }}>
+                  <Tag icon={<FileExcelOutlined />} color="orange" closable onClose={() => setImportFile(null)}>
+                    {importFile.name}（{(importFile.size / 1024).toFixed(1)} KB）
+                  </Tag>
+                </div>
+              )}
+
+              {importResult && (
+                <div style={{ marginTop: 16, padding: 16, background: '#fff', borderRadius: 8 }}>
+                  <Alert
+                    message={`导入完成（${importResult.mode_label}模式）`}
+                    description={`已处理 ${importResult.processed_sheets.length} 个工作表: ${importResult.processed_sheets.join('、')}`}
+                    type="success"
+                    showIcon
+                    style={{ marginBottom: 12 }}
+                  />
+                  <Row gutter={16}>
+                    <Col span={6}>
+                      <Card size="small" style={{ textAlign: 'center', borderColor: '#91d5ff' }}>
+                        <Statistic
+                          title="可分析门店"
+                          value={importResult.stats.stores.added}
+                          suffix={importResult.mode === 'upsert'
+                            ? `新增 / ${importResult.stats.stores.skipped} 跳过`
+                            : '条'}
+                          valueStyle={{ color: '#1890ff', fontSize: 20 }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col span={6}>
+                      <Card size="small" style={{ textAlign: 'center', borderColor: '#b7eb8f' }}>
+                        <Statistic
+                          title="源商品映射"
+                          value={importResult.stats.mappings.added}
+                          suffix={importResult.mode === 'upsert'
+                            ? `新增 / ${importResult.stats.mappings.updated} 更新`
+                            : '条'}
+                          valueStyle={{ color: '#52c41a', fontSize: 20 }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col span={6}>
+                      <Card size="small" style={{ textAlign: 'center', borderColor: '#ffd591' }}>
+                        <Statistic
+                          title="源商品原料卡"
+                          value={importResult.stats.recipes.added}
+                          suffix={importResult.mode === 'upsert'
+                            ? `新增 / ${importResult.stats.recipes.updated} 更新`
+                            : '条'}
+                          valueStyle={{ color: '#fa8c16', fontSize: 20 }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col span={6}>
+                      <Card size="small" style={{ textAlign: 'center', borderColor: '#ffccc7' }}>
+                        <Statistic
+                          title="原料成本"
+                          value={importResult.stats.ingredients.added}
+                          suffix={importResult.mode === 'upsert'
+                            ? `新增 / ${importResult.stats.ingredients.updated} 更新`
+                            : '条'}
+                          valueStyle={{ color: '#f5222d', fontSize: 20 }}
+                        />
+                      </Card>
+                    </Col>
+                  </Row>
+                </div>
+              )}
+            </Card>
+
             <Tabs activeKey={configSubTab} onChange={setConfigSubTab} type="card" className="config-sub-tabs">
               {/* 可分析门店数据库 */}
               <TabPane
@@ -1314,9 +1915,8 @@ const ElemeCostAnalysis: React.FC = () => {
                     style={{ marginBottom: 16 }}
                   />
 
-                  <Row gutter={16}>
-                    <Col span={14}>
-                      <Card title="映射列表" size="small">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <Card title="映射列表" size="small">
                         <div className="tab-toolbar">
                           <Space>
                             <Button
@@ -1367,13 +1967,11 @@ const ElemeCostAnalysis: React.FC = () => {
                           }}
                         />
                       </Card>
-                    </Col>
 
-                    <Col span={10}>
-                      <Card title="未映射单品" size="small">
+                    <Card title="未映射单品" size="small">
                         <div className="upload-section" style={{ marginBottom: 16 }}>
                           <Upload
-                            accept=".xlsx"
+                            accept=".xlsx,.csv"
                             fileList={mappingFileList}
                             beforeUpload={(file) => {
                               handleGetUnmapped(file);
@@ -1391,6 +1989,29 @@ const ElemeCostAnalysis: React.FC = () => {
                             </Button>
                           </Upload>
                         </div>
+                        {unmappedStats && (
+                          <div style={{
+                            display: 'flex',
+                            gap: 16,
+                            marginBottom: 12,
+                            padding: '10px 16px',
+                            background: '#fafafa',
+                            borderRadius: 8,
+                          }}>
+                            <Statistic title="解析单品总数" value={unmappedStats.total} valueStyle={{ fontSize: 18 }} />
+                            <Statistic title="已映射" value={unmappedStats.mapped} valueStyle={{ fontSize: 18, color: '#52c41a' }} />
+                            <Statistic title="未映射" value={unmappedStats.unmapped} valueStyle={{ fontSize: 18, color: '#cf1322' }} />
+                            <Statistic
+                              title="映射覆盖率"
+                              value={unmappedStats.total > 0 ? ((unmappedStats.mapped / unmappedStats.total) * 100).toFixed(1) : 0}
+                              suffix="%"
+                              valueStyle={{
+                                fontSize: 18,
+                                color: unmappedStats.total > 0 && (unmappedStats.mapped / unmappedStats.total) >= 0.9 ? '#52c41a' : '#fa8c16',
+                              }}
+                            />
+                          </div>
+                        )}
                         {unmappedProducts.length > 0 ? (
                           <Table
                             columns={unmappedColumns}
@@ -1398,14 +2019,13 @@ const ElemeCostAnalysis: React.FC = () => {
                             rowKey="parsed_name"
                             pagination={{ pageSize: 10 }}
                             size="small"
-                            scroll={{ y: 400 }}
+                            scroll={{ x: 900, y: 400 }}
                           />
                         ) : (
                           <Empty description="上传订单Excel以查找未映射的单品" />
                         )}
                       </Card>
-                    </Col>
-                  </Row>
+                  </div>
                 </div>
               </TabPane>
 
@@ -1887,6 +2507,131 @@ const ElemeCostAnalysis: React.FC = () => {
             </div>
           )}
         </Modal>
+
+        {/* 未映射单品溯源详情弹窗 */}
+        <Modal
+          title={null}
+          open={unmappedDetailVisible}
+          onCancel={() => { setUnmappedDetailVisible(false); setUnmappedDetailProduct(null); }}
+          width={1100}
+          footer={[
+            <Button key="add" type="primary" onClick={() => {
+              if (unmappedDetailProduct) {
+                mappingForm.setFieldsValue({ parsed_name: unmappedDetailProduct.parsed_name });
+                setAddMappingModalVisible(true);
+              }
+            }}>
+              添加映射
+            </Button>,
+            <Button key="quick" onClick={() => {
+              if (unmappedDetailProduct) {
+                handleQuickAddMapping(unmappedDetailProduct.parsed_name);
+                setUnmappedDetailVisible(false);
+                setUnmappedDetailProduct(null);
+              }
+            }}>
+              快速添加（同名映射）
+            </Button>,
+            <Button key="close" onClick={() => { setUnmappedDetailVisible(false); setUnmappedDetailProduct(null); }}>
+              关闭
+            </Button>,
+          ]}
+        >
+          {unmappedDetailProduct && (
+            <div>
+              {/* 顶部汇总卡片 */}
+              <div style={{
+                background: 'linear-gradient(135deg, #fff1f0, #fff7e6)',
+                borderRadius: 12,
+                padding: '20px 24px',
+                marginBottom: 20,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <Tag color="red" style={{ fontSize: 16, padding: '4px 12px', lineHeight: '24px' }}>未映射</Tag>
+                  <Text strong style={{ fontSize: 20 }}>{unmappedDetailProduct.parsed_name}</Text>
+                </div>
+                <Row gutter={24}>
+                  <Col span={8}>
+                    <Statistic title="总出现次数" value={unmappedDetailProduct.count} valueStyle={{ color: '#cf1322' }} />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic title="涉及门店数" value={unmappedDetailProduct.store_count} suffix="家" valueStyle={{ color: '#1890ff' }} />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic title="订单样本数" value={unmappedDetailProduct.details.length} suffix={`条${unmappedDetailProduct.details.length >= 10 ? '（上限）' : ''}`} valueStyle={{ color: '#722ed1' }} />
+                  </Col>
+                </Row>
+                <div style={{ marginTop: 12 }}>
+                  <Text type="secondary">涉及门店：</Text>
+                  <div style={{ marginTop: 4 }}>
+                    {unmappedDetailProduct.stores.map((s, i) => (
+                      <Tag key={i} color="blue" style={{ marginBottom: 4 }}>{s}</Tag>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 订单级详情列表 */}
+              <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+                {unmappedDetailProduct.details.map((detail: UnmappedDetail, idx: number) => (
+                  <Card
+                    key={idx}
+                    size="small"
+                    style={{ marginBottom: 12, borderRadius: 8, borderLeft: '4px solid #1890ff' }}
+                    title={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Tag color="blue">{detail.store_name}</Tag>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          订单拆解为 <Text strong style={{ color: '#fa8c16' }}>{detail.total_parsed}</Text> 项
+                        </Text>
+                      </div>
+                    }
+                  >
+                    {/* 原始订单文本 */}
+                    <div style={{
+                      background: '#fafafa',
+                      borderRadius: 6,
+                      padding: '8px 12px',
+                      marginBottom: 10,
+                      fontSize: 12,
+                      color: '#595959',
+                      wordBreak: 'break-all',
+                      maxHeight: 60,
+                      overflowY: 'auto',
+                      border: '1px dashed #d9d9d9',
+                    }}>
+                      <Text type="secondary" style={{ fontSize: 11 }}>原始商品信息：</Text>
+                      <br />
+                      {detail.order_text}
+                    </div>
+
+                    {/* 拆解结果 */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {detail.all_items.map((item, iIdx) => (
+                        <Tag
+                          key={iIdx}
+                          color={item.is_unmapped ? 'red' : 'green'}
+                          style={{
+                            fontSize: 13,
+                            padding: '2px 10px',
+                            borderStyle: item.name === unmappedDetailProduct.parsed_name ? 'solid' : undefined,
+                            borderWidth: item.name === unmappedDetailProduct.parsed_name ? 2 : undefined,
+                            borderColor: item.name === unmappedDetailProduct.parsed_name ? '#ff4d4f' : undefined,
+                            fontWeight: item.name === unmappedDetailProduct.parsed_name ? 700 : 400,
+                          }}
+                        >
+                          {item.is_unmapped ? '⚠ ' : '✓ '}
+                          {item.name} ×{item.qty}
+                        </Tag>
+                      ))}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+        </Modal>
+
       </Card>
     </div>
   );

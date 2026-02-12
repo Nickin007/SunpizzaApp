@@ -179,6 +179,72 @@
   border-radius: 8px;
 }
 
+/* 使用说明书样式 */
+.cost-analysis .tutorial-section {
+  margin-top: 32px;
+}
+
+.cost-analysis .tutorial-header {
+  font-size: 15px;
+  font-weight: 500;
+  color: #1890ff;
+}
+
+.cost-analysis .tutorial-content {
+  padding: 8px 16px;
+  line-height: 1.8;
+}
+
+.cost-analysis .tutorial-content .ant-typography h5 {
+  color: #333;
+  margin-top: 8px;
+}
+
+.cost-analysis .tutorial-steps {
+  margin: 16px 0;
+}
+
+.cost-analysis .tutorial-steps .ant-steps-item-description {
+  max-width: 100% !important;
+}
+
+.cost-analysis .step-detail {
+  padding: 8px 0;
+  color: #555;
+}
+
+.cost-analysis .step-detail .ant-typography {
+  margin-bottom: 8px;
+  color: #555;
+}
+
+.cost-analysis .tutorial-list {
+  padding-left: 20px;
+  margin: 8px 0;
+  line-height: 2;
+}
+
+.cost-analysis .tutorial-list li {
+  color: #555;
+}
+
+.cost-analysis .tutorial-list ul {
+  padding-left: 20px;
+  margin: 4px 0;
+}
+
+.cost-analysis .tutorial-card {
+  background: #f9fbff;
+  border: 1px solid #e6f0ff;
+  border-radius: 8px;
+}
+
+.cost-analysis .tutorial-card .ant-card-head {
+  background: #edf4ff;
+  border-bottom: 1px solid #d1e3ff;
+  border-radius: 8px 8px 0 0;
+}
+
 /* 响应式布局 */
 @media (max-width: 1200px) {
   .result-section .ant-col {

@@ -24,8 +24,8 @@ const Login: React.FC = () => {
       setAuth(token, user);
       message.success('登录成功！');
       
-      // 所有用户都跳转到外卖运营系统
-      navigate('/delivery/welcome');
+      // 登录后跳转到门户选择页
+      navigate('/portal-select');
     } catch (error: any) {
       console.error('❌ 登录失败：', error);
       console.error('错误详情:', error.response);
@@ -45,9 +45,9 @@ const Login: React.FC = () => {
               <img src={logoImage} alt="圣比萨 SUN PIZZA" />
             </div>
             <h1 className="brand-title">圣比萨</h1>
-            <h3 className="brand-subtitle">外卖运营系统</h3>
+            <h3 className="brand-subtitle">数字化管理平台</h3>
             <p className="brand-description">
-              饿了么、美团数据分析与门店运营管理
+              外卖运营、供应链、财务、抖音/小程序一站式管理
             </p>
             <div className="features">
               <div className="feature-item">

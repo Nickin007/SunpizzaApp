@@ -11,7 +11,7 @@ class User(db.Model):
     username = db.Column(db.String(50), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     real_name = db.Column(db.String(50), nullable=False)
-    role = db.Column(db.Enum('admin', 'regional_manager', 'shop_manager', 'delivery_operation', name='user_role'), nullable=False)
+    role = db.Column(db.Enum('admin', 'delivery_operation', 'SupplyChain_operation', 'Accouting_operation', 'DouyinANDOffline_operation', name='user_role'), nullable=False)
     shop_id = db.Column(db.Integer, nullable=True)  # 保留字段但移除外键约束
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     

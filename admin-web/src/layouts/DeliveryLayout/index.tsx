@@ -6,11 +6,10 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  BarChartOutlined,
-  DollarOutlined,
   EnvironmentOutlined,
   CompassOutlined,
   FileExcelOutlined,
+  HomeOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -42,26 +41,9 @@ const DeliveryLayout: React.FC = () => {
       label: '饿了么',
       children: [
         {
-          key: '/delivery/eleme/cost-analysis',
-          icon: <DollarOutlined />,
-          label: '成本分析',
-        },
-        {
           key: '/delivery/eleme/excel-toolkit',
           icon: <FileExcelOutlined />,
           label: '数据分析库',
-        },
-      ],
-    },
-    {
-      key: 'meituan',
-      icon: <BarChartOutlined />,
-      label: '美团外卖',
-      children: [
-        {
-          key: '/delivery/meituan/cost-analysis',
-          icon: <DollarOutlined />,
-          label: '成本分析',
         },
       ],
     },
@@ -81,6 +63,12 @@ const DeliveryLayout: React.FC = () => {
   };
 
   const userMenuItems = [
+    {
+      key: 'portal',
+      icon: <HomeOutlined />,
+      label: '返回工作台',
+      onClick: () => navigate('/portal-select'),
+    },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
