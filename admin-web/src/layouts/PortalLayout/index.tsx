@@ -11,6 +11,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import logoImage from '../../assets/logo.png';
 import type { ItemType } from 'antd/es/menu/interface';
+import ChatDrawer from '../../components/ChatDrawer';
 import './index.css';
 
 const { Header, Sider, Content } = Layout;
@@ -186,6 +187,7 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({ title, theme, menuItems }) 
           <Outlet />
         </Content>
       </Layout>
+      <ChatDrawer />
     </Layout>
   );
 };

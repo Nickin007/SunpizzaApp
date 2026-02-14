@@ -14,6 +14,7 @@ import {
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import logoImage from '../../assets/logo.png';
+import ChatDrawer from '../../components/ChatDrawer';
 import './index.css';
 
 const { Header, Sider, Content } = Layout;
@@ -128,6 +129,7 @@ const DeliveryLayout: React.FC = () => {
           <Outlet />
         </Content>
       </Layout>
+      <ChatDrawer />
     </Layout>
   );
 };

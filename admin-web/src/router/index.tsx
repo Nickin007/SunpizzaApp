@@ -10,8 +10,15 @@ import UserManagement from '../pages/Admin/UserManagement';
 import ElemeSiteSelection from '../pages/Delivery/Eleme/SiteSelectionV2';
 import ElemeCostAnalysis from '../pages/Delivery/Eleme/CostAnalysis';
 import ElemeExcelToolkit from '../pages/Delivery/Eleme/ExcelToolkit';
-// 美团外卖页面
+// 美团外卖页面（占位）
 import MeituanCostAnalysis from '../pages/Delivery/Meituan/CostAnalysis';
+// 财务后台页面
+import AccountingCostAnalysis from '../pages/Accounting/CostAnalysis';
+import AccountingBooks from '../pages/Accounting/Books';
+import AccountingSubjects from '../pages/Accounting/Subjects';
+import AccountingVoucherForm from '../pages/Accounting/VoucherForm';
+import AccountingVoucherList from '../pages/Accounting/VoucherList';
+import AccountingWelcome from '../pages/Accounting/Welcome';
 import { useAuthStore } from '../store/authStore';
 // 图标
 import {
@@ -24,9 +31,12 @@ import {
   VideoCameraOutlined,
   AppstoreOutlined,
   ShopOutlined,
-  CompassOutlined,
-  BarChartOutlined,
   DollarOutlined,
+  SettingOutlined,
+  BookOutlined,
+  FormOutlined,
+  AuditOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 
 // 路由守卫 - 检查是否登录
@@ -70,38 +80,20 @@ const accountingMenu = [
     label: '首页',
   },
   {
-    key: 'eleme',
-    icon: <CompassOutlined />,
-    label: '饿了么',
+    key: 'finance-module',
+    icon: <BookOutlined />,
+    label: '财务模块',
     children: [
-      {
-        key: '/accounting/eleme/cost-analysis',
-        icon: <DollarOutlined />,
-        label: '成本分析',
-      },
+      { key: '/accounting/books', icon: <BookOutlined />, label: '账套管理' },
+      { key: '/accounting/subjects', icon: <DatabaseOutlined />, label: '科目管理' },
+      { key: '/accounting/voucher/new', icon: <FormOutlined />, label: '凭证录入' },
+      { key: '/accounting/vouchers', icon: <SearchOutlined />, label: '凭证查询' },
     ],
   },
   {
-    key: 'meituan',
-    icon: <BarChartOutlined />,
-    label: '美团外卖',
-    children: [
-      {
-        key: '/accounting/meituan/cost-analysis',
-        icon: <DollarOutlined />,
-        label: '成本分析',
-      },
-    ],
-  },
-  {
-    key: '/accounting/reports',
-    icon: <FileTextOutlined />,
-    label: '财务报表',
-  },
-  {
-    key: '/accounting/transactions',
-    icon: <TransactionOutlined />,
-    label: '收支管理',
+    key: '/accounting/cost-analysis',
+    icon: <DollarOutlined />,
+    label: '成本分析',
   },
 ];
 
@@ -201,18 +193,14 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/accounting/welcome" replace /> },
       {
         path: 'welcome',
-        element: <PlaceholderPage title="财务数字化后台" description="财务报表、收支管理、成本核算" color="#fa8c16" />,
+        element: <AccountingWelcome />,
       },
-      { path: 'eleme/cost-analysis', element: <ElemeCostAnalysis /> },
-      { path: 'meituan/cost-analysis', element: <MeituanCostAnalysis /> },
-      {
-        path: 'reports',
-        element: <PlaceholderPage title="财务报表" description="收入报表、支出报表、利润分析" color="#fa8c16" />,
-      },
-      {
-        path: 'transactions',
-        element: <PlaceholderPage title="收支管理" description="日常收支记录、账目管理" color="#fa8c16" />,
-      },
+      { path: 'books', element: <AccountingBooks /> },
+      { path: 'subjects', element: <AccountingSubjects /> },
+      { path: 'voucher/new', element: <AccountingVoucherForm /> },
+      { path: 'voucher/edit/:id', element: <AccountingVoucherForm /> },
+      { path: 'vouchers', element: <AccountingVoucherList /> },
+      { path: 'cost-analysis', element: <AccountingCostAnalysis /> },
     ],
   },
   // ========== 抖音/小程序后台 ==========

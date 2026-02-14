@@ -1181,7 +1181,7 @@ const ElemeCostAnalysis: React.FC = () => {
         <div className="page-header">
           <h2>
             <DollarOutlined style={{ marginRight: 8 }} />
-            饿了么 - 成本分析
+            淘宝闪购 - 成本分析
           </h2>
         </div>
 
@@ -1378,7 +1378,7 @@ const ElemeCostAnalysis: React.FC = () => {
                       <Title level={5}>一、功能概述</Title>
                       <Paragraph>
                         成本分析模块是一套完整的<Text strong>外卖订单成本核算系统</Text>。
-                        它能够将饿了么后台导出的原始订单数据，经过<Text strong>门店过滤、商品解析、名称映射、原料换算、成本计算</Text>五个步骤，
+                        它能够将淘宝闪购（原饿了么）后台导出的原始订单数据，经过<Text strong>门店过滤、商品解析、名称映射、原料换算、成本计算</Text>五个步骤，
                         最终生成每个门店的源商品销量报表和原料消耗/成本报表。
                       </Paragraph>
                       <Paragraph>
@@ -1406,7 +1406,7 @@ const ElemeCostAnalysis: React.FC = () => {
                           description={
                             <div className="step-detail">
                               <Paragraph>
-                                从饿了么后台导出的订单Excel中，通常包含你所有门店的订单数据。
+                                从淘宝闪购后台导出的订单Excel中，通常包含你所有门店的订单数据。
                                 系统会根据<Text strong>「可分析门店数据库」</Text>中配置的门店名称，
                                 自动筛选出这些门店的订单，过滤掉不需要分析的门店。
                               </Paragraph>
@@ -1425,7 +1425,7 @@ const ElemeCostAnalysis: React.FC = () => {
                           description={
                             <div className="step-detail">
                               <Paragraph>
-                                饿了么订单中的「商品信息」列包含复杂的商品描述字符串（如套餐、组合商品等）。
+                                淘宝闪购订单中的「商品信息」列包含复杂的商品描述字符串（如套餐、组合商品等）。
                                 系统使用你选择的<Text strong>解析算法</Text>（.py文件），
                                 将每条订单的商品信息拆解为一个个独立的<Text strong>「单品」</Text>及其数量。
                               </Paragraph>
@@ -1515,7 +1515,7 @@ const ElemeCostAnalysis: React.FC = () => {
                         <li><Text strong>作用</Text>：定义哪些门店参与成本分析。只有在此数据库中的门店，其订单才会被处理</li>
                         <li><Text strong>字段</Text>：门店名称（必须与Excel中的「门店名称」列<Text type="danger">完全一致</Text>）</li>
                         <li><Text strong>操作</Text>：支持单个添加、批量添加（每行一个门店名称）、单个删除、批量删除</li>
-                        <li><Text type="secondary">提示：门店名称一定要和饿了么后台的门店名称完全匹配，包括标点符号和括号类型（中文/英文括号）</Text></li>
+                        <li><Text type="secondary">提示：门店名称一定要和淘宝闪购后台的门店名称完全匹配，包括标点符号和括号类型（中文/英文括号）</Text></li>
                       </ul>
 
                       <Paragraph>
@@ -1572,7 +1572,7 @@ const ElemeCostAnalysis: React.FC = () => {
                             <div className="step-detail">
                               <Paragraph>
                                 进入「解析配置」→「可分析门店数据库」，将你需要做成本分析的门店名称逐个或批量添加。
-                                门店名称必须与饿了么后台导出的Excel中的名称<Text type="danger">完全一致</Text>。
+                                门店名称必须与淘宝闪购后台导出的Excel中的名称<Text type="danger">完全一致</Text>。
                               </Paragraph>
                             </div>
                           }
@@ -1683,7 +1683,7 @@ const ElemeCostAnalysis: React.FC = () => {
                       <ul className="tutorial-list">
                         <li>
                           <Text strong>Q: 上传的Excel文件有什么要求？</Text><br />
-                          <Text type="secondary">A: 必须是饿了么后台导出的 .xlsx 或 .csv 格式订单文件，至少包含「门店名称」和「商品信息」两列。</Text>
+                          <Text type="secondary">A: 必须是淘宝闪购后台导出的 .xlsx 或 .csv 格式订单文件，至少包含「门店名称」和「商品信息」两列。</Text>
                         </li>
                         <li>
                           <Text strong>Q: 为什么解析后出现很多橙色/蓝色警告标签？</Text><br />
