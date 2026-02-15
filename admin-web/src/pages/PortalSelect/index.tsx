@@ -8,6 +8,7 @@ import {
   SettingOutlined,
   LogoutOutlined,
   ArrowRightOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -70,6 +71,15 @@ const PORTALS: PortalItem[] = [
     icon: <SettingOutlined />,
     color: '#f5222d',
     path: '/admin/users',
+    roles: ['admin'],
+  },
+  {
+    key: 'agent',
+    title: 'AI Agent 后台',
+    description: 'AI 助手对话、记忆文件管理、向量索引配置（仅管理员）',
+    icon: <RobotOutlined />,
+    color: '#13c2c2',
+    path: '/agent/chat',
     roles: ['admin'],
   },
 ];

@@ -168,8 +168,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set((s) => ({ streamingContent: s.streamingContent + text }));
       },
       onToolCalls: (toolCalls, toolContext) => {
-        // AI 想调用工具 - 显示确认卡片（第一轮 toolContext 为空）
-        set({ pendingToolCalls: toolCalls, toolContext: toolContext || [], sending: false, streamingContent: '' });
+        // AI 想调用工具 - 保留之前流式输出的文字，再显示确认卡片
+        const { streamingContent: preContent } = get();
+        if (preContent) {
+          const partialMsg: ChatMessage = {
+            id: Date.now() + 1,
+            conversation_id: currentConversationId,
+            role: 'assistant',
+            content: preContent,
+            created_at: new Date().toISOString(),
+          };
+          set((s) => ({
+            messages: [...s.messages, partialMsg],
+            pendingToolCalls: toolCalls,
+            toolContext: toolContext || [],
+            sending: false,
+            streamingContent: '',
+          }));
+        } else {
+          set({ pendingToolCalls: toolCalls, toolContext: toolContext || [], sending: false, streamingContent: '' });
+        }
       },
       onToolStatus: (message) => {
         set({ toolStatus: message });
@@ -236,14 +254,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set((s) => ({ streamingContent: s.streamingContent + text }));
       },
       onToolCalls: (toolCalls, newToolContext) => {
-        // AI 又想调用更多工具（多轮）- 保存累积的上下文
-        set({
-          pendingToolCalls: toolCalls,
-          toolContext: newToolContext || [],
-          executingTools: false,
-          streamingContent: '',
-          toolStatus: '',
-        });
+        // AI 又想调用更多工具（多轮）- 保留已输出文字，再显示新工具确认卡片
+        const { streamingContent: preContent } = get();
+        if (preContent) {
+          const partialMsg: ChatMessage = {
+            id: Date.now() + 1,
+            conversation_id: currentConversationId,
+            role: 'assistant',
+            content: preContent,
+            created_at: new Date().toISOString(),
+          };
+          set((s) => ({
+            messages: [...s.messages, partialMsg],
+            pendingToolCalls: toolCalls,
+            toolContext: newToolContext || [],
+            executingTools: false,
+            streamingContent: '',
+            toolStatus: '',
+          }));
+        } else {
+          set({
+            pendingToolCalls: toolCalls,
+            toolContext: newToolContext || [],
+            executingTools: false,
+            streamingContent: '',
+            toolStatus: '',
+          });
+        }
       },
       onToolStatus: (message) => {
         set({ toolStatus: message });

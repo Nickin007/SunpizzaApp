@@ -12,6 +12,7 @@ import requests as http_requests
 import json
 import traceback
 import time
+import math
 
 bp = Blueprint('chat', __name__, url_prefix='/api/chat')
 
@@ -27,25 +28,39 @@ SYSTEM_PROMPT = """你是圣比萨数字化平台的AI助手。你负责帮助�
 - 数据分析与报表
 
 你拥有以下工具能力，可以直接操作选址系统：
-- poi_search: 搜索任意城市的品牌门店或特定POI类型（通过高德地图API实时搜索）
-- poi_batch_search: 批量搜索多个品牌，适合竞品分析
+
+【数据搜索】
+- poi_search: 搜索任意城市的品牌门店或特定POI类型（通过高德地图API实时搜索），支持设置max_pages控制搜索深度
+- poi_batch_search: 批量搜索多个品牌在某城市的门店，适合竞品对比分析
+- poi_get_city_list: 获取所有支持的城市列表（含省份分组和区县信息）
+
+【数据查询】
 - poi_get_brands: 查看数据库中已有的品牌列表和门店数量统计
-- poi_get_stores: 按城市/品牌/类别查询数据库中已存储的门店详细数据（含经纬度坐标）
-- poi_get_poi_types: 获取可搜索的POI类型（学校、医院、购物中心等）
+- poi_get_stores: 按城市/品牌/类别查询已存储的门店详细数据（含经纬度，最多返回200条）
+- poi_get_poi_types: 获取可搜索的POI类型列表（学校、医院、购物中心等）
 - poi_get_other_pois: 查看数据库中非品牌类POI的统计信息
-- poi_export: 导出门店数据（此功能仅返回提示，实际导出需用户在前端操作）
+- poi_export: 获取门店数据的详细统计概要（按品牌、按区域分布）
+
+【空间分析】
+- poi_analyze_radius: 以指定经纬度为圆心，在给定半径内分析周边门店分布，用于评估竞品密度和周边设施
+
+【数据管理】
+- poi_delete_brand: 从数据库中删除指定品牌的门店数据（支持限定城市范围）
 
 支持的城市：浙江省11市（杭州、宁波、温州、嘉兴、湖州、绍兴、金华、衢州、舟山、台州、丽水）、上海市、江苏省13市（南京、无锡、徐州、常州、苏州、南通、连云港、淮安、盐城、扬州、镇江、泰州、宿迁）。
+如不确定城市名称，可使用 poi_get_city_list 获取完整列表。
 
 当用户提到选址、门店分析、品牌竞争、某个城市的门店情况等话题时，主动使用工具获取数据来回答。
 在分析数据时：
 1. 先用 poi_get_brands 或 poi_get_stores 查看数据库已有数据
-2. 如果数据库没有目标城市/品牌的数据，建议使用 poi_search 从高德地图搜索并保存
+2. 如果数据库没有目标城市/品牌的数据，使用 poi_search 从高德地图搜索并保存（save_to_db=true）
 3. 获取数据后，从地理分布、区域密度、竞品对比等维度进行分析
-4. 给出具体的选址建议（推荐区域、理由、注意事项）
+4. 如需评估某个具体位置，使用 poi_analyze_radius 分析周边半径内的门店分布
+5. 给出具体的选址建议（推荐区域、理由、注意事项）
+6. 当分析需要多个维度数据时（如同时需要竞品和周边设施），可以分步使用不同工具
 
-你应该专业、准确、简洁地回答问题。如果你不确定某个信息，请如实告知。
-回答时请使用中文。"""
+你应该专业、准确、简洁地回答问题。回答时使用Markdown格式，善用表格、列表等结构化展示数据。
+如果你不确定某个信息，请如实告知。回答时请使用中文。"""
 
 # Token budget constants (approximate)
 TOTAL_TOKEN_BUDGET = 16000
@@ -81,6 +96,11 @@ TOOLS = [
                         "type": "string",
                         "description": "POI类型：'brand'表示品牌门店搜索（默认），其他值如'小学'、'医院'表示特定POI类型搜索",
                         "default": "brand"
+                    },
+                    "max_pages": {
+                        "type": "integer",
+                        "description": "每个区县最大查询页数，默认50。增大可获取更完整数据但耗时更长。范围1-120",
+                        "default": 50
                     }
                 },
                 "required": ["keyword", "city"]
@@ -135,7 +155,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "poi_get_stores",
-            "description": "查询数据库中已存储的门店详细数据，包括门店名称、地址、区域、经纬度等。支持按城市、品牌、类别筛选。返回的数据可用于地理分布分析。",
+            "description": "查询数据库中已存储的门店详细数据，包括门店名称、地址、区域、经纬度等。支持按城市、品牌、类别筛选。返回区域分布统计和最多200条门店样本数据，可用于地理分布分析。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -189,17 +209,88 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "poi_export",
-            "description": "导出门店数据到Excel文件。注意：由于文件下载限制，此工具仅返回可导出的数据概要，实际下载需要用户在前端选址工具页面操作。",
+            "description": "获取门店数据的详细统计概要，包含按品牌、按区域的门店数量分布。可选按城市和品牌筛选。实际Excel文件下载需在前端操作。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "brands": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "要导出的品牌列表"
+                        "description": "要统计的品牌列表，不传则统计全部"
+                    },
+                    "city": {
+                        "type": "string",
+                        "description": "按城市筛选统计范围"
                     }
                 },
                 "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "poi_get_city_list",
+            "description": "获取系统支持的所有城市列表，按省份分组，每个城市包含其下辖区县信息。用于确认哪些城市可以进行搜索。",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "poi_delete_brand",
+            "description": "从数据库中删除指定品牌的门店数据。可选限定城市范围。危险操作，删除后不可恢复。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "brand_name": {
+                        "type": "string",
+                        "description": "要删除的品牌名称，如'肯德基'"
+                    },
+                    "city": {
+                        "type": "string",
+                        "description": "限定删除范围到某个城市。不传则删除该品牌在所有城市的数据"
+                    }
+                },
+                "required": ["brand_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "poi_analyze_radius",
+            "description": "以指定坐标为圆心，在指定半径范围内分析周边门店分布。可用于评估某个选址位置的竞品密度和周边设施情况。返回半径内各品牌/POI类型的数量和详细列表。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "longitude": {
+                        "type": "number",
+                        "description": "圆心经度，如120.153576"
+                    },
+                    "latitude": {
+                        "type": "number",
+                        "description": "圆心纬度，如30.287459"
+                    },
+                    "radius_meters": {
+                        "type": "integer",
+                        "description": "搜索半径（米），如1000表示1公里范围",
+                        "default": 1000
+                    },
+                    "city": {
+                        "type": "string",
+                        "description": "限定搜索范围到某个城市（提高查询效率）"
+                    },
+                    "brand_filter": {
+                        "type": "string",
+                        "description": "只查看特定品牌，逗号分隔多品牌，如'必胜客,达美乐'。不传则返回所有品牌和POI"
+                    }
+                },
+                "required": ["longitude", "latitude"]
             }
         }
     }
@@ -213,7 +304,10 @@ TOOL_NAME_MAP = {
     'poi_get_stores': '查询门店数据',
     'poi_get_poi_types': '获取POI类型',
     'poi_get_other_pois': '查询其他POI统计',
-    'poi_export': '导出门店数据',
+    'poi_export': '门店数据统计',
+    'poi_get_city_list': '获取支持城市列表',
+    'poi_delete_brand': '删除品牌数据',
+    'poi_analyze_radius': '周边半径分析',
 }
 
 
@@ -237,6 +331,12 @@ def execute_tool(tool_name, arguments):
             return _tool_poi_get_other_pois(args)
         elif tool_name == 'poi_export':
             return _tool_poi_export(args)
+        elif tool_name == 'poi_get_city_list':
+            return _tool_poi_get_city_list(args)
+        elif tool_name == 'poi_delete_brand':
+            return _tool_poi_delete_brand(args)
+        elif tool_name == 'poi_analyze_radius':
+            return _tool_poi_analyze_radius(args)
         else:
             return {"error": f"未知工具: {tool_name}"}
     except Exception as e:
@@ -252,14 +352,15 @@ def _tool_poi_search(args):
     city = args.get('city', '')
     save_to_db = args.get('save_to_db', False)
     poi_category = args.get('poi_category', 'brand')
+    max_pages = min(max(int(args.get('max_pages', 50)), 1), 120)  # 限制在1-120之间
     if not city:
         return {"error": "请提供城市"}
     if not keyword:
         return {"error": "请提供搜索关键词"}
     if city in CITY_DISTRICTS:
-        stores, total = fetch_stores_from_amap_by_districts(keyword=keyword, city=city, max_pages=10)
+        stores, total = fetch_stores_from_amap_by_districts(keyword=keyword, city=city, max_pages=max_pages)
     else:
-        stores, total = fetch_stores_from_amap(keyword=keyword, city=city, max_pages=10)
+        stores, total = fetch_stores_from_amap(keyword=keyword, city=city, max_pages=max_pages)
     unique_stores = remove_duplicates(stores)
     saved_count = 0
     if save_to_db and unique_stores:
@@ -397,15 +498,15 @@ def _tool_poi_get_stores(args):
         d = s.district or '未知'
         district_stats[d] = district_stats.get(d, 0) + 1
     store_list = []
-    for s in stores[:50]:
+    for s in stores[:200]:
         store_list.append({
             'brand_name': s.brand_name, 'store_name': s.store_name,
             'district': s.district, 'address': s.address,
             'longitude': float(s.longitude) if s.longitude else None,
             'latitude': float(s.latitude) if s.latitude else None})
     result = {"total": len(stores), "district_distribution": district_stats, "sample_stores": store_list}
-    if len(stores) > 50:
-        result["note"] = f"仅展示前50条，共{len(stores)}条"
+    if len(stores) > 200:
+        result["note"] = f"仅展示前200条，共{len(stores)}条"
     return result
 
 
@@ -440,11 +541,173 @@ def _tool_poi_get_other_pois(args):
 
 def _tool_poi_export(args):
     brands = args.get('brands', [])
-    query = POIStore.query.filter(POIStore.brand_name.in_(brands)) if brands else POIStore.query
-    count = query.count()
+    city = args.get('city')
+    query = POIStore.query
+    if brands:
+        query = query.filter(POIStore.brand_name.in_(brands))
+    if city:
+        query = query.filter(POIStore.city == city)
+    total_count = query.count()
+
+    # 按品牌统计
+    brand_stats = db.session.query(
+        POIStore.brand_name, POIStore.category,
+        db.func.count(POIStore.id).label('count')
+    )
+    if brands:
+        brand_stats = brand_stats.filter(POIStore.brand_name.in_(brands))
+    if city:
+        brand_stats = brand_stats.filter(POIStore.city == city)
+    brand_stats = brand_stats.group_by(POIStore.brand_name, POIStore.category).all()
+
+    # 按区域统计
+    district_stats = db.session.query(
+        POIStore.city, POIStore.district,
+        db.func.count(POIStore.id).label('count')
+    )
+    if brands:
+        district_stats = district_stats.filter(POIStore.brand_name.in_(brands))
+    if city:
+        district_stats = district_stats.filter(POIStore.city == city)
+    district_stats = district_stats.group_by(POIStore.city, POIStore.district).all()
+
+    brand_summary = [{'brand': r.brand_name, 'category': r.category, 'count': r.count} for r in brand_stats]
+    brand_summary.sort(key=lambda x: x['count'], reverse=True)
+
+    district_summary = {}
+    for r in district_stats:
+        c = r.city or '未知'
+        if c not in district_summary:
+            district_summary[c] = {}
+        district_summary[c][r.district or '未知'] = r.count
+
     return {
-        "message": f"数据库中共有 {count} 条门店数据可导出。请前往外卖运营后台 > 选址工具页面，使用导出功能下载Excel文件。",
-        "exportable_count": count, "brands_filter": brands if brands else "全部"}
+        "total_count": total_count,
+        "filters": {"brands": brands if brands else "全部", "city": city or "全部"},
+        "brand_breakdown": brand_summary,
+        "district_breakdown": district_summary,
+        "note": "如需下载Excel文件，请前往外卖运营后台 > 选址工具页面操作"
+    }
+
+
+def _tool_poi_get_city_list(args):
+    """获取支持的城市列表，按省份分组"""
+    from app.api.poi import CITY_DISTRICTS
+    provinces = {
+        '浙江省': [],
+        '上海市': [],
+        '江苏省': [],
+    }
+    for city_name, districts in CITY_DISTRICTS.items():
+        district_names = [d[0] for d in districts]
+        city_info = {'city': city_name, 'districts': district_names, 'district_count': len(districts)}
+        if city_name == '上海市':
+            provinces['上海市'].append(city_info)
+        elif city_name.startswith(('杭州', '宁波', '温州', '嘉兴', '湖州', '绍兴', '金华', '衢州', '舟山', '台州', '丽水')):
+            provinces['浙江省'].append(city_info)
+        else:
+            provinces['江苏省'].append(city_info)
+    return {"provinces": provinces, "total_cities": len(CITY_DISTRICTS)}
+
+
+def _tool_poi_delete_brand(args):
+    """删除指定品牌的门店数据"""
+    brand_name = args.get('brand_name', '').strip()
+    city = args.get('city')
+    if not brand_name:
+        return {"error": "请提供品牌名称"}
+
+    query = POIStore.query.filter(POIStore.brand_name == brand_name)
+    if city:
+        query = query.filter(POIStore.city == city)
+
+    count = query.count()
+    if count == 0:
+        return {"message": f"数据库中没有找到品牌 '{brand_name}'" + (f" 在 {city}" if city else "") + " 的数据",
+                "deleted_count": 0}
+
+    query.delete(synchronize_session='fetch')
+    db.session.commit()
+    return {
+        "message": f"已成功删除品牌 '{brand_name}'" + (f" 在 {city}" if city else "") + f" 的 {count} 条门店数据",
+        "deleted_count": count,
+        "brand": brand_name,
+        "city": city or "全部城市"
+    }
+
+
+def _haversine_distance(lon1, lat1, lon2, lat2):
+    """计算两个经纬度坐标之间的距离（米），使用Haversine公式"""
+    R = 6371000  # 地球半径，单位：米
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _tool_poi_analyze_radius(args):
+    """以指定坐标为圆心，分析半径范围内的门店分布"""
+    center_lon = args.get('longitude')
+    center_lat = args.get('latitude')
+    radius = args.get('radius_meters', 1000)
+    city = args.get('city')
+    brand_filter = args.get('brand_filter')
+
+    if center_lon is None or center_lat is None:
+        return {"error": "请提供经纬度坐标"}
+
+    # 粗筛：先按经纬度范围缩小查询范围（约1度≈111公里）
+    delta = radius / 111000.0 * 1.5  # 留1.5倍余量
+    query = POIStore.query.filter(
+        POIStore.longitude.between(center_lon - delta, center_lon + delta),
+        POIStore.latitude.between(center_lat - delta, center_lat + delta)
+    )
+    if city:
+        query = query.filter(POIStore.city == city)
+    if brand_filter:
+        brands = [b.strip() for b in brand_filter.split(',')]
+        query = query.filter(POIStore.brand_name.in_(brands))
+
+    candidates = query.all()
+
+    # 精筛：用Haversine公式计算精确距离
+    nearby = []
+    for s in candidates:
+        if s.longitude and s.latitude:
+            dist = _haversine_distance(center_lon, center_lat, float(s.longitude), float(s.latitude))
+            if dist <= radius:
+                nearby.append({
+                    'brand_name': s.brand_name,
+                    'store_name': s.store_name,
+                    'category': s.category,
+                    'district': s.district,
+                    'address': s.address,
+                    'distance_meters': round(dist),
+                    'longitude': float(s.longitude),
+                    'latitude': float(s.latitude),
+                })
+
+    nearby.sort(key=lambda x: x['distance_meters'])
+
+    # 按品牌/类别统计
+    brand_count = {}
+    category_count = {}
+    for s in nearby:
+        bn = s['brand_name'] or '未知'
+        brand_count[bn] = brand_count.get(bn, 0) + 1
+        cat = s['category'] or '未知'
+        category_count[cat] = category_count.get(cat, 0) + 1
+
+    return {
+        "center": {"longitude": center_lon, "latitude": center_lat},
+        "radius_meters": radius,
+        "total_found": len(nearby),
+        "brand_distribution": brand_count,
+        "category_distribution": category_count,
+        "stores": nearby[:100],  # 最多返回100条
+        "note": f"以({center_lon}, {center_lat})为圆心，{radius}米半径内共找到{len(nearby)}个门店/POI" + (f"（仅展示前100条）" if len(nearby) > 100 else "")
+    }
 
 
 # ==================== 通用函数 ====================
@@ -765,8 +1028,17 @@ def send_message(current_user, conv_id):
                 # 流结束后处理
                 if tool_calls_accum:
                     # AI 想调用工具 -> 发送 tool_calls 事件给前端
+                    # 如果在调用工具之前AI已经输出了一些文字，保存到数据库并通知前端
+                    if full_content:
+                        try:
+                            assistant_msg = ChatMessage(
+                                conversation_id=conv_id, role='assistant', content=full_content)
+                            db.session.add(assistant_msg)
+                            db.session.commit()
+                        except Exception as e:
+                            traceback.print_exc()
                     pending = _tool_calls_to_pending(tool_calls_accum)
-                    yield f"data: {json.dumps({'type': 'tool_calls', 'tool_calls': pending})}\n\n"
+                    yield f"data: {json.dumps({'type': 'tool_calls', 'tool_calls': pending, 'pre_content': full_content})}\n\n"
                 elif full_content:
                     # 正常文本回复 -> 保存到数据库
                     try:
@@ -887,6 +1159,15 @@ def execute_tools_endpoint(current_user, conv_id):
 
                 if tool_calls_accum:
                     # AI 想要再次调用工具（多轮）
+                    # 如果AI在调用工具之前已经输出了文字，保存到数据库
+                    if full_content:
+                        try:
+                            assistant_msg = ChatMessage(
+                                conversation_id=conv_id, role='assistant', content=full_content)
+                            db.session.add(assistant_msg)
+                            db.session.commit()
+                        except Exception as e:
+                            traceback.print_exc()
                     # 构建当前轮的上下文记录，传给前端保存
                     current_round_ctx = [assistant_tool_msg]
                     for i, tc in enumerate(tool_calls_data):
@@ -898,7 +1179,7 @@ def execute_tools_endpoint(current_user, conv_id):
                     full_tool_context = prior_tool_context + current_round_ctx
 
                     pending = _tool_calls_to_pending(tool_calls_accum)
-                    yield f"data: {json.dumps({'type': 'tool_calls', 'tool_calls': pending, 'tool_context': full_tool_context})}\n\n"
+                    yield f"data: {json.dumps({'type': 'tool_calls', 'tool_calls': pending, 'tool_context': full_tool_context, 'pre_content': full_content})}\n\n"
                 elif full_content:
                     # 最终回复 -> 保存
                     try:

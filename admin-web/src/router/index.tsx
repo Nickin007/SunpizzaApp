@@ -19,6 +19,10 @@ import AccountingSubjects from '../pages/Accounting/Subjects';
 import AccountingVoucherForm from '../pages/Accounting/VoucherForm';
 import AccountingVoucherList from '../pages/Accounting/VoucherList';
 import AccountingWelcome from '../pages/Accounting/Welcome';
+// AI Agent 后台页面
+import AgentChat from '../pages/Agent/Chat';
+import AgentFileEditor from '../pages/Agent/FileEditor';
+import AgentMemoryBrowser from '../pages/Agent/MemoryBrowser';
 import { useAuthStore } from '../store/authStore';
 // 图标
 import {
@@ -37,6 +41,10 @@ import {
   FormOutlined,
   AuditOutlined,
   SearchOutlined,
+  RobotOutlined,
+  FileMarkdownOutlined,
+  FolderOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 
 // 路由守卫 - 检查是否登录
@@ -125,6 +133,34 @@ const adminMenu = [
     key: '/admin/users',
     icon: <TeamOutlined />,
     label: '账号管理',
+  },
+];
+
+const agentMenu = [
+  {
+    key: '/agent/chat',
+    icon: <MessageOutlined />,
+    label: 'Agent 对话',
+  },
+  {
+    key: 'memory-core',
+    icon: <FileMarkdownOutlined />,
+    label: '记忆管理',
+    children: [
+      { key: '/agent/file?path=USER.md', icon: <FileMarkdownOutlined />, label: '用户档案 (USER.md)' },
+      { key: '/agent/file?path=SOUL.md', icon: <RobotOutlined />, label: 'AI 人设 (SOUL.md)' },
+      { key: '/agent/file?path=memory/preferences.md', icon: <FileMarkdownOutlined />, label: '偏好记忆' },
+      { key: '/agent/file?path=memory/contacts.md', icon: <FileMarkdownOutlined />, label: '联系人' },
+    ],
+  },
+  {
+    key: 'memory-extended',
+    icon: <FolderOutlined />,
+    label: '扩展记忆',
+    children: [
+      { key: '/agent/memory?folder=projects', icon: <FolderOutlined />, label: '项目记忆' },
+      { key: '/agent/memory?folder=daily', icon: <FolderOutlined />, label: '每日记录' },
+    ],
   },
 ];
 
@@ -242,6 +278,21 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/admin/users" replace /> },
       { path: 'users', element: <UserManagement /> },
+    ],
+  },
+  // ========== AI Agent 后台 ==========
+  {
+    path: '/agent',
+    element: (
+      <RoleRoute allowedRoles={['admin']}>
+        <PortalLayout title="AI Agent 后台" theme={THEMES.teal} menuItems={agentMenu} />
+      </RoleRoute>
+    ),
+    children: [
+      { index: true, element: <Navigate to="/agent/chat" replace /> },
+      { path: 'chat', element: <AgentChat /> },
+      { path: 'file', element: <AgentFileEditor /> },
+      { path: 'memory', element: <AgentMemoryBrowser /> },
     ],
   },
   // 404 处理

@@ -88,6 +88,17 @@ export const THEMES = {
     menuSelectedTo: '#cf1322',
     logoShadow: 'rgba(245, 34, 45, 0.1)',
   } as PortalTheme,
+  teal: {
+    primary: '#13c2c2',
+    primaryDark: '#006d75',
+    siderGradientFrom: '#87e8de',
+    siderGradientTo: '#5cdbd3',
+    menuHoverFrom: '#e6fffb',
+    menuHoverTo: '#b5f5ec',
+    menuSelectedFrom: '#13c2c2',
+    menuSelectedTo: '#006d75',
+    logoShadow: 'rgba(19, 194, 194, 0.1)',
+  } as PortalTheme,
 };
 
 const PortalLayout: React.FC<PortalLayoutProps> = ({ title, theme, menuItems }) => {
