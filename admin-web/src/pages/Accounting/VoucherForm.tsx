@@ -5,11 +5,17 @@ import type { ColumnsType } from 'antd/es/table';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import * as financeApi from '../../api/finance';
-import type { AccountSubject, VoucherEntry } from '../../api/finance';
+import type { AccountSubject, VoucherEntry, AccountItemCategory } from '../../api/finance';
 import { useFinanceStore } from '../../store/financeStore';
 import { useAuthStore } from '../../store/authStore';
+import './accounting.css';
 
 const { Title, Text } = Typography;
+
+interface EntryItemSelection {
+  category_id: number;
+  item_id: number;
+}
 
 interface EntryRow {
   key: string;
@@ -17,6 +23,7 @@ interface EntryRow {
   subject_id: number | null;
   debit_amount: number;
   credit_amount: number;
+  items: EntryItemSelection[];
 }
 
 const VoucherForm: React.FC = () => {
@@ -29,6 +36,7 @@ const VoucherForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [subjects, setSubjects] = useState<AccountSubject[]>([]);
+  const [categories, setCategories] = useState<AccountItemCategory[]>([]);
 
   // 凭证头字段
   const [voucherWord, setVoucherWord] = useState('记');
@@ -37,13 +45,11 @@ const VoucherForm: React.FC = () => {
   const [period, setPeriod] = useState(dayjs().format('YYYY-MM'));
   const [attachmentCount, setAttachmentCount] = useState(0);
 
-  // 分录行
   const [entries, setEntries] = useState<EntryRow[]>([
-    { key: '1', summary: '', subject_id: null, debit_amount: 0, credit_amount: 0 },
-    { key: '2', summary: '', subject_id: null, debit_amount: 0, credit_amount: 0 },
+    { key: '1', summary: '', subject_id: null, debit_amount: 0, credit_amount: 0, items: [] },
+    { key: '2', summary: '', subject_id: null, debit_amount: 0, credit_amount: 0, items: [] },
   ]);
 
-  // 加载科目树
   useEffect(() => {
     if (!currentBookId) return;
     financeApi.listSubjects(currentBookId).then((res) => {
@@ -51,9 +57,17 @@ const VoucherForm: React.FC = () => {
         setSubjects(res.data.data.filter((s) => s.is_enabled));
       }
     });
+    financeApi.listItemCategories(currentBookId).then((res) => {
+      if (res.data.code === 200) setCategories(res.data.data);
+    });
   }, [currentBookId]);
 
-  // 加载已有凭证（编辑模式）
+  const subjectMap = useMemo(() => {
+    const m = new Map<number, AccountSubject>();
+    subjects.forEach(s => m.set(s.id, s));
+    return m;
+  }, [subjects]);
+
   useEffect(() => {
     if (!isEdit || !id) return;
     setLoading(true);
@@ -72,6 +86,7 @@ const VoucherForm: React.FC = () => {
             subject_id: e.subject_id,
             debit_amount: e.debit_amount,
             credit_amount: e.credit_amount,
+            items: (e.items || []).map(it => ({ category_id: it.category_id, item_id: it.item_id })),
           })));
         }
       }
@@ -126,11 +141,19 @@ const VoucherForm: React.FC = () => {
     );
   }, []);
 
-  // 添加行
   const addRow = () => {
     const nextKey = String(entries.length + 1 + Math.random());
-    setEntries((prev) => [...prev, { key: nextKey, summary: '', subject_id: null, debit_amount: 0, credit_amount: 0 }]);
+    setEntries((prev) => [...prev, { key: nextKey, summary: '', subject_id: null, debit_amount: 0, credit_amount: 0, items: [] }]);
   };
+
+  const updateEntryItem = useCallback((key: string, categoryId: number, itemId: number) => {
+    setEntries(prev => prev.map(row => {
+      if (row.key !== key) return row;
+      const items = row.items.filter(i => i.category_id !== categoryId);
+      if (itemId) items.push({ category_id: categoryId, item_id: itemId });
+      return { ...row, items };
+    }));
+  }, []);
 
   // 删除行
   const removeRow = (key: string) => {
@@ -174,6 +197,7 @@ const VoucherForm: React.FC = () => {
           subject_id: e.subject_id!,
           debit_amount: e.debit_amount || 0,
           credit_amount: e.credit_amount || 0,
+          items: e.items.filter(it => it.item_id),
         })),
       };
 
@@ -189,8 +213,8 @@ const VoucherForm: React.FC = () => {
         if (!isEdit) {
           // 新建后清空，准备下一张
           setEntries([
-            { key: '1', summary: '', subject_id: null, debit_amount: 0, credit_amount: 0 },
-            { key: '2', summary: '', subject_id: null, debit_amount: 0, credit_amount: 0 },
+            { key: '1', summary: '', subject_id: null, debit_amount: 0, credit_amount: 0, items: [] },
+            { key: '2', summary: '', subject_id: null, debit_amount: 0, credit_amount: 0, items: [] },
           ]);
           // 刷新凭证号
           financeApi.getNextVoucherNo(currentBookId, period, voucherWord).then((r) => {
@@ -232,7 +256,10 @@ const VoucherForm: React.FC = () => {
       render: (val: number | null, record) => (
         <TreeSelect
           value={val}
-          onChange={(v) => updateEntry(record.key, 'subject_id', v)}
+          onChange={(v) => {
+            updateEntry(record.key, 'subject_id', v);
+            updateEntry(record.key, 'items', []);
+          }}
           treeData={subjectTreeData}
           placeholder="选择科目"
           showSearch
@@ -242,6 +269,36 @@ const VoucherForm: React.FC = () => {
           dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
         />
       ),
+    },
+    {
+      title: '核算项目',
+      width: 200,
+      render: (_, record) => {
+        if (!record.subject_id) return null;
+        const subj = subjectMap.get(record.subject_id);
+        if (!subj || !subj.linked_category_ids || subj.linked_category_ids.length === 0) return <Text type="secondary">-</Text>;
+        return (
+          <Space direction="vertical" size={2} style={{ width: '100%' }}>
+            {subj.linked_category_ids.map(cid => {
+              const cat = categories.find(c => c.id === cid);
+              if (!cat) return null;
+              const selected = record.items.find(i => i.category_id === cid);
+              return (
+                <Select
+                  key={cid}
+                  value={selected?.item_id}
+                  onChange={(v) => updateEntryItem(record.key, cid, v)}
+                  placeholder={cat.name}
+                  size="small"
+                  style={{ width: '100%' }}
+                  allowClear
+                  options={(cat.items || []).filter(it => it.is_enabled).map(it => ({ value: it.id, label: `${it.code} ${it.name}` }))}
+                />
+              );
+            })}
+          </Space>
+        );
+      },
     },
     {
       title: '借方金额',
@@ -312,8 +369,16 @@ const VoucherForm: React.FC = () => {
           </Space>
         </div>
 
-        {/* 凭证头 */}
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16, padding: '12px 16px', background: '#fafafa', borderRadius: 8 }}>
+        <div className="acct-voucher-header">
+          <h2>记 账 凭 证</h2>
+          <div className="meta-row">
+            <span>{currentBookName}</span>
+            <span>日期：{voucherDate.format('YYYY年MM月DD日')}</span>
+            <span>{voucherWord}字第 {String(voucherNo).padStart(4, '0')} 号</span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16, padding: '12px 16px', background: '#fafafa' }}>
           <div>
             <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>凭证字</Text>
             <Select value={voucherWord} onChange={setVoucherWord} style={{ width: 80 }} size="small"
@@ -343,14 +408,15 @@ const VoucherForm: React.FC = () => {
           </div>
         </div>
 
-        {/* 分录表 */}
         <Table
+          className="acct-table"
           columns={columns}
           dataSource={entries}
           rowKey="key"
           pagination={false}
           size="small"
           bordered
+          scroll={{ x: 800 }}
           footer={() => (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Button type="dashed" icon={<PlusOutlined />} onClick={addRow} size="small">添加分录行</Button>

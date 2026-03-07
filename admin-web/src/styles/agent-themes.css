@@ -1,0 +1,51 @@
+/* Agent 聊天界面主题变量 */
+
+[data-theme="light"] {
+  --agent-bg: #ffffff;
+  --agent-sidebar-bg: #f7f7f8;
+  --agent-sidebar-hover: #ececee;
+  --agent-sidebar-active: #e3e3e6;
+  --agent-text: #1a1a1a;
+  --agent-text-secondary: #666666;
+  --agent-text-tertiary: #999999;
+  --agent-border: #e5e5e5;
+  --agent-msg-user-bg: #f7f7f8;
+  --agent-msg-assistant-bg: transparent;
+  --agent-code-bg: #f6f8fa;
+  --agent-code-border: #e1e4e8;
+  --agent-input-bg: #ffffff;
+  --agent-input-border: #d9d9e3;
+  --agent-input-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --agent-tool-bg: #f8f9fb;
+  --agent-tool-border: #e8eaed;
+  --agent-tool-header: #f0f1f3;
+  --agent-accent: #6c5ce7;
+  --agent-success: #27ae60;
+  --agent-error: #e74c3c;
+  --agent-link: #2980b9;
+}
+
+[data-theme="dark"] {
+  --agent-bg: #212121;
+  --agent-sidebar-bg: #171717;
+  --agent-sidebar-hover: #2a2a2a;
+  --agent-sidebar-active: #333333;
+  --agent-text: #ececec;
+  --agent-text-secondary: #a0a0a0;
+  --agent-text-tertiary: #707070;
+  --agent-border: #383838;
+  --agent-msg-user-bg: #2f2f2f;
+  --agent-msg-assistant-bg: transparent;
+  --agent-code-bg: #0d1117;
+  --agent-code-border: #30363d;
+  --agent-input-bg: #2f2f2f;
+  --agent-input-border: #424242;
+  --agent-input-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  --agent-tool-bg: #1e1e1e;
+  --agent-tool-border: #333333;
+  --agent-tool-header: #2a2a2a;
+  --agent-accent: #a29bfe;
+  --agent-success: #2ecc71;
+  --agent-error: #ff6b6b;
+  --agent-link: #74b9ff;
+}

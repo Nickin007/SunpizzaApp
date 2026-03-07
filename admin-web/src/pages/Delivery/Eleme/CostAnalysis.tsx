@@ -61,7 +61,8 @@ import type {
   UnmappedDetail,
   ParserInfo,
   PreviewResult,
-  MatrixAnalysisResult,
+  AnalysisResultV2,
+  RevenueRow,
   ImportConfigResult,
 } from '../../../api/costAnalysis';
 import './CostAnalysis.css';
@@ -110,11 +111,19 @@ const ElemeCostAnalysis: React.FC = () => {
   const [selectedIngredientKeys, setSelectedIngredientKeys] = useState<React.Key[]>([]);
 
   // 分析结果状态
-  const [analysisResult, setAnalysisResult] = useState<MatrixAnalysisResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResultV2 | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [selectedStore, setSelectedStore] = useState<string>('');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+
+  // 门店收入数据状态
+  const [revenueFileList, setRevenueFileList] = useState<UploadFile[]>([]);
+  const [revenueRows, setRevenueRows] = useState<RevenueRow[]>([]);
+  const [revenueStores, setRevenueStores] = useState<string[]>([]);
+  const [revenueLoading, setRevenueLoading] = useState(false);
+  const [revenueUploaded, setRevenueUploaded] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
 
   // 预览状态
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
@@ -1047,7 +1056,7 @@ const ElemeCostAnalysis: React.FC = () => {
     return false;
   };
 
-  // 确认解析并导出Excel
+  // 确认解析
   const handleConfirmAnalyze = async () => {
     if (!uploadedFile) {
       message.error('请先上传文件');
@@ -1059,10 +1068,9 @@ const ElemeCostAnalysis: React.FC = () => {
     setAnalysisResult(null);
     setAnalysisProgress(0);
 
-    // 启动模拟进度条（逐步增长到90%，实际完成时跳到100%）
     let progress = 0;
     analysisTimerRef.current = setInterval(() => {
-      progress += Math.random() * 8 + 2; // 每次增2~10%
+      progress += Math.random() * 8 + 2;
       if (progress > 90) progress = 90;
       setAnalysisProgress(Math.round(progress));
     }, 500);
@@ -1070,24 +1078,16 @@ const ElemeCostAnalysis: React.FC = () => {
     try {
       const response = await costAnalysisApi.analyzeOrders(uploadedFile);
 
-      // 清除定时器，跳到95%
       if (analysisTimerRef.current) {
         clearInterval(analysisTimerRef.current);
         analysisTimerRef.current = null;
       }
-      setAnalysisProgress(95);
+      setAnalysisProgress(100);
 
       if (response.data.code === 200) {
         const result = response.data.data;
         setAnalysisResult(result);
-        message.success('解析完成，正在生成Excel文件...');
-
-        // 自动下载两个Excel文件
-        await downloadSourceProductExcel(result);
-        await downloadIngredientExcel(result);
-
-        setAnalysisProgress(100);
-        message.success('两个Excel文件已生成并下载');
+        message.success(`解析完成！共 ${result.summary.total_orders} 条订单，${result.dates?.length || 0} 天数据`);
       } else {
         message.error(response.data.message || '解析失败');
       }
@@ -1103,14 +1103,45 @@ const ElemeCostAnalysis: React.FC = () => {
     }
   };
 
-  // 下载源商品Excel
-  const downloadSourceProductExcel = async (result: MatrixAnalysisResult) => {
+  // 上传门店收入数据表
+  const handleUploadRevenue = async (file: File) => {
+    setRevenueLoading(true);
     try {
-      const response = await costAnalysisApi.exportSourceProduct({
-        stores: result.stores,
-        source_products: result.source_products,
-        source_product_quantity_matrix: result.source_product_quantity_matrix,
-        source_product_cost_matrix: result.source_product_cost_matrix,
+      const response = await costAnalysisApi.uploadRevenue(file);
+      if (response.data.code === 200) {
+        const data = response.data.data;
+        setRevenueRows(data.rows);
+        setRevenueStores(data.stores);
+        setRevenueUploaded(true);
+        message.success(`收入数据解析成功：${data.total_rows} 条记录，${data.stores.length} 家门店`);
+      } else {
+        message.error(response.data.message || '解析失败');
+      }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || '门店收入数据解析失败');
+    } finally {
+      setRevenueLoading(false);
+    }
+    return false;
+  };
+
+  // 导出成本明细表
+  const handleExportCostDetail = async () => {
+    if (!analysisResult) {
+      message.error('请先完成订单解析');
+      return;
+    }
+    if (!revenueUploaded) {
+      message.error('请先上传门店收入数据表');
+      return;
+    }
+
+    setExportLoading(true);
+    try {
+      const response = await costAnalysisApi.exportCostDetail({
+        analysis: analysisResult,
+        revenue_rows: revenueRows,
       });
       const blob = new Blob([response.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1118,48 +1149,15 @@ const ElemeCostAnalysis: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = '源商品数据.xlsx';
+      link.download = '成本明细表.xlsx';
       link.click();
       window.URL.revokeObjectURL(url);
+      message.success('成本明细表已下载');
     } catch (error) {
-      message.error('源商品数据导出失败');
+      message.error('导出失败');
+    } finally {
+      setExportLoading(false);
     }
-  };
-
-  // 下载原料Excel
-  const downloadIngredientExcel = async (result: MatrixAnalysisResult) => {
-    try {
-      const response = await costAnalysisApi.exportIngredient({
-        stores: result.stores,
-        ingredients: result.ingredients,
-        ingredient_quantity_matrix: result.ingredient_quantity_matrix,
-        ingredient_cost_matrix: result.ingredient_cost_matrix,
-      });
-      const blob = new Blob([response.data], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = '原料数据.xlsx';
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      message.error('原料数据导出失败');
-    }
-  };
-
-  // 手动导出按钮
-  const handleExportSourceProduct = async () => {
-    if (!analysisResult) return;
-    await downloadSourceProductExcel(analysisResult);
-    message.success('源商品数据导出成功');
-  };
-
-  const handleExportIngredient = async () => {
-    if (!analysisResult) return;
-    await downloadIngredientExcel(analysisResult);
-    message.success('原料数据导出成功');
   };
 
   // 预览表格的列定义
@@ -1197,94 +1195,92 @@ const ElemeCostAnalysis: React.FC = () => {
             key="analysis"
           >
             <div className="analysis-tab">
-              <div className="upload-section">
-                <Space size="large" wrap>
-                  <div className="parser-select">
-                    <span style={{ marginRight: 8 }}>解析算法：</span>
-                    <Select
-                      style={{ width: 200 }}
-                      value={selectedParser}
-                      onChange={setSelectedParser}
-                      options={parsers.map((p) => ({
-                        label: p.filename,
-                        value: p.name,
-                      }))}
-                      placeholder="选择解析算法"
-                    />
-                  </div>
-                  <Upload
-                    accept=".xlsx,.csv"
-                    fileList={fileList}
-                    beforeUpload={(file) => {
-                      handleUploadPreview(file);
-                      setFileList([file]);
-                      return false;
-                    }}
-                    onRemove={() => {
-                      setFileList([]);
-                      setAnalysisResult(null);
-                      setUploadedFile(null);
-                    }}
-                    maxCount={1}
-                  >
-                    <Button icon={<UploadOutlined />} type="primary" loading={previewLoading}>
-                      上传订单Excel
-                    </Button>
-                  </Upload>
-                </Space>
-                <span className="upload-tip">支持 .xlsx / .csv 格式，文件需包含"门店名称"和"商品信息"列</span>
-              </div>
+              {/* Step 1: 上传订单 Excel */}
+              <Card size="small" title={<span><UploadOutlined style={{ marginRight: 6 }} />第一步：上传订单 Excel</span>} style={{ marginBottom: 16 }}>
+                <div className="upload-section">
+                  <Space size="large" wrap>
+                    <div className="parser-select">
+                      <span style={{ marginRight: 8 }}>解析算法：</span>
+                      <Select
+                        style={{ width: 200 }}
+                        value={selectedParser}
+                        onChange={setSelectedParser}
+                        options={parsers.map((p) => ({
+                          label: p.filename,
+                          value: p.name,
+                        }))}
+                        placeholder="选择解析算法"
+                      />
+                    </div>
+                    <Upload
+                      accept=".xlsx,.csv"
+                      fileList={fileList}
+                      beforeUpload={(file) => {
+                        handleUploadPreview(file);
+                        setFileList([file]);
+                        return false;
+                      }}
+                      onRemove={() => {
+                        setFileList([]);
+                        setAnalysisResult(null);
+                        setUploadedFile(null);
+                      }}
+                      maxCount={1}
+                    >
+                      <Button icon={<UploadOutlined />} type="primary" loading={previewLoading}>
+                        上传订单Excel
+                      </Button>
+                    </Upload>
+                  </Space>
+                  <span className="upload-tip">支持 .xlsx / .csv 格式，文件需包含"日期"、"门店名称"和"商品信息"列</span>
+                </div>
+              </Card>
 
               {analysisLoading && (
-                <Card style={{ marginTop: 20, marginBottom: 20, borderRadius: 12, textAlign: 'center' }}>
+                <Card style={{ marginBottom: 16, borderRadius: 12, textAlign: 'center' }}>
                   <Spin size="large" />
                   <div style={{ marginTop: 16, marginBottom: 8 }}>
-                    <Text strong style={{ fontSize: 16 }}>正在解析订单数据并生成报表...</Text>
+                    <Text strong style={{ fontSize: 16 }}>正在解析订单数据...</Text>
                   </div>
                   <div style={{ maxWidth: 500, margin: '0 auto' }}>
                     <Progress
                       percent={analysisProgress}
                       status="active"
-                      strokeColor={{
-                        '0%': '#108ee9',
-                        '100%': '#87d068',
-                      }}
+                      strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
                     />
                   </div>
                   <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
                     {analysisProgress < 30 && '读取订单文件并过滤门店...'}
                     {analysisProgress >= 30 && analysisProgress < 60 && '解析商品信息并映射源商品...'}
-                    {analysisProgress >= 60 && analysisProgress < 90 && '计算原料消耗并生成矩阵...'}
-                    {analysisProgress >= 90 && '生成Excel文件中...'}
+                    {analysisProgress >= 60 && analysisProgress < 90 && '按日期+门店计算原料消耗...'}
+                    {analysisProgress >= 90 && '汇总数据中...'}
                   </Text>
                 </Card>
               )}
 
               {analysisResult && (
                 <>
-                  <div className="summary-section">
+                  <div className="summary-section" style={{ marginBottom: 16 }}>
                     <Row gutter={16}>
-                      <Col span={4}>
+                      <Col xs={12} sm={6} md={4}>
                         <Statistic title="总订单数" value={analysisResult.summary.total_orders} />
                       </Col>
-                      <Col span={4}>
+                      <Col xs={12} sm={6} md={4}>
                         <Statistic title="解析门店数" value={analysisResult.summary.total_stores} />
                       </Col>
-                      <Col span={4}>
+                      <Col xs={12} sm={6} md={4}>
+                        <Statistic title="日期天数" value={analysisResult.dates?.length || 0} />
+                      </Col>
+                      <Col xs={12} sm={6} md={4}>
                         <Statistic title="源商品种类" value={analysisResult.summary.total_source_products} />
                       </Col>
-                      <Col span={4}>
+                      <Col xs={12} sm={6} md={4}>
                         <Statistic title="原料种类" value={analysisResult.summary.total_ingredients} />
                       </Col>
-                      <Col span={8}>
-                        <Space>
-                          <Button type="primary" icon={<DownloadOutlined />} onClick={handleExportSourceProduct}>
-                            下载源商品数据
-                          </Button>
-                          <Button icon={<DownloadOutlined />} onClick={handleExportIngredient}>
-                            下载原料数据
-                          </Button>
-                        </Space>
+                      <Col xs={12} sm={6} md={4}>
+                        <Tag color="geekblue" style={{ fontSize: 13, padding: '4px 8px', marginTop: 8 }}>
+                          {analysisResult.summary.date_range}
+                        </Tag>
                       </Col>
                     </Row>
 
@@ -1297,9 +1293,7 @@ const ElemeCostAnalysis: React.FC = () => {
                         description={
                           <div className="unmapped-products">
                             {analysisResult.summary.unmapped_products.slice(0, 20).map((p) => (
-                              <Tag key={p} color="orange">
-                                {p}
-                              </Tag>
+                              <Tag key={p} color="orange">{p}</Tag>
                             ))}
                             {analysisResult.summary.unmapped_products.length > 20 && (
                               <Tag>...还有 {analysisResult.summary.unmapped_products.length - 20} 个</Tag>
@@ -1318,9 +1312,7 @@ const ElemeCostAnalysis: React.FC = () => {
                         description={
                           <div className="unmapped-products">
                             {analysisResult.summary.unmapped_source_products.slice(0, 20).map((p) => (
-                              <Tag key={p} color="blue">
-                                {p}
-                              </Tag>
+                              <Tag key={p} color="blue">{p}</Tag>
                             ))}
                             {analysisResult.summary.unmapped_source_products.length > 20 && (
                               <Tag>...还有 {analysisResult.summary.unmapped_source_products.length - 20} 个</Tag>
@@ -1331,31 +1323,96 @@ const ElemeCostAnalysis: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="result-section" style={{ marginTop: 24 }}>
-                    <Alert
-                      type="success"
-                      showIcon
-                      message="解析完成"
-                      description={
-                        <div>
-                          <p>已成功解析 {analysisResult.summary.total_orders} 条订单数据。</p>
-                          <p>生成的两个Excel文件说明：</p>
-                          <ul>
-                            <li><strong>源商品数据.xlsx</strong>：包含两个子表</li>
-                            <ul>
-                              <li>Sheet1 (源商品销量)：行为源商品，列为门店，数据为销量</li>
-                              <li>Sheet2 (源商品成本)：行为源商品，列为门店，数据为成本</li>
-                            </ul>
-                            <li><strong>原料数据.xlsx</strong>：包含两个子表</li>
-                            <ul>
-                              <li>Sheet1 (原料消耗量)：行为原料，列为门店，数据为消耗量</li>
-                              <li>Sheet2 (原料成本)：行为原料，列为门店，数据为成本</li>
-                            </ul>
-                          </ul>
-                        </div>
-                      }
-                    />
-                  </div>
+                  {/* Step 2: 上传门店收入数据表 */}
+                  <Card
+                    size="small"
+                    title={<span><DatabaseOutlined style={{ marginRight: 6 }} />第二步：上传门店收入数据表</span>}
+                    style={{ marginBottom: 16, borderColor: revenueUploaded ? '#52c41a' : undefined }}
+                  >
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <Upload
+                        accept=".xlsx,.csv"
+                        fileList={revenueFileList}
+                        beforeUpload={(file) => {
+                          handleUploadRevenue(file);
+                          setRevenueFileList([file]);
+                          return false;
+                        }}
+                        onRemove={() => {
+                          setRevenueFileList([]);
+                          setRevenueRows([]);
+                          setRevenueStores([]);
+                          setRevenueUploaded(false);
+                        }}
+                        maxCount={1}
+                      >
+                        <Button icon={<UploadOutlined />} loading={revenueLoading}>
+                          上传门店收入数据表
+                        </Button>
+                      </Upload>
+                      <Text type="secondary">
+                        需要包含"日期"、"门店名称"（或"门店"）和"收入"列的 .xlsx / .csv 文件
+                      </Text>
+
+                      {revenueUploaded && (
+                        <Alert
+                          type="success"
+                          showIcon
+                          message={`已解析 ${revenueRows.length} 条收入数据，涉及 ${revenueStores.length} 家门店`}
+                          description={
+                            <div>
+                              {(() => {
+                                const matchedStores = revenueStores.filter(s => analysisResult.stores.includes(s));
+                                const unmatchedStores = revenueStores.filter(s => !analysisResult.stores.includes(s));
+                                return (
+                                  <>
+                                    <div>
+                                      <Text strong>与订单门店匹配：</Text>
+                                      <Tag color="green">{matchedStores.length} 家</Tag>
+                                      {unmatchedStores.length > 0 && (
+                                        <Tag color="orange">未匹配 {unmatchedStores.length} 家</Tag>
+                                      )}
+                                    </div>
+                                    {unmatchedStores.length > 0 && (
+                                      <div style={{ marginTop: 4 }}>
+                                        <Text type="secondary">未匹配：</Text>
+                                        {unmatchedStores.slice(0, 10).map(s => <Tag key={s}>{s}</Tag>)}
+                                        {unmatchedStores.length > 10 && <Tag>...还有 {unmatchedStores.length - 10} 家</Tag>}
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          }
+                        />
+                      )}
+                    </Space>
+                  </Card>
+
+                  {/* Step 3: 导出成本明细表 */}
+                  <Card
+                    size="small"
+                    title={<span><DownloadOutlined style={{ marginRight: 6 }} />第三步：导出成本明细表</span>}
+                    style={{ marginBottom: 16 }}
+                  >
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <Button
+                        type="primary"
+                        size="large"
+                        icon={<DownloadOutlined />}
+                        onClick={handleExportCostDetail}
+                        loading={exportLoading}
+                        disabled={!analysisResult || !revenueUploaded}
+                        block
+                      >
+                        下载成本明细表
+                      </Button>
+                      <Text type="secondary">
+                        成本明细表包含 6 个 Sheet：门店汇总看板、逐日看板、源商品销量明细、源商品成本明细、原料消耗量明细、原料成本明细
+                      </Text>
+                    </Space>
+                  </Card>
                 </>
               )}
 
@@ -1378,14 +1435,14 @@ const ElemeCostAnalysis: React.FC = () => {
                       <Title level={5}>一、功能概述</Title>
                       <Paragraph>
                         成本分析模块是一套完整的<Text strong>外卖订单成本核算系统</Text>。
-                        它能够将淘宝闪购（原饿了么）后台导出的原始订单数据，经过<Text strong>门店过滤、商品解析、名称映射、原料换算、成本计算</Text>五个步骤，
-                        最终生成每个门店的源商品销量报表和原料消耗/成本报表。
+                        它能够将淘宝闪购（原饿了么）后台导出的原始订单数据，结合门店收入数据，经过<Text strong>门店过滤、商品解析、名称映射、原料换算、成本计算</Text>五个步骤，
+                        最终生成一份包含 6 个 Sheet 的「成本明细表」Excel 文件。
                       </Paragraph>
                       <Paragraph>
                         整个系统由两大部分组成：
                       </Paragraph>
                       <ul className="tutorial-list">
-                        <li><Text strong>订单解析</Text>（当前页面）：上传订单Excel，选择解析算法，执行解析并下载结果</li>
+                        <li><Text strong>订单解析</Text>（当前页面）：上传订单Excel + 门店收入数据表，执行解析并导出成本明细表</li>
                         <li><Text strong>解析配置</Text>（第二个Tab）：维护解析所需的四个配置数据库</li>
                       </ul>
 
@@ -1626,13 +1683,14 @@ const ElemeCostAnalysis: React.FC = () => {
                           }
                         />
                         <Step
-                          title="步骤6：正式解析并下载报表"
+                          title="步骤6：上传门店收入数据并导出成本明细表"
                           icon={<DownloadOutlined />}
                           description={
                             <div className="step-detail">
                               <Paragraph>
                                 回到「订单解析」页面，重新上传订单Excel并确认解析。
-                                解析完成后，点击「下载源商品数据」和「下载原料数据」获取报表。
+                                然后上传门店收入数据表（包含日期、门店名称、收入列），
+                                最后点击「下载成本明细表」获取包含 6 个 Sheet 的完整报表。
                               </Paragraph>
                             </div>
                           }
@@ -1644,36 +1702,27 @@ const ElemeCostAnalysis: React.FC = () => {
                       <Title level={5}>五、输出报表说明</Title>
 
                       <Paragraph>
-                        解析完成后可以下载两个Excel报表，共包含四个子表：
+                        解析完成后可以下载一个「成本明细表.xlsx」，包含 6 个 Sheet：
                       </Paragraph>
 
-                      <Paragraph>
-                        <Text strong>5.1 源商品数据.xlsx</Text>
-                      </Paragraph>
                       <ul className="tutorial-list">
                         <li>
-                          <Tag color="purple">Sheet1: 源商品销量</Tag> — 矩阵表格，行为各源商品名称，列为各门店名称。
-                          单元格数值表示该门店在上传周期内卖出了多少份该源商品
+                          <Tag color="purple">Sheet1: 门店汇总看板</Tag> — 整个时间周期内每家门店的汇总数据：时间周期、门店名称、门店收入、理论成本、理论毛利率
                         </li>
                         <li>
-                          <Tag color="purple">Sheet2: 源商品成本</Tag> — 同样的矩阵结构。
-                          单元格数值表示该门店在该源商品上消耗的原料总成本（元）。
-                          计算方式：源商品数量 x 该源商品所有原料的（单位用量 x 原料单位成本）之和
-                        </li>
-                      </ul>
-
-                      <Paragraph>
-                        <Text strong>5.2 原料数据.xlsx</Text>
-                      </Paragraph>
-                      <ul className="tutorial-list">
-                        <li>
-                          <Tag color="cyan">Sheet1: 原料消耗量</Tag> — 矩阵表格，行为各原料名称，列为各门店名称。
-                          单元格数值表示该门店在上传周期内消耗了多少该原料（按原料卡中的计量单位）
+                          <Tag color="purple">Sheet2: 逐日看板</Tag> — 逐日逐门店的明细：日期、门店名称、门店收入、理论成本、理论毛利率
                         </li>
                         <li>
-                          <Tag color="cyan">Sheet2: 原料成本</Tag> — 同样的矩阵结构。
-                          单元格数值表示该门店在该原料上的成本花费（元）。
-                          计算方式：原料消耗量 x 原料单位成本
+                          <Tag color="cyan">Sheet3: 源商品销量明细</Tag> — 竖表格式：日期、门店名称、源商品、销量
+                        </li>
+                        <li>
+                          <Tag color="cyan">Sheet4: 源商品成本明细</Tag> — 竖表格式：日期、门店名称、源商品、成本
+                        </li>
+                        <li>
+                          <Tag color="green">Sheet5: 原料消耗量明细</Tag> — 竖表格式：日期、门店名称、原料、消耗量
+                        </li>
+                        <li>
+                          <Tag color="green">Sheet6: 原料成本明细</Tag> — 竖表格式：日期、门店名称、原料、成本
                         </li>
                       </ul>
 
@@ -1683,7 +1732,7 @@ const ElemeCostAnalysis: React.FC = () => {
                       <ul className="tutorial-list">
                         <li>
                           <Text strong>Q: 上传的Excel文件有什么要求？</Text><br />
-                          <Text type="secondary">A: 必须是淘宝闪购后台导出的 .xlsx 或 .csv 格式订单文件，至少包含「门店名称」和「商品信息」两列。</Text>
+                          <Text type="secondary">A: 订单文件必须是淘宝闪购后台导出的 .xlsx 或 .csv 格式，至少包含「日期」、「门店名称」和「商品信息」三列。门店收入数据表需包含「日期」、「门店名称」和「收入」三列。</Text>
                         </li>
                         <li>
                           <Text strong>Q: 为什么解析后出现很多橙色/蓝色警告标签？</Text><br />

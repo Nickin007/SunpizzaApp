@@ -213,38 +213,49 @@
   height: calc(100vh - 64px);
 }
 
+/* --- 标题 --- */
+.portal-title {
+  font-size: 20px;
+}
+
 /* --- 响应式 --- */
 @media (max-width: 768px) {
+  .portal-sider {
+    display: none !important;
+  }
+
   .portal-header {
-    padding: 0 16px;
-    margin: 0 16px 0 20px;
+    padding: 0 12px;
+    margin: 0;
+    border-radius: 0;
+    height: 52px;
+    line-height: 52px;
+  }
+
+  .portal-title {
+    font-size: 16px !important;
+  }
+
+  .portal-header-left {
+    gap: 12px;
   }
 
   .portal-page-content {
-    margin: 12px 12px 12px 12px;
+    padding: 12px;
+    height: calc(100vh - 52px);
+    min-height: calc(100vh - 52px);
   }
 
   .portal-username {
     display: none;
   }
 
-  .portal-logo-box {
-    height: 60px;
-    margin: 12px;
-    padding: 8px;
-  }
-
-  .portal-logo-large {
-    max-height: 40px;
-  }
-
-  .portal-menu .ant-menu-item {
-    height: 42px !important;
-    line-height: 42px !important;
-    margin: 3px 8px !important;
+  .portal-user-info {
+    padding: 6px 8px;
   }
 
   .portal-content-layout {
     overflow: auto;
+    width: 100% !important;
   }
 }

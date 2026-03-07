@@ -1,0 +1,220 @@
+/* MarkdownRenderer 样式 — 支持主题变量 */
+
+.md-renderer {
+  line-height: 1.7;
+  word-break: break-word;
+  font-size: 15px;
+  color: var(--agent-text, #333);
+}
+
+.md-compact {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 段落 */
+.md-renderer p {
+  margin: 0 0 8px;
+}
+.md-renderer p:last-child {
+  margin-bottom: 0;
+}
+
+/* 标题 */
+.md-renderer h1,
+.md-renderer h2,
+.md-renderer h3,
+.md-renderer h4,
+.md-renderer h5,
+.md-renderer h6 {
+  margin: 16px 0 8px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--agent-text, #1a1a1a);
+}
+.md-renderer h1 { font-size: 1.5em; }
+.md-renderer h2 { font-size: 1.3em; }
+.md-renderer h3 { font-size: 1.15em; }
+.md-renderer h4 { font-size: 1.05em; }
+.md-compact h1 { font-size: 1.3em; }
+.md-compact h2 { font-size: 1.15em; }
+.md-compact h3 { font-size: 1.05em; }
+
+/* 列表 */
+.md-renderer ul,
+.md-renderer ol {
+  margin: 4px 0 8px;
+  padding-left: 24px;
+}
+.md-renderer li {
+  margin-bottom: 4px;
+}
+.md-renderer li > p {
+  margin-bottom: 4px;
+}
+
+/* 行内代码 */
+.md-inline-code {
+  background: var(--agent-code-bg, #f2f2f2);
+  border: 1px solid var(--agent-code-border, #e0e0e0);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: 'Consolas', 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 0.88em;
+  color: var(--agent-accent, #d63384);
+  word-break: break-all;
+}
+
+/* 代码块容器 */
+.md-code-block {
+  margin: 8px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--agent-code-border, #383838);
+}
+
+/* 代码块头部 */
+.md-code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--agent-tool-header, #2d2d2d);
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.md-code-lang {
+  color: var(--agent-text-tertiary, #aaa);
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.md-code-copy,
+.md-code-fold {
+  background: none;
+  border: 1px solid var(--agent-border, #555);
+  border-radius: 4px;
+  color: var(--agent-text-secondary, #ccc);
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+.md-code-copy:hover,
+.md-code-fold:hover {
+  border-color: var(--agent-text-secondary, #888);
+  color: var(--agent-text, #fff);
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.md-code-expand {
+  padding: 6px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--agent-link, #1890ff);
+  cursor: pointer;
+  background: var(--agent-tool-header, #2d2d2d);
+  border-top: 1px solid var(--agent-code-border, #383838);
+  transition: background 0.2s;
+}
+.md-code-expand:hover {
+  background: var(--agent-sidebar-hover, #333);
+}
+
+/* 表格 */
+.md-table-wrapper {
+  overflow-x: auto;
+  margin: 8px 0;
+  border-radius: 6px;
+  border: 1px solid var(--agent-border, #e8e8e8);
+}
+
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.md-table th {
+  background: var(--agent-tool-header, #fafafa);
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--agent-border, #e8e8e8);
+  white-space: nowrap;
+  color: var(--agent-text, #333);
+}
+
+.md-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--agent-border, #f0f0f0);
+  color: var(--agent-text, #333);
+}
+
+.md-table tr:hover td {
+  background: var(--agent-sidebar-hover, #fafafa);
+}
+
+/* 引用 */
+.md-blockquote {
+  margin: 8px 0;
+  padding: 8px 16px;
+  border-left: 4px solid var(--agent-accent, #1890ff);
+  background: var(--agent-tool-bg, #f6f8fa);
+  border-radius: 0 6px 6px 0;
+  color: var(--agent-text-secondary, #555);
+}
+.md-blockquote p {
+  margin: 0;
+}
+
+/* 链接 */
+.md-link {
+  color: var(--agent-link, #1890ff);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+.md-link:hover {
+  border-bottom-color: var(--agent-link, #1890ff);
+}
+
+/* 分割线 */
+.md-renderer hr {
+  border: none;
+  border-top: 1px solid var(--agent-border, #e8e8e8);
+  margin: 16px 0;
+}
+
+/* 图片 */
+.md-image {
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+/* 加粗和斜体 */
+.md-renderer strong {
+  font-weight: 600;
+  color: var(--agent-text, #1a1a1a);
+}
+
+.md-renderer em {
+  font-style: italic;
+}
+
+/* 删除线 (GFM) */
+.md-renderer del {
+  text-decoration: line-through;
+  color: var(--agent-text-tertiary, #999);
+}
+
+/* 任务列表 (GFM) */
+.md-renderer input[type="checkbox"] {
+  margin-right: 6px;
+  accent-color: var(--agent-accent, #1890ff);
+}

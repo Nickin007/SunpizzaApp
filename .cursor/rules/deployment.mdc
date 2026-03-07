@@ -1,0 +1,60 @@
+---
+description: 部署流程和服务器配置记忆
+globs: "**/*.ps1,**/gunicorn*,**/.env"
+alwaysApply: false
+---
+
+# 部署记忆
+
+## 服务器信息
+
+| | 前端 | 后端 |
+|---|---|---|
+| **地址** | `ubuntu@118.25.70.79` | `ubuntu@118.89.73.199` |
+| **服务** | Nginx | Gunicorn (systemd `sunpizza-backend`) |
+| **代码路径** | `~/SunpizzaApp/admin-web/dist/` | `~/SunpizzaApp/backend/` |
+| **文件权限** | `www-data:www-data` | `ubuntu:ubuntu` |
+| **日志** | Nginx error log | `~/SunpizzaApp/backend/logs/gunicorn_error.log` |
+
+## 后端部署
+
+**脚本**：`quick_deploy_backend.ps1 -File backend/app/api/xxx.py`（单文件上传 + 重启服务）
+
+**手动方式**（脚本编码报错时的 workaround）：
+```
+scp backend/app/api/xxx.py ubuntu@118.89.73.199:~/SunpizzaApp/backend/app/api/xxx.py
+ssh ubuntu@118.89.73.199 "sudo systemctl restart sunpizza-backend"
+```
+
+**Gunicorn 配置**：4 workers, sync, 600s timeout, bind 0.0.0.0:5000
+
+## 前端部署
+
+**脚本**：`admin-web/quick_redeploy_frontend.ps1`（build → zip → scp → unzip → nginx reload）
+
+**手动方式**：
+```
+cd admin-web; npm install; npm run build
+Compress-Archive -Path dist\* -DestinationPath dist.zip -Force
+scp dist.zip ubuntu@118.25.70.79:~/SunpizzaApp/admin-web/dist.zip
+ssh ubuntu@118.25.70.79 "cd ~/SunpizzaApp/admin-web && sudo rm -rf dist && unzip -o dist.zip -d dist && sudo chown -R www-data:www-data dist && sudo nginx -t && sudo systemctl reload nginx"
+```
+
+**注意**：Node 22.11.0 版本警告（Vite 要求 22.12+）可安全忽略，不影响构建。
+
+## 数据库迁移
+
+无 Alembic，通过手动 Python 脚本（`backend/migrate_*.py`），在后端服务器 venv 环境中运行：
+```
+scp backend/migrate_xxx.py ubuntu@118.89.73.199:~/SunpizzaApp/backend/
+ssh ubuntu@118.89.73.199 "cd ~/SunpizzaApp/backend && source venv/bin/activate && python migrate_xxx.py"
+```
+
+现有迁移脚本：`migrate_accounting.py`、`migrate_company_model.py`、`migrate_fix.py`、`migrate_multi_roles.py`、`migrate_supply_chain.py`
+
+## 已知问题
+
+1. 部署脚本含非 ASCII 字符（✓/✗），在部分 PowerShell 环境下触发 `TerminatorExpectedAtEndOfString` 编码错误 → 用手动 scp + ssh 替代
+2. `Compress-Archive` 打包的 zip 在 Linux 解压时显示 `backslashes as path separators` 警告 → 可忽略，文件正常解压
+3. 前端 dist 目录权限为 `www-data`，删除时需 `sudo rm -rf`
+4. `npm install; npm run build`（PowerShell 用 `;` 分隔，不能用 `&&`）

@@ -16,13 +16,15 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   created_at: string;
-}
-
-export interface ToolCall {
-  id: string;
-  name: string;
-  name_cn: string;
-  arguments: Record<string, any>;
+  msg_type?: 'text' | 'tool_call' | 'tool_result';
+  type?: 'text' | 'tool_call' | 'tool_result';
+  toolName?: string;
+  toolCode?: string;
+  toolOutput?: string;
+  toolSuccess?: boolean;
+  metadata?: Record<string, any>;
+  fileInfo?: { filename: string };
+  fileInfos?: { filename: string }[];
 }
 
 export interface MemoryEntry {
@@ -42,8 +44,12 @@ export interface MemoryEntry {
 
 export interface StreamCallbacks {
   onChunk: (text: string) => void;
-  onToolCalls: (toolCalls: ToolCall[], toolContext?: any[]) => void;
-  onToolStatus: (message: string) => void;
+  onReasoning?: (content: string) => void;
+  onToolCallStart: (name: string) => void;
+  onToolCallDelta: (codeDelta: string) => void;
+  onToolCallEnd: (fullCode: string) => void;
+  onToolResult: (output: string, success: boolean) => void;
+  onStatus?: (message: string) => void;
   onDone: () => void;
   onError: (err: string) => void;
 }
@@ -83,13 +89,27 @@ async function processSSEStream(resp: Response, callbacks: StreamCallbacks) {
               callbacks.onError(parsed.error);
               return;
             }
-            if (parsed.type === 'tool_calls') {
-              callbacks.onToolCalls(parsed.tool_calls, parsed.tool_context);
-            } else if (parsed.type === 'tool_status') {
-              callbacks.onToolStatus(parsed.message);
-            } else if (parsed.content) {
+            if (parsed.type === 'reasoning') {
+              callbacks.onReasoning?.(parsed.content || '');
+            }
+            if (parsed.content) {
               receivedContent = true;
               callbacks.onChunk(parsed.content);
+            }
+            if (parsed.type === 'tool_call_start') {
+              callbacks.onToolCallStart(parsed.name || 'python_execute');
+            }
+            if (parsed.type === 'tool_call_delta') {
+              callbacks.onToolCallDelta(parsed.code_delta || '');
+            }
+            if (parsed.type === 'tool_call_end') {
+              callbacks.onToolCallEnd(parsed.code || '');
+            }
+            if (parsed.type === 'tool_result') {
+              callbacks.onToolResult(parsed.output || '', parsed.success ?? true);
+            }
+            if (parsed.type === 'status') {
+              callbacks.onStatus?.(parsed.message || '处理中...');
             }
           } catch {
             // skip malformed JSON
@@ -99,7 +119,9 @@ async function processSSEStream(resp: Response, callbacks: StreamCallbacks) {
     }
     callbacks.onDone();
   } catch (err: any) {
-    // If we already received content, treat stream closure as normal completion
+    if (err.name === 'AbortError') {
+      return;
+    }
     if (receivedContent) {
       callbacks.onDone();
     } else {
@@ -108,12 +130,15 @@ async function processSSEStream(resp: Response, callbacks: StreamCallbacks) {
   }
 }
 
-function getAuthHeaders() {
+function getAuthHeaders(isJson = true) {
   const token = localStorage.getItem('admin_token');
-  return {
-    'Content-Type': 'application/json',
+  const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
   };
+  if (isJson) {
+    headers['Content-Type'] = 'application/json';
+  }
+  return headers;
 }
 
 function getBaseURL() {
@@ -134,8 +159,73 @@ export function deleteConversation(id: number) {
   return request.delete<any, any>(`/chat/conversations/${id}`);
 }
 
+export function renameConversation(id: number, title: string) {
+  return request.patch<any, any>(`/chat/conversations/${id}`, { title });
+}
+
 export function getMessages(conversationId: number) {
   return request.get<any, any>(`/chat/conversations/${conversationId}/messages`);
+}
+
+// ==================== 工具：将后端消息映射为前端格式 ====================
+
+export function mapBackendMessage(msg: any): ChatMessage {
+  const msgType = msg.msg_type || 'text';
+  const meta = msg.metadata || {};
+  const result: ChatMessage = {
+    id: msg.id,
+    conversation_id: msg.conversation_id,
+    role: msg.role,
+    content: msg.content,
+    created_at: msg.created_at,
+    msg_type: msgType,
+    type: msgType,
+  };
+  if (msgType === 'tool_call') {
+    result.toolName = meta.tool_name || 'python_execute';
+    result.toolCode = msg.content;
+  } else if (msgType === 'tool_result') {
+    result.toolOutput = msg.content;
+    result.toolSuccess = meta.success ?? true;
+  }
+  if (msg.role === 'user') {
+    if (meta.files && Array.isArray(meta.files)) {
+      result.fileInfos = meta.files.map((f: any) => ({ filename: f.filename }));
+    } else if (meta.filename) {
+      result.fileInfo = { filename: meta.filename };
+    }
+  }
+  return result;
+}
+
+// ==================== 文件上传 ====================
+
+export async function uploadFile(file: File): Promise<{
+  file_token: string;
+  filename: string;
+  summary: string;
+  shape: number[];
+  columns: string[];
+} | null> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const resp = await fetch(`${getBaseURL()}/chat/upload`, {
+      method: 'POST',
+      headers: getAuthHeaders(false),
+      body: formData,
+    });
+    const json = await resp.json();
+    if (json.code === 200) {
+      return json.data;
+    }
+    console.error('Upload failed:', json.message);
+    return null;
+  } catch (err) {
+    console.error('Upload error:', err);
+    return null;
+  }
 }
 
 // ==================== 流式发送消息 ====================
@@ -144,16 +234,27 @@ export async function sendMessageStream(
   conversationId: number,
   content: string,
   callbacks: StreamCallbacks,
+  fileTokens?: string[],
+  thinking?: boolean,
+  signal?: AbortSignal,
 ) {
   try {
+    const body: any = { content };
+    if (fileTokens && fileTokens.length > 0) {
+      body.file_tokens = fileTokens;
+    }
+    if (thinking !== undefined) {
+      body.thinking = thinking;
+    }
+
     const resp = await fetch(`${getBaseURL()}/chat/conversations/${conversationId}/messages`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ content, stream: true }),
+      body: JSON.stringify(body),
+      signal,
     });
 
     if (!resp.ok) {
-      // 可能是 JSON 错误响应
       try {
         const errJson = await resp.json();
         callbacks.onError(errJson.message || `HTTP ${resp.status}`);
@@ -163,12 +264,10 @@ export async function sendMessageStream(
       return;
     }
 
-    // 检查是否是 SSE 流
     const contentType = resp.headers.get('content-type') || '';
     if (contentType.includes('text/event-stream')) {
       await processSSEStream(resp, callbacks);
     } else {
-      // JSON 响应（不应出现，但以防万一）
       const json = await resp.json();
       if (json.code === 200 && json.data?.assistant_message) {
         callbacks.onChunk(json.data.assistant_message.content);
@@ -178,62 +277,9 @@ export async function sendMessageStream(
       }
     }
   } catch (err: any) {
-    callbacks.onError(err.message || '网络错误');
-  }
-}
-
-// ==================== 流式工具执行 ====================
-
-export async function executeToolsStream(
-  conversationId: number,
-  toolCalls: ToolCall[],
-  priorToolContext: any[],
-  callbacks: StreamCallbacks,
-) {
-  try {
-    const resp = await fetch(`${getBaseURL()}/chat/conversations/${conversationId}/execute-tools`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ tool_calls: toolCalls, prior_tool_context: priorToolContext }),
-    });
-
-    if (!resp.ok) {
-      try {
-        const errJson = await resp.json();
-        callbacks.onError(errJson.message || `HTTP ${resp.status}`);
-      } catch {
-        callbacks.onError(`HTTP ${resp.status}`);
-      }
+    if (err.name === 'AbortError') {
       return;
     }
-
-    const contentType = resp.headers.get('content-type') || '';
-    if (contentType.includes('text/event-stream')) {
-      await processSSEStream(resp, callbacks);
-    } else {
-      const json = await resp.json();
-      callbacks.onError(json.message || '未知响应格式');
-    }
-  } catch (err: any) {
     callbacks.onError(err.message || '网络错误');
   }
-}
-
-// ==================== 记忆 API ====================
-
-export function listMemory(tier?: string) {
-  const params = tier ? { tier } : {};
-  return request.get<any, any>('/chat/memory', { params });
-}
-
-export function addMemory(data: { tier: string; category: string; content: string }) {
-  return request.post<any, any>('/chat/memory', data);
-}
-
-export function deleteMemory(id: number) {
-  return request.delete<any, any>(`/chat/memory/${id}`);
-}
-
-export function summarizeConversation(conversationId: number) {
-  return request.post<any, any>(`/chat/memory/summarize/${conversationId}`);
 }

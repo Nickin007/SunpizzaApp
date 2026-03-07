@@ -1,0 +1,49 @@
+---
+description: 财务数字化后台模块记忆
+globs: "**/Accounting/**,**/finance*"
+alwaysApply: false
+---
+
+# 财务数字化后台 (`/accounting`)
+
+使用 `PortalLayout`（橙色主题 #fa8c16）。侧边栏：首页、财务模块（账套管理/科目管理/凭证录入/凭证查询/核算项目/财务报表）、成本分析。期初余额已合并到新建账套流程中（多步向导）。
+
+## 账套管理 (`/accounting/books`)
+
+- `AccountBook` 模型：名称、开始日期、币种、上次结账期间
+- 支持创建/编辑/删除
+
+## 科目管理 (`/accounting/subjects`)
+
+- `AccountSubject` 模型：科目代码、名称、类型（资产/负债/权益/收入/费用）、余额方向（借/贷）、level、is_enabled、is_cash
+- 预置中国企业会计准则标准一级科目（1001 库存现金、1002 银行存款 等）
+- 树形结构，支持增加下级科目
+- 可通过 `SubjectItemLink` 关联核算项目类别（`linked_category_ids`）
+
+## 核算项目 (`/accounting/items`)
+
+- `AccountItemCategory` — 核算项目类别（如"门店"、"部门"）
+- `AccountItem` — 类别下的具体项（如"朝阳店"、"财务部"），有 code 和 is_enabled
+- 通过 `SubjectItemLink` 将类别关联到科目
+
+## 凭证 (`/accounting/voucher/new`, `/accounting/vouchers`)
+
+- `Voucher` 模型：凭证字号、凭证号（自动递增）、期间、日期、附件数、状态（draft/approved）
+- `VoucherEntry` 模型：行号、摘要、科目ID、借方金额、贷方金额
+- `VoucherEntryItem` — 分录中的核算项目明细（category_id + item_id）
+- 借贷两栏式录入，实时计算差额，不平不能保存
+- 审核/反审核功能
+
+## 期初余额 (`/accounting/initial-balance`)
+
+- `SubjectInitialBalance` 模型：book_id、subject_id、item_id（可选）、debit_amount、credit_amount
+- 用于从其他系统迁移时设置非零初始值
+
+## 报表系统 (`/accounting/reports`)
+
+5 个报表：科目余额表、核算项目余额表、资产负债表、利润表、现金流量表
+- 支持按期间筛选、自动引用科目/核算项目余额数据、Excel 导出
+
+## 相关模型一览
+
+`AccountBook`、`AccountSubject`、`Voucher`、`VoucherEntry`、`AccountItemCategory`、`AccountItem`、`SubjectItemLink`、`VoucherEntryItem`、`SubjectInitialBalance`（共 9 个）

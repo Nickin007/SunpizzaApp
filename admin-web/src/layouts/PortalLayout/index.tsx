@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { Layout, Menu, Avatar, Dropdown, message } from 'antd';
+import { Layout, Menu, Avatar, Dropdown, Drawer, message } from 'antd';
 import {
   UserOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  MenuOutlined,
+  CloseOutlined,
   HomeOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import logoImage from '../../assets/logo.png';
 import type { ItemType } from 'antd/es/menu/interface';
 import ChatDrawer from '../../components/ChatDrawer';
@@ -99,10 +102,23 @@ export const THEMES = {
     menuSelectedTo: '#006d75',
     logoShadow: 'rgba(19, 194, 194, 0.1)',
   } as PortalTheme,
+  geekblue: {
+    primary: '#2f54eb',
+    primaryDark: '#1d39c4',
+    siderGradientFrom: '#adc6ff',
+    siderGradientTo: '#85a5ff',
+    menuHoverFrom: '#f0f5ff',
+    menuHoverTo: '#d6e4ff',
+    menuSelectedFrom: '#2f54eb',
+    menuSelectedTo: '#1d39c4',
+    logoShadow: 'rgba(47, 84, 235, 0.1)',
+  } as PortalTheme,
 };
 
 const PortalLayout: React.FC<PortalLayoutProps> = ({ title, theme, menuItems }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
@@ -110,6 +126,7 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({ title, theme, menuItems }) 
   const handleMenuClick = ({ key }: { key: string }) => {
     if (key.startsWith('/')) {
       navigate(key);
+      if (isMobile) setDrawerOpen(false);
     }
   };
 
@@ -134,7 +151,6 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({ title, theme, menuItems }) 
     },
   ];
 
-  // 用 CSS 变量注入主题色
   const cssVars = {
     '--portal-primary': theme.primary,
     '--portal-primary-dark': theme.primaryDark,
@@ -147,41 +163,75 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({ title, theme, menuItems }) 
     '--portal-logo-shadow': theme.logoShadow,
   } as React.CSSProperties;
 
+  const siderContent = (
+    <>
+      <div className="portal-logo-box">
+        <img src={logoImage} alt="圣比萨 Logo" className="portal-logo-large" />
+      </div>
+      <Menu
+        theme="light"
+        mode="inline"
+        selectedKeys={[location.pathname]}
+        items={menuItems}
+        onClick={handleMenuClick}
+        className="portal-menu"
+      />
+    </>
+  );
+
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5', ...cssVars }}>
-      <Sider
-        trigger={null}
-        collapsible
-        collapsed={collapsed}
-        theme="light"
-        className="portal-sider"
-        width={260}
-        collapsedWidth={80}
-      >
-        <div className="portal-logo-box">
-          {collapsed ? (
-            <img src={logoImage} alt="Logo" className="portal-logo-small" />
-          ) : (
-            <img src={logoImage} alt="圣比萨 Logo" className="portal-logo-large" />
-          )}
-        </div>
-        <Menu
+      {isMobile ? (
+        <Drawer
+          placement="left"
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          width={280}
+          styles={{ body: { padding: 0, background: `linear-gradient(180deg, ${theme.siderGradientFrom} 0%, ${theme.siderGradientTo} 100%)` } }}
+          closeIcon={<CloseOutlined style={{ color: '#333' }} />}
+        >
+          {siderContent}
+        </Drawer>
+      ) : (
+        <Sider
+          trigger={null}
+          collapsible
+          collapsed={collapsed}
           theme="light"
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          onClick={handleMenuClick}
-          className="portal-menu"
-        />
-      </Sider>
+          className="portal-sider"
+          width={260}
+          collapsedWidth={80}
+        >
+          {!collapsed && siderContent}
+          {collapsed && (
+            <>
+              <div className="portal-logo-box">
+                <img src={logoImage} alt="Logo" className="portal-logo-small" />
+              </div>
+              <Menu
+                theme="light"
+                mode="inline"
+                selectedKeys={[location.pathname]}
+                items={menuItems}
+                onClick={handleMenuClick}
+                className="portal-menu"
+              />
+            </>
+          )}
+        </Sider>
+      )}
       <Layout className="portal-content-layout">
         <Header className="portal-header">
           <div className="portal-header-left">
-            {React.createElement(collapsed ? MenuUnfoldOutlined : MenuFoldOutlined, {
-              className: 'portal-trigger',
-              onClick: () => setCollapsed(!collapsed),
-            })}
-            <h2 style={{ margin: 0, color: theme.primary, fontSize: '20px', fontWeight: 600 }}>
+            {isMobile ? (
+              <MenuOutlined className="portal-trigger" onClick={() => setDrawerOpen(true)} />
+            ) : (
+              React.createElement(collapsed ? MenuUnfoldOutlined : MenuFoldOutlined, {
+                className: 'portal-trigger',
+                onClick: () => setCollapsed(!collapsed),
+              })
+            )}
+            <h2 className="portal-title" style={{ margin: 0, color: theme.primary, fontWeight: 600 }}>
               {title}
             </h2>
           </div>

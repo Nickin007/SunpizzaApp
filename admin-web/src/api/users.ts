@@ -9,12 +9,12 @@ export interface CreateUserRequest {
   username: string;
   password: string;
   real_name: string;
-  role: string;
+  roles: string[];
 }
 
 export interface UpdateUserRequest {
   real_name?: string;
-  role?: string;
+  roles?: string[];
   password?: string;
 }
 

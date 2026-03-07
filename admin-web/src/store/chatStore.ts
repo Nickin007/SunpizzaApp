@@ -1,21 +1,26 @@
 import { create } from 'zustand';
-import type { Conversation, ChatMessage, ToolCall } from '../api/chat';
+import type { Conversation, ChatMessage } from '../api/chat';
 import {
   listConversations,
   createConversation as apiCreateConversation,
   deleteConversation as apiDeleteConversation,
   getMessages,
   sendMessageStream,
-  executeToolsStream,
+  uploadFile as apiUploadFile,
+  mapBackendMessage,
 } from '../api/chat';
 
+interface UploadedFile {
+  fileToken: string;
+  filename: string;
+  summary: string;
+}
+
 interface ChatState {
-  // UI state
   drawerVisible: boolean;
   toggleDrawer: () => void;
   setDrawerVisible: (visible: boolean) => void;
 
-  // Conversations
   conversations: Conversation[];
   currentConversationId: number | null;
   loadingConversations: boolean;
@@ -24,32 +29,31 @@ interface ChatState {
   deleteConversation: (id: number) => Promise<void>;
   setCurrentConversation: (id: number | null) => void;
 
-  // Messages
   messages: ChatMessage[];
   loadingMessages: boolean;
   loadMessages: (conversationId: number) => Promise<void>;
 
-  // Sending (streaming)
   sending: boolean;
   streamingContent: string;
-  sendMessage: (content: string) => Promise<void>;
+  reasoningContent: string;
+  statusMessage: string;
+  sendMessage: (content: string, fileTokens?: string[], thinking?: boolean) => Promise<void>;
+  stopGeneration: () => void;
 
-  // Tool calls
-  pendingToolCalls: ToolCall[] | null;
-  toolContext: any[];  // 多轮工具调用时保存的前几轮上下文
-  executingTools: boolean;
-  toolStatus: string;
-  confirmToolCalls: () => Promise<void>;
-  rejectToolCalls: () => void;
+  uploadedFiles: UploadedFile[];
+  uploading: boolean;
+  uploadFile: (file: File) => Promise<boolean>;
+  removeUploadedFile: (index: number) => void;
+  clearAllUploadedFiles: () => void;
 }
 
+const activeStreams = new Map<number, AbortController>();
+
 export const useChatStore = create<ChatState>((set, get) => ({
-  // UI state
   drawerVisible: false,
   toggleDrawer: () => set((s) => ({ drawerVisible: !s.drawerVisible })),
   setDrawerVisible: (visible) => set({ drawerVisible: visible }),
 
-  // Conversations
   conversations: [],
   currentConversationId: null,
   loadingConversations: false,
@@ -88,6 +92,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   deleteConversation: async (id) => {
     try {
+      activeStreams.get(id)?.abort();
+      activeStreams.delete(id);
       await apiDeleteConversation(id);
       set((s) => {
         const newConvs = s.conversations.filter((c) => c.id !== id);
@@ -113,13 +119,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setCurrentConversation: (id) => {
-    set({ currentConversationId: id, messages: [], pendingToolCalls: null, toolContext: [], toolStatus: '' });
+    if (activeStreams.has(id!)) {
+      activeStreams.get(id!)?.abort();
+      activeStreams.delete(id!);
+    }
+    set({ currentConversationId: id, messages: [], sending: false, streamingContent: '', statusMessage: '' });
     if (id) {
       get().loadMessages(id);
     }
   },
 
-  // Messages
   messages: [],
   loadingMessages: false,
 
@@ -128,7 +137,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const resp = await getMessages(conversationId);
       if (resp.data?.code === 200) {
-        set({ messages: resp.data.data || [] });
+        const rawMessages = resp.data.data || [];
+        const mapped = rawMessages.map(mapBackendMessage);
+        set({ messages: mapped });
       }
     } catch (e) {
       console.error('加载消息失败', e);
@@ -137,68 +148,142 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  // Sending
   sending: false,
   streamingContent: '',
+  reasoningContent: '',
+  statusMessage: '',
 
-  sendMessage: async (content) => {
+  sendMessage: async (content, fileTokens, thinking) => {
     const { currentConversationId, messages } = get();
     if (!currentConversationId || !content.trim()) return;
 
-    // Optimistic: add user message to UI
+    const convId = currentConversationId;
+
+    activeStreams.get(convId)?.abort();
+    const abortController = new AbortController();
+    activeStreams.set(convId, abortController);
+
+    const files = get().uploadedFiles;
     const tempUserMsg: ChatMessage = {
       id: Date.now(),
-      conversation_id: currentConversationId,
+      conversation_id: convId,
       role: 'user',
       content: content.trim(),
       created_at: new Date().toISOString(),
+      ...(files.length > 0 ? { fileInfos: files.map((f) => ({ filename: f.filename })) } : {}),
     };
 
     set({
       sending: true,
       streamingContent: '',
+      reasoningContent: '',
+      statusMessage: '',
       messages: [...messages, tempUserMsg],
-      pendingToolCalls: null,
-      toolContext: [],
-      toolStatus: '',
+      uploadedFiles: [],
     });
 
-    await sendMessageStream(currentConversationId, content.trim(), {
+    await sendMessageStream(convId, content.trim(), {
       onChunk: (text) => {
-        set((s) => ({ streamingContent: s.streamingContent + text }));
+        if (get().currentConversationId !== convId) return;
+        set((s) => ({ streamingContent: s.streamingContent + text, statusMessage: '', reasoningContent: '' }));
       },
-      onToolCalls: (toolCalls, toolContext) => {
-        // AI 想调用工具 - 保留之前流式输出的文字，再显示确认卡片
-        const { streamingContent: preContent } = get();
-        if (preContent) {
-          const partialMsg: ChatMessage = {
-            id: Date.now() + 1,
-            conversation_id: currentConversationId,
+
+      onReasoning: (content) => {
+        if (get().currentConversationId !== convId) return;
+        set((s) => ({ reasoningContent: s.reasoningContent + content, statusMessage: '' }));
+      },
+
+      onToolCallStart: (name) => {
+        if (get().currentConversationId !== convId) return;
+        const { streamingContent, messages: msgs } = get();
+        const newMsgs = [...msgs];
+        if (streamingContent) {
+          newMsgs.push({
+            id: Date.now(),
+            conversation_id: convId,
             role: 'assistant',
-            content: preContent,
+            content: streamingContent,
             created_at: new Date().toISOString(),
-          };
-          set((s) => ({
-            messages: [...s.messages, partialMsg],
-            pendingToolCalls: toolCalls,
-            toolContext: toolContext || [],
-            sending: false,
-            streamingContent: '',
-          }));
-        } else {
-          set({ pendingToolCalls: toolCalls, toolContext: toolContext || [], sending: false, streamingContent: '' });
+          });
         }
+        newMsgs.push({
+          id: Date.now() + 1,
+          conversation_id: convId,
+          role: 'assistant',
+          content: '',
+          created_at: new Date().toISOString(),
+          type: 'tool_call',
+          toolName: name,
+          toolCode: '',
+        });
+        set({ messages: newMsgs, streamingContent: '', statusMessage: '' });
       },
-      onToolStatus: (message) => {
-        set({ toolStatus: message });
+
+      onToolCallDelta: (codeDelta) => {
+        if (get().currentConversationId !== convId) return;
+        set((s) => {
+          const msgs = [...s.messages];
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].type === 'tool_call') {
+              msgs[i] = {
+                ...msgs[i],
+                toolCode: (msgs[i].toolCode || '') + codeDelta,
+                content: (msgs[i].toolCode || '') + codeDelta,
+              };
+              break;
+            }
+          }
+          return { messages: msgs };
+        });
       },
+
+      onToolCallEnd: (fullCode) => {
+        if (get().currentConversationId !== convId) return;
+        set((s) => {
+          const msgs = [...s.messages];
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].type === 'tool_call') {
+              msgs[i] = { ...msgs[i], toolCode: fullCode, content: fullCode };
+              break;
+            }
+          }
+          return { messages: msgs };
+        });
+      },
+
+      onToolResult: (output, success) => {
+        if (get().currentConversationId !== convId) return;
+        set((s) => ({
+          messages: [
+            ...s.messages,
+            {
+              id: Date.now() + 2,
+              conversation_id: convId,
+              role: 'assistant',
+              content: output,
+              created_at: new Date().toISOString(),
+              type: 'tool_result',
+              toolOutput: output,
+              toolSuccess: success,
+            },
+          ],
+          statusMessage: '',
+        }));
+      },
+
+      onStatus: (message) => {
+        if (get().currentConversationId !== convId) return;
+        set({ statusMessage: message });
+      },
+
       onDone: () => {
+        activeStreams.delete(convId);
+        if (get().currentConversationId !== convId) return;
         const { streamingContent } = get();
         if (streamingContent) {
-          // 流式结束，将 streamingContent 转为正式消息
           const assistantMsg: ChatMessage = {
-            id: Date.now() + 1,
-            conversation_id: currentConversationId,
+            id: Date.now() + 3,
+            conversation_id: convId,
             role: 'assistant',
             content: streamingContent,
             created_at: new Date().toISOString(),
@@ -207,16 +292,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
             messages: [...s.messages, assistantMsg],
             sending: false,
             streamingContent: '',
+            reasoningContent: '',
+            statusMessage: '',
           }));
-          get().loadConversations();
         } else {
-          set({ sending: false, streamingContent: '' });
+          set({ sending: false, streamingContent: '', reasoningContent: '', statusMessage: '' });
         }
+        get().loadConversations();
       },
+
       onError: (err) => {
+        activeStreams.delete(convId);
+        if (get().currentConversationId !== convId) return;
         const errorMsg: ChatMessage = {
-          id: Date.now() + 1,
-          conversation_id: currentConversationId,
+          id: Date.now() + 4,
+          conversation_id: convId,
           role: 'assistant',
           content: `[错误] ${err}`,
           created_at: new Date().toISOString(),
@@ -225,119 +315,67 @@ export const useChatStore = create<ChatState>((set, get) => ({
           messages: [...s.messages, errorMsg],
           sending: false,
           streamingContent: '',
+          reasoningContent: '',
+          statusMessage: '',
         }));
       },
-    });
+    }, fileTokens, thinking, abortController.signal);
   },
 
-  // Tool calls
-  pendingToolCalls: null,
-  toolContext: [],
-  executingTools: false,
-  toolStatus: '',
+  stopGeneration: () => {
+    const convId = get().currentConversationId;
+    if (!convId) return;
+    activeStreams.get(convId)?.abort();
+    activeStreams.delete(convId);
+    const { streamingContent } = get();
+    if (streamingContent) {
+      const msg: ChatMessage = {
+        id: Date.now(),
+        conversation_id: convId,
+        role: 'assistant',
+        content: streamingContent,
+        created_at: new Date().toISOString(),
+      };
+      set((s) => ({
+        messages: [...s.messages, msg],
+        sending: false,
+        streamingContent: '',
+        reasoningContent: '',
+        statusMessage: '',
+      }));
+    } else {
+      set({ sending: false, streamingContent: '', reasoningContent: '', statusMessage: '' });
+    }
+  },
 
-  confirmToolCalls: async () => {
-    const { currentConversationId, pendingToolCalls, toolContext } = get();
-    if (!currentConversationId || !pendingToolCalls) return;
+  uploadedFiles: [],
+  uploading: false,
 
-    const toolCallsCopy = [...pendingToolCalls];
-    const toolContextCopy = [...toolContext];
-    set({
-      executingTools: true,
-      pendingToolCalls: null,
-      streamingContent: '',
-      toolStatus: '',
-    });
-
-    await executeToolsStream(currentConversationId, toolCallsCopy, toolContextCopy, {
-      onChunk: (text) => {
-        set((s) => ({ streamingContent: s.streamingContent + text }));
-      },
-      onToolCalls: (toolCalls, newToolContext) => {
-        // AI 又想调用更多工具（多轮）- 保留已输出文字，再显示新工具确认卡片
-        const { streamingContent: preContent } = get();
-        if (preContent) {
-          const partialMsg: ChatMessage = {
-            id: Date.now() + 1,
-            conversation_id: currentConversationId,
-            role: 'assistant',
-            content: preContent,
-            created_at: new Date().toISOString(),
-          };
-          set((s) => ({
-            messages: [...s.messages, partialMsg],
-            pendingToolCalls: toolCalls,
-            toolContext: newToolContext || [],
-            executingTools: false,
-            streamingContent: '',
-            toolStatus: '',
-          }));
-        } else {
-          set({
-            pendingToolCalls: toolCalls,
-            toolContext: newToolContext || [],
-            executingTools: false,
-            streamingContent: '',
-            toolStatus: '',
-          });
-        }
-      },
-      onToolStatus: (message) => {
-        set({ toolStatus: message });
-      },
-      onDone: () => {
-        const { streamingContent } = get();
-        if (streamingContent) {
-          const assistantMsg: ChatMessage = {
-            id: Date.now() + 1,
-            conversation_id: currentConversationId,
-            role: 'assistant',
-            content: streamingContent,
-            created_at: new Date().toISOString(),
-          };
-          set((s) => ({
-            messages: [...s.messages, assistantMsg],
-            executingTools: false,
-            streamingContent: '',
-            toolStatus: '',
-          }));
-          get().loadConversations();
-        } else {
-          set({ executingTools: false, streamingContent: '', toolStatus: '' });
-        }
-      },
-      onError: (err) => {
-        const errorMsg: ChatMessage = {
-          id: Date.now() + 1,
-          conversation_id: currentConversationId,
-          role: 'assistant',
-          content: `[工具执行错误] ${err}`,
-          created_at: new Date().toISOString(),
-        };
+  uploadFile: async (file) => {
+    set({ uploading: true });
+    try {
+      const result = await apiUploadFile(file);
+      if (result) {
         set((s) => ({
-          messages: [...s.messages, errorMsg],
-          executingTools: false,
-          streamingContent: '',
-          toolStatus: '',
+          uploadedFiles: [
+            ...s.uploadedFiles,
+            { fileToken: result.file_token, filename: result.filename, summary: result.summary },
+          ],
+          uploading: false,
         }));
-      },
-    });
+        return true;
+      }
+      set({ uploading: false });
+      return false;
+    } catch (e) {
+      console.error('上传文件失败', e);
+      set({ uploading: false });
+      return false;
+    }
   },
 
-  rejectToolCalls: () => {
-    const { currentConversationId } = get();
-    const rejectMsg: ChatMessage = {
-      id: Date.now(),
-      conversation_id: currentConversationId || 0,
-      role: 'assistant',
-      content: '已取消工具调用。',
-      created_at: new Date().toISOString(),
-    };
-    set((s) => ({
-      pendingToolCalls: null,
-      toolContext: [],
-      toolStatus: '',
-      messages: [...s.messages, rejectMsg],
-    }));
-  },
+  removeUploadedFile: (index) =>
+    set((s) => ({ uploadedFiles: s.uploadedFiles.filter((_, i) => i !== index) })),
+
+  clearAllUploadedFiles: () => set({ uploadedFiles: [] }),
 }));

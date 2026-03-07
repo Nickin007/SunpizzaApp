@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, Tree, Button, Modal, Form, Input, Select, Switch, Space, Tag, message, Empty, Typography, Alert, Popconfirm, Input as AntInput } from 'antd';
+import { Card, Tree, Button, Modal, Form, Input, Select, Switch, Space, Tag, message, Empty, Typography, Alert, Popconfirm, Input as AntInput, Checkbox } from 'antd';
 import { PlusOutlined, DatabaseOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import * as financeApi from '../../api/finance';
-import type { AccountSubject } from '../../api/finance';
+import type { AccountSubject, AccountItemCategory } from '../../api/finance';
 import { useFinanceStore } from '../../store/financeStore';
+import './accounting.css';
 
 const { Text, Title } = Typography;
 const { Search } = AntInput;
@@ -25,6 +26,15 @@ const Subjects: React.FC = () => {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [addForm] = Form.useForm();
   const [searchText, setSearchText] = useState('');
+  const [categories, setCategories] = useState<AccountItemCategory[]>([]);
+
+  const loadCategories = async () => {
+    if (!currentBookId) return;
+    try {
+      const res = await financeApi.listItemCategories(currentBookId);
+      if (res.data.code === 200) setCategories(res.data.data);
+    } catch { /* ignore */ }
+  };
 
   const loadSubjects = async () => {
     if (!currentBookId) return;
@@ -43,6 +53,7 @@ const Subjects: React.FC = () => {
 
   useEffect(() => {
     loadSubjects();
+    loadCategories();
     setSelectedSubject(null);
   }, [currentBookId]);
 
@@ -232,6 +243,25 @@ const Subjects: React.FC = () => {
                     <Text type="secondary">现金科目：</Text>
                     <Tag color={selectedSubject.is_cash ? 'green' : 'default'}>{selectedSubject.is_cash ? '是' : '否'}</Tag>
                   </div>
+
+                  {categories.length > 0 && (
+                    <div>
+                      <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>核算项目关联：</Text>
+                      <Checkbox.Group
+                        value={selectedSubject.linked_category_ids || []}
+                        onChange={async (vals) => {
+                          try {
+                            const res = await financeApi.setSubjectItemLinks(selectedSubject.id, vals as number[]);
+                            if (res.data.code === 200) {
+                              message.success('关联更新成功');
+                              loadSubjects();
+                            }
+                          } catch { message.error('更新失败'); }
+                        }}
+                        options={categories.map(c => ({ label: c.name, value: c.id }))}
+                      />
+                    </div>
+                  )}
 
                   <Space style={{ marginTop: 8 }}>
                     <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddChild}>

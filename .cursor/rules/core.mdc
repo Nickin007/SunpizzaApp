@@ -1,0 +1,55 @@
+---
+description: 项目核心全局信息——项目概况、服务器、角色、门户
+alwaysApply: true
+---
+
+# 圣比萨数字化管理平台 — 核心记忆
+
+## 项目基本信息
+
+- **项目名称**：圣比萨数字化管理平台（SunpizzaApp）
+- **主仓库路径**：`C:\Users\YQH20\Desktop\SunpizzaApp`
+- **远程仓库**：`https://github.com/Nickin007/SunpizzaApp`，分支 `dev`
+- **前端服务器**：`ubuntu@118.25.70.79`（Nginx，静态文件 `~/SunpizzaApp/admin-web/dist/`）
+- **后端服务器**：`ubuntu@118.89.73.199`（Flask/Gunicorn，systemd 服务 `sunpizza-backend`，代码 `~/SunpizzaApp/backend/`）
+- **数据库**：MySQL `sunpizza_db`（后端服务器上，用户 `root`）
+
+## 目录结构概要
+
+- `admin-web/src/` — 前端：`pages/`（按模块分目录）、`api/`（10 个 API 文件）、`store/`（4 个 Zustand store）、`hooks/`、`components/`
+- `backend/app/` — 后端：`api/`（9 个蓝图）、`models.py`（33 个模型）、`utils/`（auth/response/order_parser）
+
+## 用户角色系统
+
+`users.role` 列类型为 **TEXT**（非 ENUM），支持逗号分隔多角色。合法角色值：
+
+| 角色 | 说明 |
+|------|------|
+| `admin` | 系统管理员（全部权限） |
+| `delivery_operation` | 外卖运营 |
+| `SupplyChain_operation` | 供应链运营 |
+| `Accouting_operation` | 财务运营 |
+| `DouyinANDOffline_operation` | 抖音/小程序运营 |
+| `model_operation` | 模型运营 |
+| `warehouse_admin` | 仓库管理员 |
+| `store_manager` | 门店店长 |
+
+多角色校验工具：`has_any_role(current_user, 'role1', 'role2')`（`app/utils/auth.py`）
+
+## 门户系统（7 个后台）
+
+登录后进入 `PortalSelect` 页面，按角色显示可访问后台：
+
+| 后台 | 路由前缀 | 允许角色 | 主题色 |
+|------|----------|----------|--------|
+| 外卖运营数字化后台 | `/delivery` | admin, delivery_operation | 蓝 #1890ff |
+| 供应链数字化后台 | `/supply-chain` | admin, SupplyChain_operation, warehouse_admin, store_manager | 绿 #52c41a |
+| 财务数字化后台 | `/accounting` | admin, Accouting_operation | 橙 #fa8c16 |
+| 抖音/小程序数字化后台 | `/douyin` | admin, DouyinANDOffline_operation | 紫 #722ed1 |
+| 账号权限管理后台 | `/admin` | admin | 红 #f5222d |
+| AI Agent 后台 | `/agent` | admin | 青 #13c2c2 |
+| 模型压力测试 | `/model-test` | admin, model_operation | 极客蓝 #2f54eb |
+
+## 开发流程约定
+
+- **每次功能改动完成后，必须立即部署**：代码改动完成并通过检查后，自动执行前端 + 后端的部署流程（即使只改了一端，也确认另一端无需部署后再跳过）。部署方式参见 `deployment.mdc`。

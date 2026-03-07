@@ -19,10 +19,25 @@ import AccountingSubjects from '../pages/Accounting/Subjects';
 import AccountingVoucherForm from '../pages/Accounting/VoucherForm';
 import AccountingVoucherList from '../pages/Accounting/VoucherList';
 import AccountingWelcome from '../pages/Accounting/Welcome';
+import AccountingItemManage from '../pages/Accounting/ItemManage';
+import AccountingReports from '../pages/Accounting/Reports';
 // AI Agent 后台页面
 import AgentChat from '../pages/Agent/Chat';
-import AgentFileEditor from '../pages/Agent/FileEditor';
-import AgentMemoryBrowser from '../pages/Agent/MemoryBrowser';
+import AgentLayout from '../layouts/AgentLayout';
+// 模型压力测试页面
+import CompanyModel from '../pages/ModelTest/CompanyModel';
+import StoreModel from '../pages/ModelTest/StoreModel';
+// 供应链页面
+import SCDashboard from '../pages/SupplyChain/Dashboard';
+import SCProductManage from '../pages/SupplyChain/ProductManage';
+import SCStoreManage from '../pages/SupplyChain/StoreManage';
+import SCWarehouseManage from '../pages/SupplyChain/WarehouseManage';
+import SCShopOrder from '../pages/SupplyChain/ShopOrder';
+import SCShopOrderHistory from '../pages/SupplyChain/ShopOrderHistory';
+import SCOrderReview from '../pages/SupplyChain/OrderReview';
+import SCWarehouseShip from '../pages/SupplyChain/WarehouseShip';
+import SCInventoryManage from '../pages/SupplyChain/InventoryManage';
+import SCReports from '../pages/SupplyChain/Reports';
 import { useAuthStore } from '../store/authStore';
 // 图标
 import {
@@ -31,7 +46,6 @@ import {
   DatabaseOutlined,
   ShoppingCartOutlined,
   FileTextOutlined,
-  TransactionOutlined,
   VideoCameraOutlined,
   AppstoreOutlined,
   ShopOutlined,
@@ -42,9 +56,14 @@ import {
   AuditOutlined,
   SearchOutlined,
   RobotOutlined,
-  FileMarkdownOutlined,
-  FolderOutlined,
   MessageOutlined,
+  ExperimentOutlined,
+  BankOutlined,
+  InboxOutlined,
+  SendOutlined,
+  BarChartOutlined,
+  HomeOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 
 // 路由守卫 - 检查是否登录
@@ -53,33 +72,59 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
-// 角色守卫 - 检查角色权限
+// 角色守卫 - 检查角色权限（支持多角色）
 const RoleRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) => {
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const user = useAuthStore(state => state.user);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!user || !allowedRoles.includes(user.role)) return <Navigate to="/portal-select" replace />;
+  if (!user || !user.roles?.some(r => allowedRoles.includes(r))) return <Navigate to="/portal-select" replace />;
   return <>{children}</>;
 };
 
+// 供应链布局 wrapper —— 根据用户角色动态生成菜单
+const SupplyChainLayoutWrapper = () => {
+  const user = useAuthStore(state => state.user);
+  return <PortalLayout title="供应链数字化后台" theme={THEMES.green} menuItems={getSupplyChainMenu(user?.roles)} />;
+};
+
 // ========== 各门户侧边栏菜单配置 ==========
-const supplyChainMenu = [
-  {
-    key: '/supply-chain/welcome',
-    icon: <DashboardOutlined />,
-    label: '首页',
-  },
-  {
-    key: '/supply-chain/inventory',
-    icon: <DatabaseOutlined />,
-    label: '库存管理',
-  },
-  {
-    key: '/supply-chain/purchase',
-    icon: <ShoppingCartOutlined />,
-    label: '采购管理',
-  },
-];
+const getSupplyChainMenu = (roles?: string[]) => {
+  const adminRoles = ['admin', 'SupplyChain_operation'];
+  const isAdmin = roles?.some(r => adminRoles.includes(r));
+  const isWarehouse = roles?.includes('warehouse_admin');
+  const isStore = roles?.includes('store_manager');
+
+  const menu: any[] = [
+    { key: '/supply-chain/dashboard', icon: <DashboardOutlined />, label: '首页' },
+  ];
+
+  if (isStore) {
+    menu.push(
+      { key: '/supply-chain/shop-order', icon: <ShoppingCartOutlined />, label: '门店订货' },
+      { key: '/supply-chain/shop-orders', icon: <HistoryOutlined />, label: '订单历史' },
+    );
+  }
+
+  if (isAdmin) {
+    menu.push(
+      { key: '/supply-chain/products', icon: <AppstoreOutlined />, label: '货品管理' },
+      { key: '/supply-chain/stores', icon: <ShopOutlined />, label: '门店管理' },
+      { key: '/supply-chain/warehouses', icon: <HomeOutlined />, label: '仓库管理' },
+      { key: '/supply-chain/order-review', icon: <AuditOutlined />, label: '订单审核' },
+      { key: '/supply-chain/inventory', icon: <DatabaseOutlined />, label: '库存管理' },
+      { key: '/supply-chain/reports', icon: <BarChartOutlined />, label: '报表统计' },
+    );
+  }
+
+  if (isWarehouse) {
+    menu.push(
+      { key: '/supply-chain/warehouse-ship', icon: <SendOutlined />, label: '订单处理' },
+      { key: '/supply-chain/inventory', icon: <DatabaseOutlined />, label: '库存管理' },
+    );
+  }
+
+  return menu;
+};
 
 const accountingMenu = [
   {
@@ -96,6 +141,8 @@ const accountingMenu = [
       { key: '/accounting/subjects', icon: <DatabaseOutlined />, label: '科目管理' },
       { key: '/accounting/voucher/new', icon: <FormOutlined />, label: '凭证录入' },
       { key: '/accounting/vouchers', icon: <SearchOutlined />, label: '凭证查询' },
+      { key: '/accounting/items', icon: <AppstoreOutlined />, label: '核算项目' },
+      { key: '/accounting/reports', icon: <BarChartOutlined />, label: '财务报表' },
     ],
   },
   {
@@ -136,31 +183,17 @@ const adminMenu = [
   },
 ];
 
-const agentMenu = [
+
+const modelTestMenu = [
   {
-    key: '/agent/chat',
-    icon: <MessageOutlined />,
-    label: 'Agent 对话',
+    key: '/model-test/company',
+    icon: <BankOutlined />,
+    label: '公司模型',
   },
   {
-    key: 'memory-core',
-    icon: <FileMarkdownOutlined />,
-    label: '记忆管理',
-    children: [
-      { key: '/agent/file?path=USER.md', icon: <FileMarkdownOutlined />, label: '用户档案 (USER.md)' },
-      { key: '/agent/file?path=SOUL.md', icon: <RobotOutlined />, label: 'AI 人设 (SOUL.md)' },
-      { key: '/agent/file?path=memory/preferences.md', icon: <FileMarkdownOutlined />, label: '偏好记忆' },
-      { key: '/agent/file?path=memory/contacts.md', icon: <FileMarkdownOutlined />, label: '联系人' },
-    ],
-  },
-  {
-    key: 'memory-extended',
-    icon: <FolderOutlined />,
-    label: '扩展记忆',
-    children: [
-      { key: '/agent/memory?folder=projects', icon: <FolderOutlined />, label: '项目记忆' },
-      { key: '/agent/memory?folder=daily', icon: <FolderOutlined />, label: '每日记录' },
-    ],
+    key: '/model-test/store',
+    icon: <ShopOutlined />,
+    label: '单店模型',
   },
 ];
 
@@ -197,24 +230,22 @@ const router = createBrowserRouter([
   {
     path: '/supply-chain',
     element: (
-      <RoleRoute allowedRoles={['admin', 'SupplyChain_operation']}>
-        <PortalLayout title="供应链数字化后台" theme={THEMES.green} menuItems={supplyChainMenu} />
+      <RoleRoute allowedRoles={['admin', 'SupplyChain_operation', 'warehouse_admin', 'store_manager']}>
+        <SupplyChainLayoutWrapper />
       </RoleRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/supply-chain/welcome" replace /> },
-      {
-        path: 'welcome',
-        element: <PlaceholderPage title="供应链数字化后台" description="供应链管理、库存管理、采购管理" color="#52c41a" />,
-      },
-      {
-        path: 'inventory',
-        element: <PlaceholderPage title="库存管理" description="实时库存监控、出入库管理" color="#52c41a" />,
-      },
-      {
-        path: 'purchase',
-        element: <PlaceholderPage title="采购管理" description="采购订单、供应商管理" color="#52c41a" />,
-      },
+      { index: true, element: <Navigate to="/supply-chain/dashboard" replace /> },
+      { path: 'dashboard', element: <SCDashboard /> },
+      { path: 'products', element: <SCProductManage /> },
+      { path: 'stores', element: <SCStoreManage /> },
+      { path: 'warehouses', element: <SCWarehouseManage /> },
+      { path: 'shop-order', element: <SCShopOrder /> },
+      { path: 'shop-orders', element: <SCShopOrderHistory /> },
+      { path: 'order-review', element: <SCOrderReview /> },
+      { path: 'warehouse-ship', element: <SCWarehouseShip /> },
+      { path: 'inventory', element: <SCInventoryManage /> },
+      { path: 'reports', element: <SCReports /> },
     ],
   },
   // ========== 财务后台 ==========
@@ -237,6 +268,8 @@ const router = createBrowserRouter([
       { path: 'voucher/edit/:id', element: <AccountingVoucherForm /> },
       { path: 'vouchers', element: <AccountingVoucherList /> },
       { path: 'cost-analysis', element: <AccountingCostAnalysis /> },
+      { path: 'items', element: <AccountingItemManage /> },
+      { path: 'reports', element: <AccountingReports /> },
     ],
   },
   // ========== 抖音/小程序后台 ==========
@@ -285,14 +318,26 @@ const router = createBrowserRouter([
     path: '/agent',
     element: (
       <RoleRoute allowedRoles={['admin']}>
-        <PortalLayout title="AI Agent 后台" theme={THEMES.teal} menuItems={agentMenu} />
+        <AgentLayout />
       </RoleRoute>
     ),
     children: [
       { index: true, element: <Navigate to="/agent/chat" replace /> },
       { path: 'chat', element: <AgentChat /> },
-      { path: 'file', element: <AgentFileEditor /> },
-      { path: 'memory', element: <AgentMemoryBrowser /> },
+    ],
+  },
+  // ========== 模型压力测试 ==========
+  {
+    path: '/model-test',
+    element: (
+      <RoleRoute allowedRoles={['admin', 'model_operation']}>
+        <PortalLayout title="模型压力测试" theme={THEMES.geekblue} menuItems={modelTestMenu} />
+      </RoleRoute>
+    ),
+    children: [
+      { index: true, element: <Navigate to="/model-test/company" replace /> },
+      { path: 'company', element: <CompanyModel /> },
+      { path: 'store', element: <StoreModel /> },
     ],
   },
   // 404 处理

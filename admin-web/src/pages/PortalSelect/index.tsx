@@ -9,6 +9,7 @@ import {
   LogoutOutlined,
   ArrowRightOutlined,
   RobotOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -40,11 +41,11 @@ const PORTALS: PortalItem[] = [
   {
     key: 'supply-chain',
     title: '供应链数字化后台',
-    description: '供应链管理、库存管理、采购管理',
+    description: '供应链管理、库存管理、采购管理、门店订货',
     icon: <AccountBookOutlined />,
     color: '#52c41a',
     path: '/supply-chain',
-    roles: ['admin', 'SupplyChain_operation'],
+    roles: ['admin', 'SupplyChain_operation', 'warehouse_admin', 'store_manager'],
   },
   {
     key: 'accounting',
@@ -76,11 +77,20 @@ const PORTALS: PortalItem[] = [
   {
     key: 'agent',
     title: 'AI Agent 后台',
-    description: 'AI 助手对话、记忆文件管理、向量索引配置（仅管理员）',
+    description: 'AI 助手对话、数据分析（仅管理员）',
     icon: <RobotOutlined />,
     color: '#13c2c2',
     path: '/agent/chat',
     roles: ['admin'],
+  },
+  {
+    key: 'model-test',
+    title: '模型压力测试',
+    description: '公司模型和单店模型的压力测试与验证',
+    icon: <ExperimentOutlined />,
+    color: '#2f54eb',
+    path: '/model-test/company',
+    roles: ['admin', 'model_operation'],
   },
 ];
 
@@ -94,7 +104,7 @@ const PortalSelect: React.FC = () => {
     navigate('/login');
   };
 
-  const visiblePortals = PORTALS.filter(p => user && p.roles.includes(user.role));
+  const visiblePortals = PORTALS.filter(p => user && user.roles?.some(r => p.roles.includes(r)));
 
   return (
     <div className="portal-container">

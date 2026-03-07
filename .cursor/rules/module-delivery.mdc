@@ -1,0 +1,48 @@
+---
+description: 外卖运营数字化后台模块记忆
+globs: "**/Delivery/**,**/poi*,**/excel_toolkit*,**/cost_analysis*,**/ExcelToolkit*,**/CostAnalysis*,**/DailyDashboard*"
+alwaysApply: false
+---
+
+# 外卖运营数字化后台 (`/delivery`)
+
+使用 `DeliveryLayout`（独立布局，非 PortalLayout）。侧边栏：首页、选址工具、饿了么数据分析库。
+
+## 选址工具 (`/delivery/site-selection`)
+
+- 页面：`pages/Delivery/Eleme/SiteSelectionV2`，后端：`api/poi.py`
+- 高德地图 POI 搜索、品牌门店数据库管理、城市区县覆盖搜索、门店数据导出
+- 核心数据：`CITY_DISTRICTS` 字典（城市→区县列表）、`POIStore` 模型
+
+## 数据分析库 (`/delivery/eleme/excel-toolkit`)
+
+页面：`pages/Delivery/Eleme/ExcelToolkit`，后端：`api/excel_toolkit.py`，3 个子功能（Tabs）：
+
+1. **推广门店聚合** — 上传推广 Excel → 按"日期+门店名称"聚合 → 预览 → 下载
+2. **淘宝闪购运营核心指标计算** — 上传销售+推广两个文件，left join，计算 12 个指标（C1-C12：推广成本率/单均推广成本/千次曝光成本/综合转化率/推广流量贡献度 等），除数为零显示 `N/A(除数为0)`
+3. **一图看清当日运营情况** (`DailyDashboard`) — 上传 3 个文件，交互式仪表盘（日期选择/门店对比/单店详情/总体综述），额外 14 个观察指标（MR/FQ/US/OH/PE 系列），ECharts 热力图/柱状图/散点图/雷达图，支持 PNG 导出
+
+## 成本分析 (`/accounting/cost-analysis`)
+
+页面：`pages/Accounting/CostAnalysis.tsx`，后端：`api/cost_analysis.py`
+
+顶部 Segmented 切换平台：淘宝闪购、美团外卖（`Meituan/` 子目录）、京东外卖（占位）、堂食/自提/团购（占位）
+
+### 三步流程
+
+1. `POST /api/cost/analyze` — 上传订单 Excel，按 (日期,门店) 分组解析
+2. `POST /api/cost/upload-revenue` — 上传门店收入数据表（列名必须含"收入"或"门店收入"，**不能用"营业额"**）
+3. `POST /api/cost/export-cost-detail` — 导出 6 sheet Excel（门店汇总/逐日看板/源商品销量/源商品成本/原料消耗/原料成本）
+
+### 解析配置（4 个子 Tab + 一站式贴入）
+
+1. 可分析门店数据库 — 门店名称列表
+2. 源商品映射数据库 — 解析单品名→标准源商品名（多对一），有"查找未映射"功能
+3. 源商品原料卡 — 每个源商品对应原料（名称+用量+计量单位），支持批量创建
+4. 原料成本数据库 — 原料名称+单位+单位成本
+
+一站式贴入：上传 `.xlsx`（4 sheet 对应 4 项配置），支持"智能合并"或"完全替换"
+
+### 业务概念
+
+**收入**（实际到手，扣除营销后） ≠ **营业额**（未扣除营销），上传收入表时严禁混淆。

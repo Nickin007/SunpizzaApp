@@ -1,0 +1,53 @@
+---
+description: 供应链数字化后台模块记忆
+globs: "**/SupplyChain/**,**/supply_chain*"
+alwaysApply: false
+---
+
+# 供应链数字化后台 (`/supply-chain`)
+
+使用 `PortalLayout`（绿色主题 #52c41a），通过 `SupplyChainLayoutWrapper` 组件读取用户角色调用 `getSupplyChainMenu(role)` 动态生成侧边栏菜单。后端 API：`api/supply_chain.py`，前缀 `/api/sc`，约 30 个端点。
+
+## 角色分权
+
+| 角色 | 可见菜单 |
+|------|----------|
+| admin / SupplyChain_operation | 全部菜单 |
+| warehouse_admin | 首页、订单处理、库存管理 |
+| store_manager | 首页、门店订货、订单历史 |
+
+## 数据库表（10 张，`sc_` 前缀，BIGINT UNSIGNED 主键）
+
+| 表名 | 模型 | 说明 |
+|------|------|------|
+| sc_product_categories | ProductCategory | 货品分类（树形，parent_id 自引用） |
+| sc_products | Product | 货品（name, unit, default_price, image_url, is_active） |
+| sc_product_specs | ProductSpec | 货品规格（spec_name, spec_value, price_override） |
+| sc_warehouses | Warehouse | 仓库（admin_user_id 关联 users） |
+| sc_stores | SCStore | 门店（warehouse_id 关联仓库，manager_user_id 关联用户） |
+| sc_inventory | Inventory | 库存（warehouse+product+spec 唯一约束，含 safety_stock） |
+| sc_inventory_logs | InventoryLog | 库存变动日志（类型：in/out/adjust/order_out） |
+| sc_orders | SCOrder | 订单（状态流转见下方） |
+| sc_order_items | SCOrderItem | 订单明细（product_name/spec_info 快照） |
+
+## 前端页面（10 个，`pages/SupplyChain/`）
+
+- `Dashboard.tsx` — 看板（待审核/待发货/低库存/今日订单 + 最近订单表格）
+- `ProductManage.tsx` — 货品管理（左侧分类树 + 右侧货品表格 + 规格管理 Modal）
+- `StoreManage.tsx` — 门店管理 CRUD（绑定仓库选择器）
+- `WarehouseManage.tsx` — 仓库管理 CRUD
+- `ShopOrder.tsx` — 门店订货（商品卡片浏览 + 购物车侧边栏/移动端底部抽屉 + 规格选择 + 提交订单）
+- `ShopOrderHistory.tsx` — 订单历史（状态筛选 + 详情弹窗）
+- `OrderReview.tsx` — 管理员订单审核（通过/驳回含原因 + 门店筛选）
+- `WarehouseShip.tsx` — 仓库发货（可选物流单号 + 展开行商品明细）
+- `InventoryManage.tsx` — 库存管理（库存概览 + 手动调整 Modal + 变动记录 Tab）
+- `Reports.tsx` — 报表统计（日期范围查询 + 门店订货汇总 + Excel 导出）
+
+## 核心业务流程
+
+1. 管理员维护货品/分类 → 创建仓库和门店 → 绑定关系
+2. 门店店长登录 → 浏览货品 → 加购物车 → 提交订单（状态 `pending`）
+3. 管理员审核 → 通过（`approved`）或驳回（`rejected` + 原因）
+4. 仓库管理员发货 → 自动扣减库存 + 记录变动日志 → 状态 `shipped`
+5. 确认收货 → 状态 `completed`
+6. 库存支持手动调整（盘点入库/盘亏出库）

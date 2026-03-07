@@ -70,11 +70,68 @@ export interface PreviewResult {
   product_col_name: string | null;
 }
 
-// 矩阵分析结果类型
+// 矩阵分析结果类型（旧版，保留兼容）
 export interface MatrixRow {
   source_product?: string;
   ingredient?: string;
   [storeName: string]: string | number | undefined;
+}
+
+// 竖表行类型
+export interface SpRow {
+  date: string;
+  store: string;
+  source_product: string;
+  value: number;
+}
+
+export interface IngRow {
+  date: string;
+  store: string;
+  ingredient: string;
+  value: number;
+}
+
+export interface DailyCostItem {
+  date: string;
+  store: string;
+  cost: number;
+}
+
+export interface AnalysisResultV2 {
+  summary: {
+    total_orders: number;
+    total_stores: number;
+    total_source_products: number;
+    total_ingredients: number;
+    unmapped_products: string[];
+    unmapped_source_products: string[];
+    date_range: string;
+  };
+  stores: string[];
+  dates: string[];
+  source_products: string[];
+  ingredients: string[];
+  store_cost_summary: Record<string, number>;
+  daily_cost_summary: DailyCostItem[];
+  sp_qty_rows: SpRow[];
+  sp_cost_rows: SpRow[];
+  ing_qty_rows: IngRow[];
+  ing_cost_rows: IngRow[];
+}
+
+// 门店收入数据
+export interface RevenueRow {
+  date: string;
+  store: string;
+  revenue: number;
+}
+
+export interface RevenueUploadResult {
+  rows: RevenueRow[];
+  stores: string[];
+  dates: string[];
+  total_rows: number;
 }
 
 export interface MatrixAnalysisResult {
@@ -355,7 +412,7 @@ export const previewOrders = (file: File) => {
 export const analyzeOrders = (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
-  return request.post<{ code: number; data: MatrixAnalysisResult; message?: string }>(
+  return request.post<{ code: number; data: AnalysisResultV2; message?: string }>(
     '/cost-analysis/analyze',
     formData,
     {
@@ -364,6 +421,27 @@ export const analyzeOrders = (file: File) => {
       },
     }
   );
+};
+
+export const uploadRevenue = (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request.post<{ code: number; data: RevenueUploadResult; message?: string }>(
+    '/cost-analysis/upload-revenue',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+};
+
+export const exportCostDetail = (data: {
+  analysis: AnalysisResultV2;
+  revenue_rows: RevenueRow[];
+}) => {
+  return request.post('/cost-analysis/export-cost-detail', data, { responseType: 'blob' });
 };
 
 export const exportAnalysis = (stores: StoreAnalysis[]) => {

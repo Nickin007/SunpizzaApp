@@ -12,62 +12,33 @@ import {
   Space,
   Tag,
   Divider,
-  Card,
+  message,
 } from 'antd';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import {
-  MessageOutlined,
   PlusOutlined,
   DeleteOutlined,
   SendOutlined,
   RobotOutlined,
   UserOutlined,
   CloseOutlined,
-  BookOutlined,
-  ClearOutlined,
-  ToolOutlined,
+  PaperClipOutlined,
+  CodeOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   LoadingOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { useChatStore } from '../../store/chatStore';
-import type { ToolCall } from '../../api/chat';
+import type { ChatMessage } from '../../api/chat';
+import MarkdownRenderer from '../MarkdownRenderer';
 import './style.css';
 
 const { TextArea } = Input;
 const { Text } = Typography;
 
-/**
- * 工具参数摘要：将工具的参数对象展示为简洁的中文文本
- */
-function formatToolArgs(name: string, args: Record<string, any>): string {
-  const parts: string[] = [];
-  for (const [key, value] of Object.entries(args)) {
-    const label = ARG_LABEL_MAP[key] || key;
-    if (Array.isArray(value)) {
-      parts.push(`${label}: ${value.join(', ')}`);
-    } else if (typeof value === 'boolean') {
-      parts.push(`${label}: ${value ? '是' : '否'}`);
-    } else if (value !== undefined && value !== null && value !== '') {
-      parts.push(`${label}: ${value}`);
-    }
-  }
-  return parts.join(' | ') || '无参数';
-}
-
-const ARG_LABEL_MAP: Record<string, string> = {
-  keyword: '关键词',
-  keywords: '品牌列表',
-  city: '城市',
-  save_to_db: '保存到数据库',
-  poi_category: 'POI类别',
-  brand_name: '品牌',
-  category: '分类',
-  brands: '品牌列表',
-  store_ids: '门店ID',
-};
-
 const ChatDrawer: React.FC = () => {
+  const isMobile = useIsMobile();
   const { user } = useAuthStore();
   const {
     drawerVisible,
@@ -84,34 +55,26 @@ const ChatDrawer: React.FC = () => {
     loadingMessages,
     sending,
     streamingContent,
+    statusMessage,
     sendMessage,
-    pendingToolCalls,
-    executingTools,
-    toolStatus,
-    confirmToolCalls,
-    rejectToolCalls,
+    uploadedFiles,
+    uploading,
+    uploadFile,
+    removeUploadedFile,
   } = useChatStore();
 
   const [inputValue, setInputValue] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 非管理员不渲染
-  if (!user || user.role !== 'admin') return null;
+  if (!user || !user.roles?.includes('admin')) return null;
 
-  // 加载会话列表
   useEffect(() => {
     if (drawerVisible && conversations.length === 0) {
       loadConversations();
     }
   }, [drawerVisible]);
 
-  // 自动滚动到底部
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingContent, pendingToolCalls, executingTools]);
-
-  // 发送消息
   const handleSend = async () => {
     if (!inputValue.trim() || sending) return;
     let convId = currentConversationId;
@@ -120,11 +83,11 @@ const ChatDrawer: React.FC = () => {
       if (!convId) return;
     }
     const msg = inputValue.trim();
+    const tokens = uploadedFiles.length > 0 ? uploadedFiles.map((f) => f.fileToken) : undefined;
     setInputValue('');
-    await sendMessage(msg);
+    await sendMessage(msg, tokens);
   };
 
-  // 键盘快捷键
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -132,155 +95,97 @@ const ChatDrawer: React.FC = () => {
     }
   };
 
-  // 简单 Markdown 渲染（代码块、加粗、列表）
-  const renderContent = (content: string) => {
-    const lines = content.split('\n');
-    let inCodeBlock = false;
-    const result: React.ReactNode[] = [];
-    let codeBuffer: string[] = [];
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    const ok = await uploadFile(file);
+    if (!ok) {
+      message.error('文件上传失败');
+    }
+  };
 
-    lines.forEach((line, idx) => {
-      if (line.startsWith('```')) {
-        if (inCodeBlock) {
-          result.push(
-            <pre key={`code-${idx}`} className="chat-code-block">
-              <code>{codeBuffer.join('\n')}</code>
+  const renderMessage = (msg: ChatMessage) => {
+    if (msg.type === 'tool_call') {
+      return (
+        <div key={msg.id} className="chat-message chat-message-assistant">
+          <div className="chat-message-avatar">
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#722ed1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CodeOutlined style={{ color: '#fff', fontSize: 13 }} />
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: '#722ed1', fontWeight: 500, marginBottom: 2 }}>AI 执行代码</div>
+            <pre style={{
+              margin: 0, padding: 8, background: '#1e1e1e', color: '#d4d4d4',
+              borderRadius: 6, fontSize: 12, lineHeight: 1.4, overflowX: 'auto',
+              whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 200,
+            }}>
+              <code>{msg.toolCode || msg.content}</code>
             </pre>
-          );
-          codeBuffer = [];
-          inCodeBlock = false;
-        } else {
-          inCodeBlock = true;
-        }
-        return;
-      }
-
-      if (inCodeBlock) {
-        codeBuffer.push(line);
-        return;
-      }
-
-      // Bold **text**
-      const parts = line.split(/(\*\*[^*]+\*\*)/g);
-      const rendered = parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={i}>{part.slice(2, -2)}</strong>;
-        }
-        return part;
-      });
-
-      // List items
-      if (line.startsWith('- ')) {
-        result.push(
-          <div key={idx} style={{ paddingLeft: 12 }}>
-            &bull; {rendered.slice(0).map((r, i) => (typeof r === 'string' ? r.replace(/^- /, '') : r))}
           </div>
-        );
-      } else {
-        result.push(
-          <div key={idx}>
-            {rendered}
-          </div>
-        );
-      }
-    });
-
-    if (inCodeBlock && codeBuffer.length > 0) {
-      result.push(
-        <pre key="code-end" className="chat-code-block">
-          <code>{codeBuffer.join('\n')}</code>
-        </pre>
+        </div>
       );
     }
 
-    return result;
-  };
-
-  // 渲染工具调用确认卡片
-  const renderToolCallCard = () => {
-    if (!pendingToolCalls || pendingToolCalls.length === 0) return null;
+    if (msg.type === 'tool_result') {
+      return (
+        <div key={msg.id} className="chat-message chat-message-assistant">
+          <div className="chat-message-avatar">
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: msg.toolSuccess ? '#52c41a' : '#ff4d4f',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {msg.toolSuccess
+                ? <CheckCircleOutlined style={{ color: '#fff', fontSize: 13 }} />
+                : <CloseCircleOutlined style={{ color: '#fff', fontSize: 13 }} />}
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 2, color: msg.toolSuccess ? '#52c41a' : '#ff4d4f' }}>
+              {msg.toolSuccess ? '执行结果' : '执行出错'}
+            </div>
+            <pre style={{
+              margin: 0, padding: 8, background: '#f6f8fa', border: '1px solid #e1e4e8',
+              borderRadius: 6, fontSize: 12, lineHeight: 1.4, overflowX: 'auto',
+              whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 250,
+            }}>
+              {msg.toolOutput || msg.content}
+            </pre>
+          </div>
+        </div>
+      );
+    }
 
     return (
-      <div className="chat-tool-call-card">
-        <div className="chat-tool-call-header">
-          <ToolOutlined style={{ color: '#faad14', marginRight: 6 }} />
-          <Text strong style={{ color: '#faad14' }}>AI 请求调用工具</Text>
-          <Tag color="warning" style={{ marginLeft: 8, fontSize: 11 }}>需要确认</Tag>
+      <div key={msg.id} className={`chat-message chat-message-${msg.role}`}>
+        <div className="chat-message-avatar">
+          {msg.role === 'user' ? (
+            <div className="chat-avatar-user"><UserOutlined /></div>
+          ) : (
+            <div className="chat-avatar-assistant"><RobotOutlined /></div>
+          )}
         </div>
-        <div className="chat-tool-call-list">
-          {pendingToolCalls.map((tc, idx) => (
-            <div key={tc.id || idx} className="chat-tool-call-item">
-              <div className="chat-tool-call-name">
-                <Tag color="blue">{tc.name_cn}</Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>{tc.name}</Text>
-              </div>
-              <div className="chat-tool-call-args">
-                <Text style={{ fontSize: 12 }}>{formatToolArgs(tc.name, tc.arguments)}</Text>
-              </div>
+        <div className={`chat-message-bubble chat-bubble-${msg.role}`}>
+          {msg.role === 'user' && msg.fileInfo && (
+            <div style={{
+              padding: '4px 10px', background: 'rgba(255,255,255,0.15)',
+              borderBottom: '1px solid rgba(255,255,255,0.2)',
+              display: 'flex', alignItems: 'center', gap: 4, fontSize: 11,
+            }}>
+              <PaperClipOutlined />
+              <span>{msg.fileInfo.filename}</span>
             </div>
-          ))}
-        </div>
-        <div className="chat-tool-call-actions">
-          <Button
-            type="primary"
-            icon={<CheckCircleOutlined />}
-            onClick={confirmToolCalls}
-            loading={executingTools}
-            style={{ marginRight: 8 }}
-          >
-            确认执行
-          </Button>
-          <Button
-            icon={<CloseCircleOutlined />}
-            onClick={rejectToolCalls}
-            disabled={executingTools}
-          >
-            取消
-          </Button>
+          )}
+          {msg.role === 'user' ? msg.content : <MarkdownRenderer content={msg.content} compact />}
         </div>
       </div>
     );
   };
 
-  // 渲染工具执行中的状态（含状态信息 + 流式输出）
-  const renderToolExecuting = () => {
-    if (!executingTools) return null;
-    return (
-      <>
-        {/* 工具状态消息 */}
-        {toolStatus && (
-          <div className="chat-tool-status">
-            <Text style={{ fontSize: 12, color: '#8c8c8c' }}>{toolStatus}</Text>
-          </div>
-        )}
-        {/* 工具执行后的 AI 流式回复 */}
-        {streamingContent ? (
-          <div className="chat-message chat-message-assistant">
-            <div className="chat-message-avatar">
-              <div className="chat-avatar-assistant">
-                <RobotOutlined />
-              </div>
-            </div>
-            <div className="chat-message-bubble chat-bubble-assistant">
-              {renderContent(streamingContent)}
-              <span className="chat-cursor-blink">|</span>
-            </div>
-          </div>
-        ) : (
-          <div className="chat-tool-executing">
-            <Spin indicator={<LoadingOutlined style={{ fontSize: 16, color: '#1890ff' }} spin />} />
-            <Text style={{ marginLeft: 8, color: '#1890ff', fontSize: 13 }}>
-              {toolStatus || '正在执行工具调用，请稍候...'}
-            </Text>
-          </div>
-        )}
-      </>
-    );
-  };
-
   return (
     <>
-      {/* 悬浮按钮 */}
       <Tooltip title="AI 助手" placement="left">
         <Button
           type="primary"
@@ -292,11 +197,10 @@ const ChatDrawer: React.FC = () => {
         />
       </Tooltip>
 
-      {/* 抽屉 */}
       <Drawer
         title={null}
         placement="right"
-        width={440}
+        width={isMobile ? '100%' : 440}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
         closable={false}
@@ -315,19 +219,9 @@ const ChatDrawer: React.FC = () => {
           </div>
           <div className="chat-drawer-header-right">
             <Tooltip title="新对话">
-              <Button
-                type="text"
-                size="small"
-                icon={<PlusOutlined />}
-                onClick={() => createConversation()}
-              />
+              <Button type="text" size="small" icon={<PlusOutlined />} onClick={() => createConversation()} />
             </Tooltip>
-            <Button
-              type="text"
-              size="small"
-              icon={<CloseOutlined />}
-              onClick={() => setDrawerVisible(false)}
-            />
+            <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setDrawerVisible(false)} />
           </div>
         </div>
 
@@ -350,12 +244,7 @@ const ChatDrawer: React.FC = () => {
                 {menu}
                 <Divider style={{ margin: '4px 0' }} />
                 <div style={{ padding: '4px 8px' }}>
-                  <Button
-                    type="link"
-                    size="small"
-                    icon={<PlusOutlined />}
-                    onClick={() => createConversation()}
-                  >
+                  <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => createConversation()}>
                     新建对话
                   </Button>
                 </div>
@@ -377,9 +266,7 @@ const ChatDrawer: React.FC = () => {
         {/* Messages Area */}
         <div className="chat-messages-area">
           {loadingMessages ? (
-            <div className="chat-loading">
-              <Spin tip="加载中..." />
-            </div>
+            <div className="chat-loading"><Spin tip="加载中..." /></div>
           ) : messages.length === 0 && !streamingContent ? (
             <div className="chat-empty">
               <Empty
@@ -387,46 +274,22 @@ const ChatDrawer: React.FC = () => {
                 description={
                   <Space direction="vertical" size={4}>
                     <Text type="secondary">你好，我是圣比萨AI助手</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      有什么可以帮您的？
-                    </Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>有什么可以帮您的？</Text>
                   </Space>
                 }
               />
             </div>
           ) : (
             <>
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`chat-message chat-message-${msg.role}`}
-                >
-                  <div className="chat-message-avatar">
-                    {msg.role === 'user' ? (
-                      <div className="chat-avatar-user">
-                        <UserOutlined />
-                      </div>
-                    ) : (
-                      <div className="chat-avatar-assistant">
-                        <RobotOutlined />
-                      </div>
-                    )}
-                  </div>
-                  <div className={`chat-message-bubble chat-bubble-${msg.role}`}>
-                    {renderContent(msg.content)}
-                  </div>
-                </div>
-              ))}
-              {/* Streaming indicator */}
+              {messages.map((msg) => renderMessage(msg))}
+
               {sending && streamingContent && (
                 <div className="chat-message chat-message-assistant">
                   <div className="chat-message-avatar">
-                    <div className="chat-avatar-assistant">
-                      <RobotOutlined />
-                    </div>
+                    <div className="chat-avatar-assistant"><RobotOutlined /></div>
                   </div>
                   <div className="chat-message-bubble chat-bubble-assistant">
-                    {renderContent(streamingContent)}
+                    <MarkdownRenderer content={streamingContent} compact />
                     <span className="chat-cursor-blink">|</span>
                   </div>
                 </div>
@@ -434,46 +297,76 @@ const ChatDrawer: React.FC = () => {
               {sending && !streamingContent && (
                 <div className="chat-message chat-message-assistant">
                   <div className="chat-message-avatar">
-                    <div className="chat-avatar-assistant">
-                      <RobotOutlined />
-                    </div>
+                    <div className="chat-avatar-assistant"><RobotOutlined /></div>
                   </div>
                   <div className="chat-message-bubble chat-bubble-assistant">
-                    <div className="chat-typing-indicator">
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                    </div>
+                    {statusMessage ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <LoadingOutlined style={{ color: '#722ed1' }} />
+                        <Text type="secondary" style={{ fontSize: 12 }}>{statusMessage}</Text>
+                      </div>
+                    ) : (
+                      <div className="chat-typing-indicator">
+                        <span></span><span></span><span></span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
-              {/* Tool call confirmation card */}
-              {renderToolCallCard()}
-              {/* Tool executing indicator */}
-              {renderToolExecuting()}
-              <div ref={messagesEndRef} />
             </>
           )}
         </div>
 
+        {/* Uploaded file tag */}
+        {uploadedFiles.length > 0 && (
+          <div style={{
+            padding: '4px 12px', background: '#f6ffed', borderTop: '1px solid #b7eb8f',
+            display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+          }}>
+            <PaperClipOutlined style={{ color: '#52c41a' }} />
+            {uploadedFiles.map((f, i) => (
+              <Tag key={i} color="green" closable onClose={() => removeUploadedFile(i)} style={{ fontSize: 11 }}>
+                {f.filename}
+              </Tag>
+            ))}
+          </div>
+        )}
+
         {/* Input Area */}
         <div className="chat-input-area">
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept=".xlsx,.xls,.csv"
+            onChange={handleFileSelect}
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={uploading ? <LoadingOutlined /> : <PaperClipOutlined />}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || sending}
+            title="上传 Excel/CSV"
+            style={{ flexShrink: 0 }}
+          />
           <TextArea
             ref={inputRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"
+            placeholder={uploadedFiles.length > 0 ? "输入分析问题..." : "输入消息... (Enter 发送)"}
             autoSize={{ minRows: 1, maxRows: 4 }}
-            disabled={sending || executingTools}
+            disabled={sending}
             className="chat-input"
+            style={{ flex: 1 }}
           />
           <Button
             type="primary"
             icon={<SendOutlined />}
             onClick={handleSend}
             loading={sending}
-            disabled={!inputValue.trim() || executingTools}
+            disabled={!inputValue.trim()}
             className="chat-send-btn"
           />
         </div>

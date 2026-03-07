@@ -8,6 +8,7 @@ import * as financeApi from '../../api/finance';
 import type { Voucher, VoucherEntry } from '../../api/finance';
 import { useFinanceStore } from '../../store/financeStore';
 import { useAuthStore } from '../../store/authStore';
+import './accounting.css';
 
 const { Title, Text } = Typography;
 
@@ -282,6 +283,7 @@ const VoucherList: React.FC = () => {
           dataSource={vouchers}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 800 }}
           pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 张凭证` }}
           size="small"
         />

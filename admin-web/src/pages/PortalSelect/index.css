@@ -93,3 +93,29 @@
   text-align: center;
   padding: 24px;
 }
+
+@media (max-width: 768px) {
+  .portal-header {
+    padding: 0 16px;
+    height: 52px;
+  }
+
+  .portal-content {
+    padding: 24px 12px;
+  }
+
+  .portal-welcome {
+    margin-bottom: 24px;
+  }
+
+  .portal-card-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 22px;
+    margin-bottom: 12px;
+  }
+
+  .portal-footer {
+    padding: 16px;
+  }
+}

@@ -203,3 +203,22 @@
   }
 }
 
+@media (max-width: 768px) {
+  .search-panel {
+    max-height: 300px;
+  }
+
+  .map-panel {
+    height: 400px;
+  }
+
+  .map-container {
+    min-height: 400px;
+  }
+
+  .drawing-tools-panel {
+    min-width: 120px;
+    padding: 6px;
+  }
+}
+

@@ -92,8 +92,7 @@ const UserManagement: React.FC = () => {
   const handleEdit = async (values: any) => {
     if (!editingUser) return;
     try {
-      // 如果密码为空，不发送
-      const payload: any = { real_name: values.real_name, role: values.role };
+      const payload: any = { real_name: values.real_name, roles: values.roles };
       if (values.password && values.password.trim()) {
         payload.password = values.password;
       }
@@ -122,7 +121,7 @@ const UserManagement: React.FC = () => {
     setEditingUser(user);
     editForm.setFieldsValue({
       real_name: user.real_name,
-      role: user.role,
+      roles: user.roles,
       password: '',
     });
     setEditModalOpen(true);
@@ -152,10 +151,14 @@ const UserManagement: React.FC = () => {
     },
     {
       title: '角色',
-      dataIndex: 'role',
-      key: 'role',
-      render: (role: string) => (
-        <Tag color={ROLE_COLORS[role] || 'default'}>{getRoleLabel(role)}</Tag>
+      dataIndex: 'roles',
+      key: 'roles',
+      render: (roles: string[]) => (
+        <Space size={[0, 4]} wrap>
+          {(roles || []).map(role => (
+            <Tag key={role} color={ROLE_COLORS[role] || 'default'}>{getRoleLabel(role)}</Tag>
+          ))}
+        </Space>
       ),
     },
     {
@@ -208,6 +211,7 @@ const UserManagement: React.FC = () => {
         rowKey="id"
         loading={loading}
         pagination={false}
+        scroll={{ x: 600 }}
       />
 
       {/* 创建用户 Modal */}
@@ -229,8 +233,8 @@ const UserManagement: React.FC = () => {
           <Form.Item name="real_name" label="真实姓名" rules={[{ required: true, message: '请输入真实姓名' }]}>
             <Input placeholder="请输入真实姓名" />
           </Form.Item>
-          <Form.Item name="role" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
-            <Select placeholder="请选择角色" options={roles} />
+          <Form.Item name="roles" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
+            <Select mode="multiple" placeholder="请选择角色（可多选）" options={roles} />
           </Form.Item>
         </Form>
       </Modal>
@@ -248,8 +252,8 @@ const UserManagement: React.FC = () => {
           <Form.Item name="real_name" label="真实姓名" rules={[{ required: true, message: '请输入真实姓名' }]}>
             <Input placeholder="请输入真实姓名" />
           </Form.Item>
-          <Form.Item name="role" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
-            <Select placeholder="请选择角色" options={roles} />
+          <Form.Item name="roles" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
+            <Select mode="multiple" placeholder="请选择角色（可多选）" options={roles} />
           </Form.Item>
           <Form.Item name="password" label="重置密码（留空则不修改）">
             <Input.Password placeholder="输入新密码以重置（留空则保持不变）" />

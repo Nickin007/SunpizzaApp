@@ -1026,63 +1026,66 @@ def preview_orders():
 
 @bp.route('/analyze', methods=['POST'])
 def analyze_orders():
-    """上传并分析订单，返回矩阵数据"""
+    """上传并分析订单，按 (日期, 门店) 双维度分组，返回竖表格式数据"""
     try:
         if 'file' not in request.files:
             return error_response('请上传Excel文件')
-        
+
         file = request.files['file']
         if file.filename == '':
             return error_response('文件名不能为空')
-        
+
         filename_lower = file.filename.lower() if file.filename else ''
         if not (filename_lower.endswith('.xlsx') or filename_lower.endswith('.csv')):
             return error_response('请上传 .xlsx 或 .csv 格式的文件')
-        
-        # 读取文件
+
         if filename_lower.endswith('.csv'):
             df = pd.read_csv(file)
         else:
             df = pd.read_excel(file, engine='openpyxl')
-        
-        # 获取列名
+
         columns = list(df.columns)
-        
-        # 查找门店名称和商品信息列
+
         store_col = None
         product_col = None
-        
+        date_col = None
+
         for col in columns:
-            if '门店名称' in str(col):
+            col_str = str(col).strip()
+            if '门店名称' in col_str:
                 store_col = col
-            if '商品信息' in str(col):
+            if '商品信息' in col_str:
                 product_col = col
-        
+            if col_str == '日期':
+                date_col = col
+
         if not store_col:
             return error_response('未找到"门店名称"列')
         if not product_col:
             return error_response('未找到"商品信息"列')
-        
-        # 获取可分析门店列表
+        if not date_col:
+            return error_response('未找到"日期"列')
+
         analyzable_stores = AnalyzableStore.query.all()
         analyzable_store_names = {s.store_name for s in analyzable_stores}
-        
+
         if not analyzable_store_names:
             return error_response('请先配置可分析门店')
-        
-        # 过滤订单
-        df_filtered = df[df[store_col].isin(analyzable_store_names)]
-        
+
+        df_filtered = df[df[store_col].isin(analyzable_store_names)].copy()
+
         if df_filtered.empty:
             return error_response('没有找到匹配的可分析门店订单')
-        
-        # 获取源商品名称映射
+
+        df_filtered[date_col] = pd.to_datetime(df_filtered[date_col], errors='coerce')
+        df_filtered['_date_str'] = df_filtered[date_col].dt.strftime('%Y-%m-%d')
+        df_filtered['_date_str'] = df_filtered['_date_str'].fillna('unknown')
+
         mappings = ProductNameMapping.query.all()
         mapping_dict = {m.parsed_name: m.source_name for m in mappings}
-        
-        # 获取原料卡映射 - 使用源商品名称作为key
+
         recipes = ProductRecipeCard.query.all()
-        recipe_map = {}  # {source_product_name: [{ingredient_name, ingredient_unit, quantity}]}
+        recipe_map = {}
         for recipe in recipes:
             if recipe.product_name not in recipe_map:
                 recipe_map[recipe.product_name] = []
@@ -1091,129 +1094,129 @@ def analyze_orders():
                 'ingredient_unit': recipe.ingredient_unit,
                 'quantity': float(recipe.quantity)
             })
-        
-        # 获取原料成本
-        ingredient_costs = IngredientCost.query.all()
-        cost_map = {ic.ingredient_name: float(ic.unit_cost) for ic in ingredient_costs}
-        
-        # 收集所有门店名称
+
+        ingredient_costs_db = IngredientCost.query.all()
+        cost_map = {ic.ingredient_name: float(ic.unit_cost) for ic in ingredient_costs_db}
+
         all_store_names = sorted(df_filtered[store_col].unique().tolist())
-        
-        # 收集所有源商品名称和原料名称（用于矩阵）
+        all_dates = sorted(df_filtered['_date_str'].unique().tolist())
+
+        # {date: {store: {source_product: {quantity, cost}}}}
+        daily_sp = {}
+        # {date: {store: {ingredient: {unit, quantity, cost}}}}
+        daily_ing = {}
+        # {store: total_ingredient_cost} for store summary
+        store_total_cost = {s: 0.0 for s in all_store_names}
+        # {date: {store: total_ingredient_cost}} for daily summary
+        daily_store_cost = {}
+
+        unmapped_products = set()
+        unmapped_source_products = set()
         all_source_products = set()
         all_ingredients = set()
-        
-        # 按门店分析数据
-        # 结构：{store_name: {source_product: {quantity, cost}}}
-        store_source_product_data = {}
-        # 结构：{store_name: {ingredient: {quantity, cost}}}
-        store_ingredient_data = {}
-        
-        # 未映射的单品
-        unmapped_products = set()
-        # 源商品没有原料卡的
-        unmapped_source_products = set()
-        
-        for store_name in all_store_names:
-            store_orders = df_filtered[df_filtered[store_col] == store_name]
-            
-            store_source_product_data[store_name] = {}
-            store_ingredient_data[store_name] = {}
-            
-            for _, row in store_orders.iterrows():
-                product_info = str(row[product_col]) if pd.notna(row[product_col]) else ''
-                if not product_info:
-                    continue
-                
-                # 解析商品信息
-                items = parse_order_items(product_info)
-                
-                for item in items:
-                    # 格式: 单品名称_数量
-                    if '_' in item:
-                        parts = item.rsplit('_', 1)
-                        product_name = parts[0]
-                        try:
-                            qty = int(parts[1])
-                        except ValueError:
-                            qty = 1
-                    else:
-                        product_name = item
+
+        for _, row in df_filtered.iterrows():
+            product_info = str(row[product_col]) if pd.notna(row[product_col]) else ''
+            if not product_info:
+                continue
+            store_name = str(row[store_col])
+            order_date = row['_date_str']
+
+            if order_date not in daily_sp:
+                daily_sp[order_date] = {}
+                daily_ing[order_date] = {}
+                daily_store_cost[order_date] = {}
+            if store_name not in daily_sp[order_date]:
+                daily_sp[order_date][store_name] = {}
+                daily_ing[order_date][store_name] = {}
+                daily_store_cost[order_date][store_name] = 0.0
+
+            items = parse_order_items(product_info)
+
+            for item in items:
+                if '_' in item:
+                    parts = item.rsplit('_', 1)
+                    product_name = parts[0]
+                    try:
+                        qty = int(parts[1])
+                    except ValueError:
                         qty = 1
-                    
-                    # 单品映射到源商品
-                    source_product = mapping_dict.get(product_name, product_name)
-                    if product_name not in mapping_dict:
-                        unmapped_products.add(product_name)
-                    
-                    all_source_products.add(source_product)
-                    
-                    # 统计源商品数量
-                    if source_product not in store_source_product_data[store_name]:
-                        store_source_product_data[store_name][source_product] = {'quantity': 0, 'cost': 0}
-                    store_source_product_data[store_name][source_product]['quantity'] += qty
-                    
-                    # 源商品映射到原料
-                    if source_product in recipe_map:
-                        for recipe in recipe_map[source_product]:
-                            ing_name = recipe['ingredient_name']
-                            ing_unit = recipe['ingredient_unit']
-                            ing_qty = recipe['quantity'] * qty
-                            
-                            all_ingredients.add(ing_name)
-                            
-                            if ing_name not in store_ingredient_data[store_name]:
-                                store_ingredient_data[store_name][ing_name] = {'unit': ing_unit, 'quantity': 0, 'cost': 0}
-                            
-                            store_ingredient_data[store_name][ing_name]['quantity'] += ing_qty
-                            
-                            # 计算原料成本
-                            if ing_name in cost_map:
-                                ing_cost = ing_qty * cost_map[ing_name]
-                                store_ingredient_data[store_name][ing_name]['cost'] += ing_cost
-                                # 回填源商品成本
-                                store_source_product_data[store_name][source_product]['cost'] += ing_cost
-                    else:
-                        unmapped_source_products.add(source_product)
-        
-        # 排序
+                else:
+                    product_name = item
+                    qty = 1
+
+                source_product = mapping_dict.get(product_name, product_name)
+                if product_name not in mapping_dict:
+                    unmapped_products.add(product_name)
+
+                all_source_products.add(source_product)
+
+                sp_dict = daily_sp[order_date][store_name]
+                if source_product not in sp_dict:
+                    sp_dict[source_product] = {'quantity': 0, 'cost': 0.0}
+                sp_dict[source_product]['quantity'] += qty
+
+                if source_product in recipe_map:
+                    for recipe in recipe_map[source_product]:
+                        ing_name = recipe['ingredient_name']
+                        ing_unit = recipe['ingredient_unit']
+                        ing_qty = recipe['quantity'] * qty
+
+                        all_ingredients.add(ing_name)
+
+                        ing_dict = daily_ing[order_date][store_name]
+                        if ing_name not in ing_dict:
+                            ing_dict[ing_name] = {'unit': ing_unit, 'quantity': 0.0, 'cost': 0.0}
+                        ing_dict[ing_name]['quantity'] += ing_qty
+
+                        if ing_name in cost_map:
+                            ing_cost = ing_qty * cost_map[ing_name]
+                            ing_dict[ing_name]['cost'] += ing_cost
+                            sp_dict[source_product]['cost'] += ing_cost
+                            store_total_cost[store_name] += ing_cost
+                            daily_store_cost[order_date][store_name] += ing_cost
+                else:
+                    unmapped_source_products.add(source_product)
+
         all_source_products = sorted(all_source_products)
         all_ingredients = sorted(all_ingredients)
-        
-        # 构建矩阵数据
-        # 源商品销量矩阵
-        source_product_quantity_matrix = []
-        for sp in all_source_products:
-            row_data = {'source_product': sp}
-            for store in all_store_names:
-                row_data[store] = store_source_product_data[store].get(sp, {}).get('quantity', 0)
-            source_product_quantity_matrix.append(row_data)
-        
-        # 源商品成本矩阵
-        source_product_cost_matrix = []
-        for sp in all_source_products:
-            row_data = {'source_product': sp}
-            for store in all_store_names:
-                row_data[store] = round(store_source_product_data[store].get(sp, {}).get('cost', 0), 2)
-            source_product_cost_matrix.append(row_data)
-        
-        # 原料消耗量矩阵
-        ingredient_quantity_matrix = []
-        for ing in all_ingredients:
-            row_data = {'ingredient': ing}
-            for store in all_store_names:
-                row_data[store] = round(store_ingredient_data[store].get(ing, {}).get('quantity', 0), 4)
-            ingredient_quantity_matrix.append(row_data)
-        
-        # 原料成本矩阵
-        ingredient_cost_matrix = []
-        for ing in all_ingredients:
-            row_data = {'ingredient': ing}
-            for store in all_store_names:
-                row_data[store] = round(store_ingredient_data[store].get(ing, {}).get('cost', 0), 2)
-            ingredient_cost_matrix.append(row_data)
-        
-        # 汇总数据
+
+        # 竖表: 源商品销量明细
+        sp_qty_rows = []
+        sp_cost_rows = []
+        ing_qty_rows = []
+        ing_cost_rows = []
+
+        for d in all_dates:
+            for s in all_store_names:
+                sp_data = daily_sp.get(d, {}).get(s, {})
+                for sp_name in sorted(sp_data.keys()):
+                    info = sp_data[sp_name]
+                    if info['quantity'] > 0:
+                        sp_qty_rows.append({'date': d, 'store': s, 'source_product': sp_name, 'value': info['quantity']})
+                    if info['cost'] > 0:
+                        sp_cost_rows.append({'date': d, 'store': s, 'source_product': sp_name, 'value': round(info['cost'], 2)})
+
+                ing_data = daily_ing.get(d, {}).get(s, {})
+                for ing_name in sorted(ing_data.keys()):
+                    info = ing_data[ing_name]
+                    if info['quantity'] > 0:
+                        ing_qty_rows.append({'date': d, 'store': s, 'ingredient': ing_name, 'value': round(info['quantity'], 4)})
+                    if info['cost'] > 0:
+                        ing_cost_rows.append({'date': d, 'store': s, 'ingredient': ing_name, 'value': round(info['cost'], 2)})
+
+        # 门店汇总成本
+        store_cost_summary = {s: round(store_total_cost[s], 2) for s in all_store_names}
+        # 逐日门店成本
+        daily_cost_summary = []
+        for d in all_dates:
+            for s in all_store_names:
+                cost_val = daily_store_cost.get(d, {}).get(s, 0.0)
+                if cost_val > 0:
+                    daily_cost_summary.append({'date': d, 'store': s, 'cost': round(cost_val, 2)})
+
+        date_range = f"{all_dates[0]}~{all_dates[-1]}" if all_dates else ''
+
         result = {
             'summary': {
                 'total_orders': len(df_filtered),
@@ -1221,17 +1224,21 @@ def analyze_orders():
                 'total_source_products': len(all_source_products),
                 'total_ingredients': len(all_ingredients),
                 'unmapped_products': list(unmapped_products),
-                'unmapped_source_products': list(unmapped_source_products)
+                'unmapped_source_products': list(unmapped_source_products),
+                'date_range': date_range,
             },
             'stores': all_store_names,
+            'dates': all_dates,
             'source_products': all_source_products,
             'ingredients': all_ingredients,
-            'source_product_quantity_matrix': source_product_quantity_matrix,
-            'source_product_cost_matrix': source_product_cost_matrix,
-            'ingredient_quantity_matrix': ingredient_quantity_matrix,
-            'ingredient_cost_matrix': ingredient_cost_matrix
+            'store_cost_summary': store_cost_summary,
+            'daily_cost_summary': daily_cost_summary,
+            'sp_qty_rows': sp_qty_rows,
+            'sp_cost_rows': sp_cost_rows,
+            'ing_qty_rows': ing_qty_rows,
+            'ing_cost_rows': ing_cost_rows,
         }
-        
+
         return success_response(result)
     except Exception as e:
         import traceback
@@ -1415,6 +1422,187 @@ def export_ingredient():
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
             download_name='原料数据.xlsx'
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return error_response(f'导出失败: {str(e)}')
+
+
+@bp.route('/upload-revenue', methods=['POST'])
+def upload_revenue():
+    """上传门店收入数据表，返回解析结果供前端确认"""
+    try:
+        if 'file' not in request.files:
+            return error_response('请上传门店收入数据表')
+
+        file = request.files['file']
+        if file.filename == '':
+            return error_response('文件名不能为空')
+
+        filename_lower = file.filename.lower() if file.filename else ''
+        if not (filename_lower.endswith('.xlsx') or filename_lower.endswith('.csv')):
+            return error_response('请上传 .xlsx 或 .csv 格式的文件')
+
+        if filename_lower.endswith('.csv'):
+            df = pd.read_csv(file)
+        else:
+            df = pd.read_excel(file, engine='openpyxl')
+
+        columns = list(df.columns)
+        date_col = None
+        store_col = None
+        revenue_col = None
+
+        for col in columns:
+            col_str = str(col).strip()
+            if col_str == '日期':
+                date_col = col
+            if '门店名称' in col_str or col_str == '门店':
+                store_col = col
+            if col_str == '收入' or col_str == '门店收入':
+                revenue_col = col
+
+        if not date_col:
+            return error_response('未找到"日期"列')
+        if not store_col:
+            return error_response('未找到"门店名称"列')
+        if not revenue_col:
+            return error_response('未找到"收入"列')
+
+        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+        df['_date_str'] = df[date_col].dt.strftime('%Y-%m-%d')
+        df['_date_str'] = df['_date_str'].fillna('unknown')
+
+        rows = []
+        for _, row in df.iterrows():
+            try:
+                rev = float(row[revenue_col])
+            except (ValueError, TypeError):
+                rev = 0.0
+            rows.append({
+                'date': row['_date_str'],
+                'store': str(row[store_col]).strip(),
+                'revenue': round(rev, 2),
+            })
+
+        stores = sorted(set(r['store'] for r in rows))
+        dates = sorted(set(r['date'] for r in rows))
+
+        return success_response({
+            'rows': rows,
+            'stores': stores,
+            'dates': dates,
+            'total_rows': len(rows),
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return error_response(f'解析门店收入数据失败: {str(e)}')
+
+
+@bp.route('/export-cost-detail', methods=['POST'])
+def export_cost_detail():
+    """导出成本明细表（6 个 Sheet）"""
+    try:
+        data = request.get_json()
+
+        analysis = data.get('analysis', {})
+        revenue_rows = data.get('revenue_rows', [])
+
+        summary = analysis.get('summary', {})
+        date_range = summary.get('date_range', '')
+        stores = analysis.get('stores', [])
+        sp_qty_rows = analysis.get('sp_qty_rows', [])
+        sp_cost_rows = analysis.get('sp_cost_rows', [])
+        ing_qty_rows = analysis.get('ing_qty_rows', [])
+        ing_cost_rows = analysis.get('ing_cost_rows', [])
+        store_cost_summary = analysis.get('store_cost_summary', {})
+        daily_cost_summary = analysis.get('daily_cost_summary', [])
+
+        # 构建收入查找表
+        # {store: total_revenue}
+        store_revenue_total = {}
+        # {(date, store): revenue}
+        daily_revenue_map = {}
+        for r in revenue_rows:
+            s = r.get('store', '')
+            d = r.get('date', '')
+            rev = float(r.get('revenue', 0))
+            store_revenue_total[s] = store_revenue_total.get(s, 0.0) + rev
+            daily_revenue_map[(d, s)] = daily_revenue_map.get((d, s), 0.0) + rev
+
+        output = BytesIO()
+
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Sheet 1: 门店汇总看板
+            sheet1_data = []
+            for s in stores:
+                rev = store_revenue_total.get(s, 0.0)
+                cost = store_cost_summary.get(s, 0.0)
+                margin = round((rev - cost) / rev, 4) if rev > 0 else 0.0
+                sheet1_data.append({
+                    '时间周期': date_range,
+                    '门店名称': s,
+                    '门店收入': round(rev, 2),
+                    '理论成本': round(cost, 2),
+                    '理论毛利率': f'{round(margin * 100, 2)}%',
+                })
+            pd.DataFrame(sheet1_data).to_excel(writer, sheet_name='门店汇总看板', index=False)
+
+            # Sheet 2: 逐日看板
+            sheet2_data = []
+            for item in daily_cost_summary:
+                d = item['date']
+                s = item['store']
+                cost = item['cost']
+                rev = daily_revenue_map.get((d, s), 0.0)
+                margin = round((rev - cost) / rev, 4) if rev > 0 else 0.0
+                sheet2_data.append({
+                    '时间周期': d,
+                    '门店名称': s,
+                    '门店收入': round(rev, 2),
+                    '理论成本': round(cost, 2),
+                    '理论毛利率': f'{round(margin * 100, 2)}%',
+                })
+            # 对于有收入但无成本的日期门店也要补上
+            for (d, s), rev in daily_revenue_map.items():
+                already_in = any(x['时间周期'] == d and x['门店名称'] == s for x in sheet2_data)
+                if not already_in and rev > 0:
+                    sheet2_data.append({
+                        '时间周期': d,
+                        '门店名称': s,
+                        '门店收入': round(rev, 2),
+                        '理论成本': 0.0,
+                        '理论毛利率': '100.0%',
+                    })
+            sheet2_data.sort(key=lambda x: (x['时间周期'], x['门店名称']))
+            pd.DataFrame(sheet2_data).to_excel(writer, sheet_name='逐日看板', index=False)
+
+            # Sheet 3: 源商品销量明细
+            sheet3_data = [{'日期': r['date'], '门店名称': r['store'], '源商品': r['source_product'], '销量': r['value']} for r in sp_qty_rows]
+            pd.DataFrame(sheet3_data).to_excel(writer, sheet_name='源商品销量明细', index=False)
+
+            # Sheet 4: 源商品成本明细
+            sheet4_data = [{'日期': r['date'], '门店名称': r['store'], '源商品': r['source_product'], '成本': r['value']} for r in sp_cost_rows]
+            pd.DataFrame(sheet4_data).to_excel(writer, sheet_name='源商品成本明细', index=False)
+
+            # Sheet 5: 原料消耗量明细
+            sheet5_data = [{'日期': r['date'], '门店名称': r['store'], '原料': r['ingredient'], '消耗量': r['value']} for r in ing_qty_rows]
+            pd.DataFrame(sheet5_data).to_excel(writer, sheet_name='原料消耗量明细', index=False)
+
+            # Sheet 6: 原料成本明细
+            sheet6_data = [{'日期': r['date'], '门店名称': r['store'], '原料': r['ingredient'], '成本': r['value']} for r in ing_cost_rows]
+            pd.DataFrame(sheet6_data).to_excel(writer, sheet_name='原料成本明细', index=False)
+
+        output.seek(0)
+
+        from flask import send_file
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='成本明细表.xlsx'
         )
     except Exception as e:
         import traceback

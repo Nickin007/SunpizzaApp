@@ -23,6 +23,102 @@ export interface AccountSubject {
   level: number;
   is_enabled: boolean;
   is_cash: boolean;
+  linked_category_ids: number[];
+}
+
+export interface AccountItemCategory {
+  id: number;
+  book_id: number;
+  name: string;
+  created_at: string;
+  items?: AccountItem[];
+}
+
+export interface AccountItem {
+  id: number;
+  category_id: number;
+  code: string;
+  name: string;
+  is_enabled: boolean;
+  created_at: string;
+}
+
+export interface EntryItem {
+  id?: number;
+  entry_id?: number;
+  category_id: number;
+  category_name?: string;
+  item_id: number;
+  item_code?: string;
+  item_name?: string;
+}
+
+export interface InitialBalance {
+  id?: number;
+  book_id: number;
+  subject_id: number;
+  subject_code?: string;
+  subject_name?: string;
+  item_id: number | null;
+  item_name?: string;
+  debit_amount: number;
+  credit_amount: number;
+}
+
+export interface TrialBalanceRow {
+  subject_id: number;
+  code: string;
+  name: string;
+  type: string;
+  level: number;
+  balance_direction: string;
+  opening_balance: number;
+  period_debit: number;
+  period_credit: number;
+  closing_balance: number;
+}
+
+export interface ItemBalanceRow {
+  subject_id: number;
+  subject_code: string;
+  subject_name: string;
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  opening_balance: number;
+  period_debit: number;
+  period_credit: number;
+  closing_balance: number;
+}
+
+export interface BalanceSheetData {
+  period: string;
+  assets: Array<{ name: string; items: Array<{ name: string; amount: number }> }>;
+  total_assets: number;
+  liabilities: Array<{ name: string; items: Array<{ name: string; amount: number }> }>;
+  total_liabilities: number;
+  equity: Array<{ name: string; amount: number }>;
+  total_equity: number;
+  total_liabilities_equity: number;
+}
+
+export interface IncomeRow {
+  name: string;
+  amount: number;
+  level: number;
+}
+
+export interface CashFlowSection {
+  name: string;
+  items: Array<{ name: string; amount: number }>;
+}
+
+export interface CashFlowData {
+  period: string;
+  sections: CashFlowSection[];
+  net_increase: number;
+  opening_cash: number;
+  closing_cash: number;
 }
 
 export interface VoucherEntry {
@@ -36,6 +132,7 @@ export interface VoucherEntry {
   subject_full_name?: string;
   debit_amount: number;
   credit_amount: number;
+  items?: EntryItem[];
 }
 
 export interface Voucher {
@@ -150,3 +247,63 @@ export const approveVoucher = (id: number, approvedBy?: string) =>
 
 export const unapproveVoucher = (id: number) =>
   request.post<ApiResponse<Voucher>>(`/finance/vouchers/${id}/unapprove`);
+
+// ==================== 核算项目 API ====================
+
+export const listItemCategories = (bookId: number) =>
+  request.get<ApiResponse<AccountItemCategory[]>>(`/finance/books/${bookId}/item-categories`);
+
+export const createItemCategory = (bookId: number, data: { name: string }) =>
+  request.post<ApiResponse<AccountItemCategory>>(`/finance/books/${bookId}/item-categories`, data);
+
+export const updateItemCategory = (id: number, data: { name: string }) =>
+  request.put<ApiResponse<AccountItemCategory>>(`/finance/item-categories/${id}`, data);
+
+export const deleteItemCategory = (id: number) =>
+  request.delete<ApiResponse<null>>(`/finance/item-categories/${id}`);
+
+export const createItem = (categoryId: number, data: { code: string; name: string }) =>
+  request.post<ApiResponse<AccountItem>>(`/finance/item-categories/${categoryId}/items`, data);
+
+export const updateItem = (id: number, data: { code?: string; name?: string; is_enabled?: boolean }) =>
+  request.put<ApiResponse<AccountItem>>(`/finance/items/${id}`, data);
+
+export const deleteItem = (id: number) =>
+  request.delete<ApiResponse<null>>(`/finance/items/${id}`);
+
+// ==================== 科目-核算关联 API ====================
+
+export const setSubjectItemLinks = (subjectId: number, categoryIds: number[]) =>
+  request.put<ApiResponse<AccountSubject>>(`/finance/subjects/${subjectId}/item-links`, { category_ids: categoryIds });
+
+// ==================== 期初余额 API ====================
+
+export const getInitialBalances = (bookId: number) =>
+  request.get<ApiResponse<InitialBalance[]>>(`/finance/books/${bookId}/initial-balances`);
+
+export const setInitialBalances = (bookId: number, balances: Array<{
+  subject_id: number; item_id?: number | null; debit_amount: number; credit_amount: number;
+}>) => request.put<ApiResponse<null>>(`/finance/books/${bookId}/initial-balances`, { balances });
+
+// ==================== 报表 API ====================
+
+export const getTrialBalance = (bookId: number, period: string) =>
+  request.get<ApiResponse<TrialBalanceRow[]>>(`/finance/books/${bookId}/trial-balance`, { params: { period } });
+
+export const getItemBalance = (bookId: number, period: string, categoryId: number) =>
+  request.get<ApiResponse<ItemBalanceRow[]>>(`/finance/books/${bookId}/item-balance`, { params: { period, category_id: categoryId } });
+
+export const getBalanceSheet = (bookId: number, period: string) =>
+  request.get<ApiResponse<BalanceSheetData>>(`/finance/books/${bookId}/balance-sheet`, { params: { period } });
+
+export const getIncomeStatement = (bookId: number, period: string) =>
+  request.get<ApiResponse<{ period: string; rows: IncomeRow[] }>>(`/finance/books/${bookId}/income-statement`, { params: { period } });
+
+export const getCashFlowStatement = (bookId: number, period: string) =>
+  request.get<ApiResponse<CashFlowData>>(`/finance/books/${bookId}/cashflow-statement`, { params: { period } });
+
+export const exportReport = (bookId: number, type: string, period: string) =>
+  request.get(`/finance/books/${bookId}/export-report`, {
+    params: { type, period },
+    responseType: 'blob',
+  });

@@ -1,0 +1,66 @@
+---
+description: 技术栈、架构约定、开发规范
+alwaysApply: true
+---
+
+# 技术架构记忆
+
+## 前端技术栈
+
+React 19 + TypeScript 5.9 + Vite 7 + Ant Design 5.27 + Zustand 5 + ECharts 5 + react-router-dom 7 + dayjs + react-markdown + html2canvas
+
+### API 层
+
+- `utils/request.ts`：axios 实例，baseURL `http://118.89.73.199:5000/api`，timeout 600000ms，自动附加 `Authorization: Bearer {token}`
+- 10 个 API 文件：`auth.ts`、`chat.ts`（SSE 原生 fetch）、`agent.ts`、`users.ts`、`poi.ts`、`finance.ts`、`excelToolkit.ts`、`costAnalysis.ts`、`modelTest.ts`、`supplyChain.ts`
+- 认证 token 存 `localStorage` 的 `admin_token` key
+
+### 状态管理
+
+4 个 Zustand Store：`authStore`（认证/用户/角色）、`chatStore`（Agent 对话/流式/工具调用/多文件管理）、`financeStore`（财务状态）、`themeStore`（Agent 深色/浅色主题）
+
+### 移动端适配
+
+- `hooks/useIsMobile.ts`：`window.matchMedia` 监听 768px 断点
+- PortalLayout / DeliveryLayout：移动端侧边栏变为 Ant Design Drawer
+- 双栏页面：移动端 flex-direction: column 垂直堆叠
+- 表格：`scroll={{ x }}` 启用水平滚动
+
+### 布局组件
+
+- `PortalLayout`：通用后台布局，支持预设主题色（green/orange/purple/red/teal/geekblue）
+- `DeliveryLayout`：外卖运营独立布局
+- `AgentLayout`：AI Agent 独立全屏布局（左侧会话列表 + 右侧聊天区），有独立深色/浅色主题系统
+- `SupplyChainLayoutWrapper`：包装 PortalLayout，按角色动态生成侧边栏菜单
+
+## 后端技术栈
+
+Flask + SQLAlchemy + Flask-CORS + PyJWT + Pandas/NumPy + Gunicorn (4 workers, sync, 600s timeout, bind 0.0.0.0:5000)
+
+### 架构约定
+
+- **所有模型**在 `app/models.py` 单文件（33 个模型类）
+- **9 个 API 蓝图**：users / poi / cost_analysis / excel_toolkit / finance / chat / agent / model_test / supply_chain
+- **认证装饰器**：`@token_required`、`@admin_required`（`app/utils/auth.py`）
+- **标准响应**：`success_response(data, message)`、`error_response(message, code)`（`app/utils/response.py`）
+- **CORS**：允许所有来源，`supports_credentials: False`
+- **上传限制**：500MB（`MAX_CONTENT_LENGTH`）
+
+### AI 集成
+
+- SiliconFlow API（`Pro/moonshotai/Kimi-K2.5` 模型），max_tokens 16384，temperature 0.7，支持 thinking mode（可通过 `{"thinking": {"type": "disabled"}}` 关闭）
+- SiliconFlow（`BAAI/bge-m3`）用于向量嵌入（记忆系统，后端保留）
+
+## 数据库约定
+
+- **MySQL**：迁移脚本必须用 MySQL 语法（`AUTO_INCREMENT` 非 `SERIAL`，`TINYINT(1)` 非 `BOOLEAN`）
+- **供应链表**主键为 `BIGINT UNSIGNED`，外键列类型必须与父表主键匹配
+- **无 Alembic**：通过手动 Python 迁移脚本（`backend/migrate_*.py`）
+- `ALTER TABLE ... MODIFY COLUMN` 修改列类型
+
+## PowerShell 注意事项
+
+- **不能用 `&&`** 连接命令，用 `;` 替代
+- 多行 Python 代码不能直接内联 ssh，需写成 .py 文件 scp 到服务器再运行
+- 部署脚本含非 ASCII 字符（✓/✗），可能触发 `TerminatorExpectedAtEndOfString` 编码错误
+- `Compress-Archive` 打包的 zip 在 Linux 解压时会出现 Windows 反斜杠路径警告（可忽略）

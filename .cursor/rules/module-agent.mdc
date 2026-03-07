@@ -1,0 +1,117 @@
+---
+description: AI Agent 后台模块记忆
+globs: "**/Agent/**,**/chat*,**/agent*,**/ChatDrawer/**,**/MarkdownRenderer/**,**/AgentLayout/**,**/themeStore*,**/agent-themes*"
+alwaysApply: false
+---
+
+# AI Agent 后台 (`/agent`)
+
+使用独立 `AgentLayout`（全屏布局，非 PortalLayout），有独立深色/浅色主题系统。路由 `/agent/chat`，仅 1 个页面：`Chat.tsx`。
+
+## 布局与主题
+
+- `layouts/AgentLayout/index.tsx` + `style.css` — 左侧会话列表侧边栏（280px，可折叠）+ 右侧聊天区（消息居中，最大宽度 768px）
+- `store/themeStore.ts` — Zustand store 管理深色/浅色主题，持久化 localStorage
+- `styles/agent-themes.css` — CSS 变量定义（`--agent-bg`、`--agent-text`、`--agent-code-bg` 等），通过 `data-theme` 属性切换
+- 侧边栏底部有太阳/月亮图标的主题切换按钮
+
+## LLM 配置
+
+- **API**：SiliconFlow (`https://api.siliconflow.cn/v1/chat/completions`)
+- **模型**：`Pro/moonshotai/Kimi-K2.5`（Kimi K2.5，支持 thinking mode）
+- **API Key**：`sk-mdlutewvbzbpzsivumgmsiujwbntwxzyrxtmjxozckefoyvv`
+
+### 配置常量（`backend/app/api/chat.py`）
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `MAX_TOOL_ROUNDS` | 25 | 单次请求最多工具调用轮数 |
+| `max_tokens` | 16384 | 每轮 LLM 回复最大 token |
+| `HISTORY_TOKEN_BUDGET` | 60000 | 历史消息上下文预算 |
+| `temperature` | 0.7 | |
+| HTTP `timeout` | 600s | |
+
+## SSE 流式协议
+
+后端通过 SSE 流式推送 9 种事件到前端：
+
+| 事件 | 格式 | 说明 |
+|------|------|------|
+| reasoning | `{"type": "reasoning", "content": "..."}` | AI 深度思考过程（逐 chunk 流式） |
+| content | `{"content": "text"}` | AI 回复文字（逐 chunk 流式） |
+| tool_call_start | `{"type": "tool_call_start", "name": "python_execute"}` | 开始生成代码 |
+| tool_call_delta | `{"type": "tool_call_delta", "code_delta": "..."}` | 代码增量（逐字流式） |
+| tool_call_end | `{"type": "tool_call_end", "code": "..."}` | 代码生成完毕（完整代码） |
+| tool_result | `{"type": "tool_result", "output": "...", "success": true/false}` | 代码执行结果（一次性） |
+| status | `{"type": "status", "message": "..."}` | 状态提示（如"正在分析执行结果..."） |
+| error | `{"error": "..."}` | 错误信息 |
+| [DONE] | `[DONE]` | 流结束 |
+
+### 多 tool call 顺序化处理
+
+LLM 可能在一次响应中生成多个 `python_execute` tool call。后端通过 `first_streamed_tc_idx` 机制保证前端收到的事件顺序正确：
+- 流式阶段只推送**第一个** tool call 的 `start/delta/end` 事件（保留逐字符代码流式体验）
+- 后续 tool call 在执行阶段**逐个**发送 `start → end → execute → result`
+- 前端收到的事件顺序始终为 `[TC0, TR0, TC1, TR1, ...]`，确保 `MessageList` 中 `tool_call` + `tool_result` 正确配对渲染为 `ToolBlock`
+
+## 深度思考模式
+
+- 前端：输入区有"深度思考"开关（`thinkingEnabled` state），通过 `ThunderboltOutlined` 图标 + 自定义样式按钮切换
+- 数据流：`Chat.tsx` → `chatStore.sendMessage(content, tokens, thinking)` → `chat.ts sendMessageStream(..., thinking)` → 后端 `send_message` 读取 `thinking` 字段
+- 后端：`call_llm_stream(messages, tools, thinking)` — `thinking=False` 时添加 `{"thinking": {"type": "disabled"}}` 到 payload
+- 思考流式显示：`_parse_stream_with_tools` yield `('reasoning', chunk)` → SSE `reasoning` 事件 → 前端 `onReasoning` 回调累积到 `reasoningContent` → `ReasoningBlock` 组件可折叠显示
+- Kimi K2.5 要求：assistant 消息含 tool_calls 时必须包含 `reasoning_content` 字段，否则下一轮 API 报 400
+
+## 数据分析工具
+
+仅保留 `python_execute` — AI 生成 Python 代码在受限沙箱中执行。
+
+### Python 沙箱（`execute_python_sandbox`）
+
+- 预加载库：pandas(pd), numpy(np), math, re, json, datetime, timedelta, Counter, defaultdict
+- 安全措施：`_safe_import` 白名单控制（`ALLOWED_MODULES`）、危险代码正则过滤、受限 builtins、30 秒超时、线程隔离
+- 变量在同一请求的多次代码执行间持久化（`shared_globals`），且**跨消息也能持久化**
+- 跨消息持久化机制：`_save_sandbox_state` / `_load_sandbox_state` 通过 pickle 序列化用户自定义变量到 `/tmp/sunpizza_sandbox_state/conv_{conv_id}.pkl`；`SANDBOX_SYSTEM_KEYS` 排除系统变量（pd/np/df/dfs 等），不可 pickle 的对象自动跳过
+- 文件 token 通过 `/tmp/sunpizza_tokens/` 目录下 JSON 文件共享（Gunicorn 多进程兼容）
+
+### 多文件分析支持
+
+- 前端：`uploadedFiles: UploadedFile[]` 数组管理多文件，`<input>` 有 `multiple` 属性
+- 后端：`send_message` 接受 `file_tokens: string[]` 数组
+- 沙箱变量规则：
+  - 单文件：`df` 直接可用
+  - 多文件：`dfs` 字典（键为文件名），`df1`/`df2`/... 按序号，不设置 `df` 避免歧义
+- 历史文件：从会话历史 `meta_data` 中收集所有文件路径（去重、检查文件存在）
+- 用户消息 `meta_data` 存储文件数组：`{"files": [{"filename": "...", "file_path": "..."}]}`
+
+### 数据感知
+
+- Excel 上传时自动生成统计摘要注入 context：`df.shape`、`df.dtypes`、`df.describe()`、`df.head(5)`、空值统计等
+
+## 终止生成
+
+- `chatStore.stopGeneration()` — 调用 `AbortController.abort()` 终止 SSE 流，将已有 `streamingContent` 保存为消息
+- 前端：`sending` 状态时发送按钮变为方形停止图标
+
+## 分析方法论（SYSTEM_PROMPT）
+
+内置五步分析框架：观察 → 假设 → 验证 → 解读 → 建议。强制规则：
+- 所有数据结论必须来自代码执行结果，严禁编造或猜测数据
+- 每次代码执行后必须先对结果进行完整文字分析，再决定是否执行下一段代码，禁止连续调用多次 `python_execute` 而不在中间给出分析
+- 变量跨消息自动保留；遇到 NameError 必须先 `print(dir())` 检查可用变量，禁止凭记忆猜测变量名或声称"变量丢失"
+
+## ChatDrawer 组件
+
+- `components/ChatDrawer/` — 440px 宽（移动端 100%），右下角悬浮按钮仅 admin 可见
+- 跨后台共享，在非 Agent 页面也可使用
+- 支持多文件上传（`uploadedFiles` 数组、`removeUploadedFile(index)`）
+
+## 记忆系统（后端保留，前端路由已移除）
+
+- 后端 `api/agent.py` 仍提供记忆文件 CRUD 和向量搜索 API
+- `MemoryFile` 模型：file_key, title, content, embedding, always_load, is_core
+- 前端路由中已移除 FileEditor 和 MemoryBrowser 页面（用户要求移除长期记忆以避免干扰数据分析）
+
+## 相关模型
+
+`ChatConversation`、`ChatMessage`（含 `msg_type`、`meta_data` 字段）、`MemoryFile`

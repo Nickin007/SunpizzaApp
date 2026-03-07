@@ -1,0 +1,141 @@
+/* 传统中国会计表格风格 */
+
+.acct-table .ant-table {
+  border: 2px solid #333;
+  border-radius: 0;
+}
+
+.acct-table .ant-table-thead > tr > th {
+  background: #1a3353 !important;
+  color: #fff !important;
+  font-weight: 600;
+  text-align: center !important;
+  border-bottom: 2px solid #333;
+  border-right: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.acct-table .ant-table-thead > tr > th:last-child {
+  border-right: none;
+}
+
+.acct-table .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #bbb;
+  border-right: 1px solid #ddd;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.acct-table .ant-table-tbody > tr > td:last-child {
+  border-right: none;
+}
+
+.acct-table .ant-table-tbody > tr:hover > td {
+  background: #fdf8e8 !important;
+}
+
+/* 数字列：等宽字体、右对齐 */
+.acct-num {
+  font-family: 'Courier New', 'Consolas', monospace;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 负数红色 */
+.acct-num-negative {
+  color: #cf1322;
+}
+
+/* 合计行 */
+.acct-table .ant-table-tbody > tr.acct-total-row > td {
+  background: #fffbe6 !important;
+  font-weight: 700;
+  border-top: 2px solid #333;
+  border-bottom: 2px solid #333;
+}
+
+/* 分组标题行 */
+.acct-table .ant-table-tbody > tr.acct-group-row > td {
+  background: #f0f5ff !important;
+  font-weight: 600;
+}
+
+/* 凭证头 */
+.acct-voucher-header {
+  text-align: center;
+  border: 2px solid #333;
+  padding: 16px 24px;
+  margin-bottom: 16px;
+  background: #fafafa;
+}
+
+.acct-voucher-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  margin-bottom: 8px;
+  color: #1a3353;
+}
+
+.acct-voucher-header .meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #333;
+}
+
+/* 报表标题 */
+.acct-report-title {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.acct-report-title h3 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: #1a3353;
+  margin-bottom: 4px;
+}
+
+.acct-report-title .report-meta {
+  color: #666;
+  font-size: 13px;
+}
+
+/* 层级缩进 */
+.acct-indent-1 { padding-left: 24px !important; }
+.acct-indent-2 { padding-left: 48px !important; }
+.acct-indent-3 { padding-left: 72px !important; }
+
+/* 科目树 - 传统会计风格 */
+.acct-subject-tree .ant-tree-node-content-wrapper {
+  border-bottom: 1px dashed #ddd;
+  border-radius: 0;
+  padding: 4px 8px;
+}
+
+/* 期初余额表 - 输入框样式 */
+.acct-balance-input .ant-input-number {
+  border-radius: 0;
+  font-family: 'Courier New', 'Consolas', monospace;
+}
+
+/* 卡片边框 */
+.acct-card {
+  border-radius: 0 !important;
+  border: 1px solid #999;
+}
+
+.acct-card .ant-card-head {
+  background: #1a3353;
+  border-radius: 0;
+  min-height: 40px;
+}
+
+.acct-card .ant-card-head-title {
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+}

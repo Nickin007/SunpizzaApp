@@ -192,35 +192,48 @@
   color: white !important;
 }
 
+/* 标题 */
+.delivery-title {
+  font-size: 20px;
+}
+
 /* 响应式优化 */
 @media (max-width: 768px) {
+  .delivery-sider {
+    display: none !important;
+  }
+
+  .delivery-content-layout {
+    margin-right: 0 !important;
+  }
+
   .delivery-header {
-    padding: 0 16px;
-    margin: 0 16px 0 20px; /* 移动端调整边距 */
+    padding: 0 12px;
+    margin: 0;
+    border-radius: 0;
+    height: 52px;
+    line-height: 52px;
   }
-  
+
+  .delivery-title {
+    font-size: 16px !important;
+  }
+
+  .header-left {
+    gap: 12px;
+  }
+
   .delivery-page-content {
-    margin: 16px 16px 16px 20px; /* 移动端调整边距 */
+    margin: 12px;
+    min-height: calc(100vh - 76px);
   }
-  
+
   .username {
     display: none;
   }
-  
-  .logo {
-    height: 60px;
-    margin: 12px;
-    padding: 8px;
-  }
-  
-  .logo-large {
-    max-height: 40px;
-  }
-  
-  .delivery-menu .ant-menu-item {
-    height: 42px !important;
-    line-height: 42px !important;
-    margin: 3px 8px !important;
+
+  .user-info {
+    padding: 6px 8px;
   }
 }
 

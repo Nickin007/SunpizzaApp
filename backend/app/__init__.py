@@ -30,13 +30,15 @@ def create_app(config_class=Config):
          }})
     
     # 注册蓝图
-    from app.api import users, poi, cost_analysis, excel_toolkit, finance, chat
+    from app.api import users, poi, cost_analysis, excel_toolkit, finance, chat, model_test, supply_chain
     app.register_blueprint(users.bp)  # 保留用户认证API（登录）
     app.register_blueprint(poi.bp)  # POI选址工具API
     app.register_blueprint(cost_analysis.bp)  # 成本分析API
     app.register_blueprint(excel_toolkit.bp)  # Excel工具包API
     app.register_blueprint(finance.bp)  # 财务核算API
-    app.register_blueprint(chat.bp)  # AI聊天+记忆系统API
+    app.register_blueprint(chat.bp)  # AI聊天API
+    app.register_blueprint(model_test.bp)  # 模型压力测试API
+    app.register_blueprint(supply_chain.bp)  # 供应链订货系统API
     
     # 配置静态文件访问（用于访问上传的视频、图片等）
     @app.route('/uploads/<path:filename>')
