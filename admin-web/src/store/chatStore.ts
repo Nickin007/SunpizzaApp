@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Conversation, ChatMessage } from '../api/chat';
+import type { Conversation, ChatMessage, AgentDefinition } from '../api/chat';
 import {
   listConversations,
   createConversation as apiCreateConversation,
@@ -8,6 +8,7 @@ import {
   sendMessageStream,
   uploadFile as apiUploadFile,
   mapBackendMessage,
+  getAgentTree,
 } from '../api/chat';
 
 interface UploadedFile {
@@ -21,11 +22,16 @@ interface ChatState {
   toggleDrawer: () => void;
   setDrawerVisible: (visible: boolean) => void;
 
+  agents: AgentDefinition[];
+  currentAgentId: string;
+  loadAgents: () => Promise<void>;
+  setCurrentAgent: (agentId: string) => void;
+
   conversations: Conversation[];
   currentConversationId: number | null;
   loadingConversations: boolean;
   loadConversations: () => Promise<void>;
-  createConversation: (title?: string) => Promise<number | null>;
+  createConversation: (title?: string, agentId?: string) => Promise<number | null>;
   deleteConversation: (id: number) => Promise<void>;
   setCurrentConversation: (id: number | null) => void;
 
@@ -54,6 +60,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
   toggleDrawer: () => set((s) => ({ drawerVisible: !s.drawerVisible })),
   setDrawerVisible: (visible) => set({ drawerVisible: visible }),
 
+  agents: [],
+  currentAgentId: 'strategy_ai',
+
+  loadAgents: async () => {
+    try {
+      const resp = await getAgentTree();
+      if (resp.data?.code === 200) {
+        set({ agents: resp.data.data || [] });
+      }
+    } catch (e) {
+      console.error('加载 Agent 列表失败', e);
+    }
+  },
+
+  setCurrentAgent: (agentId) => {
+    set({ currentAgentId: agentId });
+  },
+
   conversations: [],
   currentConversationId: null,
   loadingConversations: false,
@@ -72,9 +96,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  createConversation: async (title) => {
+  createConversation: async (title, agentId) => {
     try {
-      const resp = await apiCreateConversation(title);
+      const aid = agentId || get().currentAgentId;
+      const resp = await apiCreateConversation(title, aid);
       if (resp.data?.code === 200) {
         const newConv = resp.data.data;
         set((s) => ({

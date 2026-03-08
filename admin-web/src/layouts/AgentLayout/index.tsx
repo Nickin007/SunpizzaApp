@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import {
   PlusOutlined, DeleteOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   SunOutlined, MoonOutlined, ArrowLeftOutlined, SearchOutlined,
-  EditOutlined, CheckOutlined, CloseOutlined,
+  EditOutlined, CloseOutlined, CheckOutlined,
 } from '@ant-design/icons';
 import { Popconfirm, Spin } from 'antd';
 import { useChatStore } from '../../store/chatStore';
@@ -26,10 +26,7 @@ function groupByDate(conversations: Conversation[]): DateGroup[] {
   const last7 = new Date(today.getTime() - 7 * 86400000);
 
   const groups: Record<string, Conversation[]> = {
-    '今天': [],
-    '昨天': [],
-    '最近 7 天': [],
-    '更早': [],
+    '今天': [], '昨天': [], '最近 7 天': [], '更早': [],
   };
 
   for (const conv of conversations) {
@@ -55,11 +52,13 @@ const AgentLayout: React.FC = () => {
   const {
     conversations, currentConversationId, loadingConversations,
     loadConversations, createConversation, deleteConversation, setCurrentConversation,
+    loadAgents,
   } = useChatStore();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     loadConversations();
+    loadAgents();
   }, []);
 
   useEffect(() => {
@@ -75,6 +74,12 @@ const AgentLayout: React.FC = () => {
   }, [conversations, searchTerm]);
 
   const dateGroups = useMemo(() => groupByDate(filteredConversations), [filteredConversations]);
+
+  const currentTitle = useMemo(() => {
+    if (!currentConversationId) return '';
+    const conv = conversations.find((c) => c.id === currentConversationId);
+    return conv?.title || '新对话';
+  }, [conversations, currentConversationId]);
 
   const handleNewChat = async () => {
     await createConversation();
@@ -97,9 +102,15 @@ const AgentLayout: React.FC = () => {
           <button className="agent-sidebar-newchat" onClick={handleNewChat}>
             <PlusOutlined /> 新建对话
           </button>
+          <button
+            className="agent-sidebar-collapse-btn"
+            onClick={() => setSidebarOpen(false)}
+            title="收起侧边栏"
+          >
+            <MenuFoldOutlined />
+          </button>
         </div>
 
-        {/* 搜索框 */}
         <div className="agent-search-box">
           <SearchOutlined className="agent-search-icon" />
           <input
@@ -110,10 +121,7 @@ const AgentLayout: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           {searchTerm && (
-            <CloseOutlined
-              className="agent-search-clear"
-              onClick={() => setSearchTerm('')}
-            />
+            <CloseOutlined className="agent-search-clear" onClick={() => setSearchTerm('')} />
           )}
         </div>
 
@@ -121,7 +129,7 @@ const AgentLayout: React.FC = () => {
           {loadingConversations ? (
             <div style={{ textAlign: 'center', padding: 24 }}><Spin size="small" /></div>
           ) : filteredConversations.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 24, color: 'var(--agent-text-tertiary)', fontSize: 13 }}>
+            <div className="agent-sidebar-empty">
               {searchTerm ? '无匹配对话' : '暂无对话'}
             </div>
           ) : (
@@ -158,12 +166,17 @@ const AgentLayout: React.FC = () => {
 
       <main className="agent-main">
         <div className="agent-topbar">
-          <button
-            className="agent-toggle-sidebar"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-          >
-            {sidebarOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
-          </button>
+          {!sidebarOpen && (
+            <button
+              className="agent-toggle-sidebar"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <MenuUnfoldOutlined />
+            </button>
+          )}
+          {currentConversationId && (
+            <div className="agent-topbar-title">{currentTitle}</div>
+          )}
         </div>
         <Outlet />
       </main>
@@ -171,7 +184,7 @@ const AgentLayout: React.FC = () => {
   );
 };
 
-/* ===== 会话列表项（支持双击重命名）===== */
+/* ===== 会话列表项 ===== */
 const ConvItem: React.FC<{
   conv: Conversation;
   active: boolean;
@@ -182,6 +195,7 @@ const ConvItem: React.FC<{
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startEdit = () => {
     setEditValue(conv.title || '新对话');
@@ -199,11 +213,32 @@ const ConvItem: React.FC<{
 
   const cancelEdit = () => setEditing(false);
 
+  const handleClick = () => {
+    if (editing) return;
+    if (clickTimer.current) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = undefined;
+      return;
+    }
+    clickTimer.current = setTimeout(() => {
+      clickTimer.current = undefined;
+      onSelect();
+    }, 220);
+  };
+
+  const handleDoubleClick = () => {
+    if (clickTimer.current) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = undefined;
+    }
+    startEdit();
+  };
+
   return (
     <div
       className={`agent-conv-item ${active ? 'active' : ''}`}
-      onClick={() => !editing && onSelect()}
-      onDoubleClick={startEdit}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
     >
       {editing ? (
         <div className="agent-conv-edit-row" onClick={(e) => e.stopPropagation()}>
@@ -216,8 +251,13 @@ const ConvItem: React.FC<{
               if (e.key === 'Enter') confirmEdit();
               if (e.key === 'Escape') cancelEdit();
             }}
-            onBlur={confirmEdit}
           />
+          <button className="agent-conv-action-btn" onClick={confirmEdit} title="确认">
+            <CheckOutlined />
+          </button>
+          <button className="agent-conv-action-btn" onClick={cancelEdit} title="取消">
+            <CloseOutlined />
+          </button>
         </div>
       ) : (
         <>

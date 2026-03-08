@@ -5,9 +5,21 @@ import request from '../utils/request';
 export interface Conversation {
   id: number;
   user_id: number;
+  agent_id?: string;
   title: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface AgentDefinition {
+  id: string;
+  name: string;
+  level: number;
+  parent_id: string | null;
+  description: string | null;
+  icon: string | null;
+  status: 'active' | 'placeholder' | 'disabled';
+  children?: AgentDefinition[];
 }
 
 export interface ChatMessage {
@@ -151,8 +163,16 @@ export function listConversations() {
   return request.get<any, any>('/chat/conversations');
 }
 
-export function createConversation(title?: string) {
-  return request.post<any, any>('/chat/conversations', { title });
+export function createConversation(title?: string, agentId?: string) {
+  return request.post<any, any>('/chat/conversations', { title, agent_id: agentId });
+}
+
+export function listAgents() {
+  return request.get<any, any>('/agents');
+}
+
+export function getAgentTree() {
+  return request.get<any, any>('/agents/tree');
 }
 
 export function deleteConversation(id: number) {

@@ -4,7 +4,7 @@ AI Chat API
 """
 from flask import Blueprint, request, Response, current_app
 from app import db
-from app.models import ChatConversation, ChatMessage
+from app.models import ChatConversation, ChatMessage, AgentDefinition
 from app.utils.response import success_response, error_response
 from app.utils.auth import token_required, admin_required
 from datetime import datetime, timedelta
@@ -137,6 +137,157 @@ TOOLS = [
         },
     }
 ]
+
+TRAINER_TOOLS = [
+    {
+        'type': 'function',
+        'function': {
+            'name': 'list_agents',
+            'description': '列出系统中所有 Agent 的基本信息，包括 id、名称、层级、状态和 system_prompt 前100字预览。',
+            'parameters': {'type': 'object', 'properties': {}, 'required': []},
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'get_agent_detail',
+            'description': '获取指定 Agent 的完整配置信息，包括 system_prompt 全文。',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'agent_id': {'type': 'string', 'description': 'Agent 的 id，如 strategy_ai'},
+                },
+                'required': ['agent_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'update_agent',
+            'description': '更新指定 Agent 的配置字段。可更新的字段：name, description, system_prompt, status, icon, level, parent_id。',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'agent_id': {'type': 'string', 'description': '要更新的 Agent id'},
+                    'name': {'type': 'string', 'description': '新的显示名称'},
+                    'description': {'type': 'string', 'description': '新的职责描述'},
+                    'system_prompt': {'type': 'string', 'description': '新的 system_prompt 全文'},
+                    'status': {'type': 'string', 'description': 'active / placeholder / disabled'},
+                    'icon': {'type': 'string', 'description': '前端图标标识，如 RocketOutlined'},
+                    'level': {'type': 'integer', 'description': '层级：1 或 2'},
+                    'parent_id': {'type': 'string', 'description': '上级 Agent id，L1 填 null'},
+                },
+                'required': ['agent_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'create_agent',
+            'description': '创建一个新的 Agent。id 必须唯一，level 只能是 1 或 2。',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'id': {'type': 'string', 'description': '唯一标识，如 supply_brain'},
+                    'name': {'type': 'string', 'description': '显示名称，如 SupplyBrain - 供应链大脑'},
+                    'level': {'type': 'integer', 'description': '层级：1 或 2'},
+                    'parent_id': {'type': 'string', 'description': '上级 Agent id，L1 填 null'},
+                    'description': {'type': 'string', 'description': '职责描述'},
+                    'system_prompt': {'type': 'string', 'description': 'Agent 的 system_prompt'},
+                    'icon': {'type': 'string', 'description': '图标标识'},
+                    'status': {'type': 'string', 'description': 'active / placeholder / disabled，默认 active'},
+                },
+                'required': ['id', 'name', 'level'],
+            },
+        },
+    },
+]
+
+
+def _handle_list_agents():
+    agents = AgentDefinition.query.order_by(AgentDefinition.level, AgentDefinition.id).all()
+    result = []
+    for a in agents:
+        prompt_preview = (a.system_prompt or '')[:100]
+        if len(a.system_prompt or '') > 100:
+            prompt_preview += '...'
+        result.append({
+            'id': a.id, 'name': a.name, 'level': a.level,
+            'status': a.status, 'parent_id': a.parent_id,
+            'description': a.description or '',
+            'prompt_preview': prompt_preview,
+        })
+    return json.dumps(result, ensure_ascii=False)
+
+
+def _handle_get_agent_detail(agent_id):
+    agent = AgentDefinition.query.get(agent_id)
+    if not agent:
+        return json.dumps({'error': f'Agent "{agent_id}" 不存在'}, ensure_ascii=False)
+    return json.dumps({
+        'id': agent.id, 'name': agent.name, 'level': agent.level,
+        'parent_id': agent.parent_id, 'status': agent.status,
+        'icon': agent.icon, 'description': agent.description or '',
+        'system_prompt': agent.system_prompt or '',
+    }, ensure_ascii=False)
+
+
+def _handle_update_agent(agent_id, **fields):
+    agent = AgentDefinition.query.get(agent_id)
+    if not agent:
+        return json.dumps({'error': f'Agent "{agent_id}" 不存在'}, ensure_ascii=False)
+    allowed = {'name', 'description', 'system_prompt', 'status', 'icon', 'level', 'parent_id'}
+    updated = []
+    for key, val in fields.items():
+        if key in allowed and val is not None:
+            setattr(agent, key, val)
+            updated.append(key)
+    if updated:
+        db.session.commit()
+    return json.dumps({
+        'success': True, 'agent_id': agent_id,
+        'updated_fields': updated,
+        'message': f'已更新 {len(updated)} 个字段: {", ".join(updated)}' if updated else '无字段需要更新',
+    }, ensure_ascii=False)
+
+
+def _handle_create_agent(**kwargs):
+    agent_id = kwargs.get('id')
+    if not agent_id:
+        return json.dumps({'error': '缺少 id 字段'}, ensure_ascii=False)
+    existing = AgentDefinition.query.get(agent_id)
+    if existing:
+        return json.dumps({'error': f'Agent "{agent_id}" 已存在'}, ensure_ascii=False)
+    level = kwargs.get('level', 2)
+    if level not in (1, 2):
+        return json.dumps({'error': 'level 只能是 1 或 2'}, ensure_ascii=False)
+    agent = AgentDefinition(
+        id=agent_id,
+        name=kwargs.get('name', agent_id),
+        level=level,
+        parent_id=kwargs.get('parent_id'),
+        description=kwargs.get('description', ''),
+        system_prompt=kwargs.get('system_prompt', ''),
+        icon=kwargs.get('icon', 'AppstoreOutlined'),
+        status=kwargs.get('status', 'active'),
+    )
+    db.session.add(agent)
+    db.session.commit()
+    return json.dumps({
+        'success': True, 'agent_id': agent_id,
+        'message': f'Agent "{kwargs.get("name", agent_id)}" 创建成功 (L{level}, {agent.status})',
+    }, ensure_ascii=False)
+
+
+TOOL_HANDLERS = {
+    'python_execute': None,
+    'list_agents': lambda args: _handle_list_agents(),
+    'get_agent_detail': lambda args: _handle_get_agent_detail(args['agent_id']),
+    'update_agent': lambda args: _handle_update_agent(**args),
+    'create_agent': lambda args: _handle_create_agent(**args),
+}
 
 HISTORY_TOKEN_BUDGET = 60000
 
@@ -376,8 +527,20 @@ def execute_python_sandbox(code, file_paths=None, timeout=30, shared_globals=Non
 
 # ==================== LLM API (SiliconFlow / Kimi K2.5) ====================
 
+def _get_agent_prompt(conversation_id):
+    """从 conversation -> agent_definition 动态获取 system_prompt，回退到默认"""
+    if conversation_id:
+        conv = ChatConversation.query.get(conversation_id)
+        if conv and conv.agent_id:
+            agent = AgentDefinition.query.get(conv.agent_id)
+            if agent and agent.system_prompt:
+                return agent.system_prompt
+    return SYSTEM_PROMPT
+
+
 def assemble_context(user_id, conversation_id, user_message, excel_context=None):
-    messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
+    prompt = _get_agent_prompt(conversation_id)
+    messages = [{'role': 'system', 'content': prompt}]
 
     if conversation_id:
         history = ChatMessage.query.filter_by(conversation_id=conversation_id).order_by(ChatMessage.created_at).all()
@@ -529,7 +692,11 @@ def create_conversation(current_user):
     try:
         data = request.get_json() or {}
         title = data.get('title', '新对话')
-        conv = ChatConversation(user_id=current_user['user_id'], title=title)
+        agent_id = data.get('agent_id', 'strategy_ai')
+        agent = AgentDefinition.query.get(agent_id)
+        if not agent or agent.status == 'disabled':
+            return error_response(f'Agent "{agent_id}" 不存在或已禁用')
+        conv = ChatConversation(user_id=current_user['user_id'], title=title, agent_id=agent_id)
         db.session.add(conv)
         db.session.commit()
         return success_response(conv.to_dict(), message='创建成功')
@@ -655,7 +822,8 @@ def send_message(current_user, conv_id):
         excel_context = '\n\n---\n\n'.join(excel_contexts) if excel_contexts else None
         assembled = assemble_context(current_user['user_id'], conv_id, user_message, excel_context=excel_context)
         app = current_app._get_current_object()
-        use_tools = len(file_paths) > 0
+        is_trainer = conv.agent_id == 'trainer'
+        use_tools = len(file_paths) > 0 or is_trainer
 
         def _save_msg(role, content, msg_type='text', metadata_dict=None):
             """实时保存一条消息到数据库。"""
@@ -687,7 +855,13 @@ def send_message(current_user, conv_id):
 
                 for round_num in range(MAX_TOOL_ROUNDS):
                     try:
-                        resp = call_llm_stream(context, tools=TOOLS if use_tools else None, thinking=thinking)
+                        if is_trainer:
+                            tools_for_round = TRAINER_TOOLS
+                        elif file_paths:
+                            tools_for_round = TOOLS
+                        else:
+                            tools_for_round = None
+                        resp = call_llm_stream(context, tools=tools_for_round, thinking=thinking)
                         round_content = ''
                         round_reasoning = ''
                         round_tool_calls = None
@@ -749,6 +923,8 @@ def send_message(current_user, conv_id):
                                         if remaining:
                                             yield f"data: {json.dumps({'type': 'tool_call_delta', 'code_delta': remaining})}\n\n"
                                         yield f"data: {json.dumps({'type': 'tool_call_end', 'code': full_code})}\n\n"
+                                    else:
+                                        yield f"data: {json.dumps({'type': 'tool_call_end', 'code': ''})}\n\n"
                             elif ev_type == '_done':
                                 round_reasoning = ev_data.get('reasoning', '')
                     except Exception as e:
@@ -779,35 +955,62 @@ def send_message(current_user, conv_id):
 
                         for idx in sorted(round_tool_calls.keys()):
                             tc = round_tool_calls[idx]
-                            if tc['name'] != 'python_execute':
-                                continue
+                            tool_name = tc['name']
+
                             try:
-                                args = json.loads(tc['arguments'])
-                                code = args.get('code', '')
+                                tc_args = json.loads(tc['arguments']) if tc['arguments'] else {}
                             except (json.JSONDecodeError, AttributeError):
-                                code = tc['arguments']
+                                tc_args = {}
 
-                            if idx != first_streamed_tc_idx:
-                                yield f"data: {json.dumps({'type': 'tool_call_start', 'name': tc['name']})}\n\n"
-                                yield f"data: {json.dumps({'type': 'tool_call_end', 'code': code})}\n\n"
+                            if tool_name == 'python_execute':
+                                code = tc_args.get('code', '') if isinstance(tc_args, dict) else tc['arguments']
 
-                            _save_msg('assistant', code, msg_type='tool_call',
-                                      metadata_dict={'tool_name': 'python_execute'})
+                                if idx != first_streamed_tc_idx:
+                                    yield f"data: {json.dumps({'type': 'tool_call_start', 'name': tool_name})}\n\n"
+                                    yield f"data: {json.dumps({'type': 'tool_call_end', 'code': code})}\n\n"
 
-                            exec_result = execute_python_sandbox(code, file_paths, shared_globals=shared_globals)
-                            output = exec_result['output']
-                            if exec_result['error']:
-                                output = f"{output}\n[错误] {exec_result['error']}" if output else f"[错误] {exec_result['error']}"
+                                _save_msg('assistant', code, msg_type='tool_call',
+                                          metadata_dict={'tool_name': 'python_execute'})
 
-                            yield f"data: {json.dumps({'type': 'tool_result', 'output': output, 'success': exec_result['success']})}\n\n"
-                            _save_msg('assistant', output, msg_type='tool_result',
-                                      metadata_dict={'success': exec_result['success']})
+                                exec_result = execute_python_sandbox(code, file_paths, shared_globals=shared_globals)
+                                output = exec_result['output']
+                                if exec_result['error']:
+                                    output = f"{output}\n[错误] {exec_result['error']}" if output else f"[错误] {exec_result['error']}"
 
-                            context.append({
-                                'role': 'tool',
-                                'tool_call_id': tc['id'],
-                                'content': output[:3000],
-                            })
+                                yield f"data: {json.dumps({'type': 'tool_result', 'output': output, 'success': exec_result['success']})}\n\n"
+                                _save_msg('assistant', output, msg_type='tool_result',
+                                          metadata_dict={'success': exec_result['success']})
+                                context.append({
+                                    'role': 'tool',
+                                    'tool_call_id': tc['id'],
+                                    'content': output[:3000],
+                                })
+
+                            elif tool_name in TOOL_HANDLERS and TOOL_HANDLERS[tool_name] is not None:
+                                handler = TOOL_HANDLERS[tool_name]
+                                if idx != first_streamed_tc_idx:
+                                    yield f"data: {json.dumps({'type': 'tool_call_start', 'name': tool_name})}\n\n"
+                                    yield f"data: {json.dumps({'type': 'tool_call_end', 'code': ''})}\n\n"
+
+                                try:
+                                    output = handler(tc_args)
+                                except Exception as e:
+                                    output = json.dumps({'error': str(e)}, ensure_ascii=False)
+
+                                yield f"data: {json.dumps({'type': 'tool_result', 'output': output, 'success': True})}\n\n"
+                                _save_msg('assistant', output, msg_type='tool_result',
+                                          metadata_dict={'tool_name': tool_name})
+                                context.append({
+                                    'role': 'tool',
+                                    'tool_call_id': tc['id'],
+                                    'content': output[:3000],
+                                })
+                            else:
+                                context.append({
+                                    'role': 'tool',
+                                    'tool_call_id': tc['id'],
+                                    'content': f'未知工具: {tool_name}',
+                                })
 
                         yield f"data: {json.dumps({'type': 'status', 'message': '正在分析执行结果...'})}\n\n"
                         continue

@@ -432,6 +432,51 @@ class SubjectInitialBalance(db.Model):
         }
 
 
+# ==================== Agent 定义 ====================
+
+class AgentDefinition(db.Model):
+    """Agent 注册表 — 数据库驱动，增删 Agent 无需改代码"""
+    __tablename__ = 'agent_definitions'
+
+    id = db.Column(db.String(50), primary_key=True, comment='如 strategy_ai, supply_brain')
+    name = db.Column(db.String(100), nullable=False, comment='显示名称')
+    level = db.Column(db.Integer, nullable=False, comment='层级 1/2/3')
+    parent_id = db.Column(db.String(50), db.ForeignKey('agent_definitions.id'), nullable=True, comment='上级 Agent')
+    description = db.Column(db.Text, nullable=True, comment='职责描述')
+    system_prompt = db.Column(db.Text, nullable=True, comment='专属 SYSTEM_PROMPT')
+    tools = db.Column(db.Text, nullable=True, comment='JSON 工具定义数组')
+    icon = db.Column(db.String(50), nullable=True, comment='前端图标标识')
+    status = db.Column(db.String(20), nullable=False, default='placeholder', comment='active/placeholder/disabled')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    children = db.relationship('AgentDefinition', backref=db.backref('parent', remote_side=[id]), lazy='dynamic')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'level': self.level,
+            'parent_id': self.parent_id,
+            'description': self.description,
+            'icon': self.icon,
+            'status': self.status,
+        }
+
+
+class AgentDispatchLog(db.Model):
+    """Agent 调度日志"""
+    __tablename__ = 'agent_dispatch_logs'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey('chat_conversations.id'), nullable=False, index=True)
+    source_agent_id = db.Column(db.String(50), nullable=False, comment='发起调度的 Agent')
+    target_agent_id = db.Column(db.String(50), nullable=False, comment='被调度的 Agent')
+    dispatch_type = db.Column(db.String(20), nullable=False, default='auto', comment='auto/manual')
+    task_summary = db.Column(db.Text, nullable=True, comment='任务摘要')
+    result_summary = db.Column(db.Text, nullable=True, comment='结果摘要')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 # ==================== AI Chat ====================
 
 class ChatConversation(db.Model):
@@ -440,6 +485,7 @@ class ChatConversation(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True, comment='用户ID')
+    agent_id = db.Column(db.String(50), db.ForeignKey('agent_definitions.id'), nullable=False, default='strategy_ai', comment='绑定的 Agent')
     title = db.Column(db.String(200), nullable=False, default='新对话', comment='会话标题')
     created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
@@ -451,6 +497,7 @@ class ChatConversation(db.Model):
         return {
             'id': self.id,
             'user_id': self.user_id,
+            'agent_id': self.agent_id,
             'title': self.title,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,

@@ -50,7 +50,7 @@ scp backend/migrate_xxx.py ubuntu@118.89.73.199:~/SunpizzaApp/backend/
 ssh ubuntu@118.89.73.199 "cd ~/SunpizzaApp/backend && source venv/bin/activate && python migrate_xxx.py"
 ```
 
-现有迁移脚本：`migrate_accounting.py`、`migrate_company_model.py`、`migrate_fix.py`、`migrate_multi_roles.py`、`migrate_supply_chain.py`
+现有迁移脚本：`migrate_accounting.py`、`migrate_company_model.py`、`migrate_fix.py`、`migrate_multi_roles.py`、`migrate_supply_chain.py`、`migrate_agents.py`（三级架构初始化）、`migrate_simplify_and_trainer.py`（简化为两层 + 插入 Trainer）
 
 ## 已知问题
 

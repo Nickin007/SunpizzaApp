@@ -8,6 +8,49 @@ alwaysApply: false
 
 使用独立 `AgentLayout`（全屏布局，非 PortalLayout），有独立深色/浅色主题系统。路由 `/agent/chat`，仅 1 个页面：`Chat.tsx`。
 
+## 两层 Agent 架构
+
+数据库驱动的 Agent 注册表（`agent_definitions` 表），增删 Agent 无需改代码。
+
+### 层级
+
+- **L1（顶层）**：`strategy_ai`（StrategyAI - 战略参谋，active）、`trainer`（Trainer - 训练管理，active）
+- **L2（执行层）**：初始为空，通过 Trainer 对话式创建，未来按需扩展
+
+### 数据模型
+
+`AgentDefinition`（`backend/app/models.py`）：id, name, level(1/2), parent_id, description, system_prompt, tools, icon, status(active/placeholder/disabled)
+
+`ChatConversation.agent_id` 外键指向 `agent_definitions.id`，每个会话绑定一个 Agent。
+
+### Agent API（`backend/app/api/agents.py`）
+
+- `GET /api/agents` — 扁平列表
+- `GET /api/agents/tree` — 树形结构
+
+### Trainer Agent
+
+L1 Agent，通过对话管理其他 Agent 的配置。拥有 4 个专属工具（`TRAINER_TOOLS`）：
+
+| 工具 | 功能 |
+|------|------|
+| `list_agents` | 列出所有 Agent 基本信息（含 prompt 前 100 字预览） |
+| `get_agent_detail(agent_id)` | 读取完整配置含 system_prompt 全文 |
+| `update_agent(agent_id, ...)` | 更新指定字段（name/description/system_prompt/status/icon/level/parent_id） |
+| `create_agent(id, name, level, ...)` | 创建新 Agent |
+
+### 工具分发机制（`chat.py`）
+
+- `TOOL_HANDLERS` 映射表统一分发工具调用
+- `generate()` 根据 `conv.agent_id` 动态选择工具集：Trainer → `TRAINER_TOOLS`，有文件 → `TOOLS`（python_execute），其他 → 无工具
+- `_get_agent_prompt(conversation_id)` 从 `agent_definitions` 动态获取 system_prompt，回退到默认 `SYSTEM_PROMPT`
+
+### 前端 Agent 展示
+
+- `visibleAgents = flatAgents.filter(a => a.level <= 2)` — 显示所有 L1+L2
+- Agent 选择器（输入区底部胶囊）和欢迎页卡片从 API 动态加载
+- placeholder 状态灰显 + 锁图标，active 状态可点击切换
+
 ## 布局与主题
 
 - `layouts/AgentLayout/index.tsx` + `style.css` — 左侧会话列表侧边栏（280px，可折叠）+ 右侧聊天区（消息居中，最大宽度 768px）
@@ -62,9 +105,16 @@ LLM 可能在一次响应中生成多个 `python_execute` tool call。后端通�
 - 思考流式显示：`_parse_stream_with_tools` yield `('reasoning', chunk)` → SSE `reasoning` 事件 → 前端 `onReasoning` 回调累积到 `reasoningContent` → `ReasoningBlock` 组件可折叠显示
 - Kimi K2.5 要求：assistant 消息含 tool_calls 时必须包含 `reasoning_content` 字段，否则下一轮 API 报 400
 
-## 数据分析工具
+## 工具系统
 
-仅保留 `python_execute` — AI 生成 Python 代码在受限沙箱中执行。
+两类工具集，按 Agent 类型动态选择：
+
+- **`TOOLS`**（共享）：仅 `python_execute`，所有非 Trainer Agent 在有文件时使用
+- **`TRAINER_TOOLS`**（专属）：`list_agents`、`get_agent_detail`、`update_agent`、`create_agent`，仅 Trainer Agent 使用
+
+### Python 沙箱（`python_execute`）
+
+AI 生成 Python 代码在受限沙箱中执行。
 
 ### Python 沙箱（`execute_python_sandbox`）
 
@@ -114,4 +164,4 @@ LLM 可能在一次响应中生成多个 `python_execute` tool call。后端通�
 
 ## 相关模型
 
-`ChatConversation`、`ChatMessage`（含 `msg_type`、`meta_data` 字段）、`MemoryFile`
+`AgentDefinition`、`AgentDispatchLog`、`ChatConversation`（含 `agent_id` 外键）、`ChatMessage`（含 `msg_type`、`meta_data` 字段）、`MemoryFile`

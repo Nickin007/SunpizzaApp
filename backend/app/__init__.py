@@ -22,7 +22,7 @@ def create_app(config_class=Config):
     CORS(app, 
          resources={r"/api/*": {
              "origins": "*",
-             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+             "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
              "allow_headers": ["Content-Type", "Authorization"],
              "expose_headers": ["Content-Type", "Authorization"],
              "supports_credentials": False,
@@ -30,7 +30,7 @@ def create_app(config_class=Config):
          }})
     
     # 注册蓝图
-    from app.api import users, poi, cost_analysis, excel_toolkit, finance, chat, model_test, supply_chain
+    from app.api import users, poi, cost_analysis, excel_toolkit, finance, chat, model_test, supply_chain, agents
     app.register_blueprint(users.bp)  # 保留用户认证API（登录）
     app.register_blueprint(poi.bp)  # POI选址工具API
     app.register_blueprint(cost_analysis.bp)  # 成本分析API
@@ -39,6 +39,7 @@ def create_app(config_class=Config):
     app.register_blueprint(chat.bp)  # AI聊天API
     app.register_blueprint(model_test.bp)  # 模型压力测试API
     app.register_blueprint(supply_chain.bp)  # 供应链订货系统API
+    app.register_blueprint(agents.bp)  # Agent 定义API
     
     # 配置静态文件访问（用于访问上传的视频、图片等）
     @app.route('/uploads/<path:filename>')
